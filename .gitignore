@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Data & generated SQL (not versioned)
+data/
+sql_chunks/
+insert_data.sql
+
+# Logs & temp
+server_out.txt
+server_err.txt
+*.log
+
+# Environment
+.env
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
