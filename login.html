@@ -134,7 +134,7 @@
 
     // Se já estiver autenticado, redireciona directamente
     const { data: { session } } = await supabase.auth.getSession()
-    if (session) window.location.href = '/index.html'
+    if (session) { window.location.href = '/index.html' }
 
     const emailEl    = document.getElementById('email')
     const passEl     = document.getElementById('password')

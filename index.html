@@ -96,22 +96,24 @@
   <script type="module">
     import { requireAuth, logout } from './js/auth.js'
 
-    const loadingEl = document.getElementById('loadingState')
-    const mainCard  = document.getElementById('mainCard')
+    ;(async () => {
+      const loadingEl = document.getElementById('loadingState')
+      const mainCard  = document.getElementById('mainCard')
 
-    const auth = await requireAuth()
-    if (!auth) return // requireAuth faz redirect se não autenticado
+      const auth = await requireAuth()
+      if (!auth) return // requireAuth faz redirect se não autenticado
 
-    const { user, profile } = auth
+      const { user, profile } = auth
 
-    loadingEl.classList.add('hidden')
-    mainCard.classList.remove('hidden')
+      loadingEl.classList.add('hidden')
+      mainCard.classList.remove('hidden')
 
-    document.getElementById('infoNome').textContent  = profile?.name  ?? user.email
-    document.getElementById('infoRole').textContent  = profile?.role  ?? '(sem perfil)'
-    document.getElementById('infoEmail').textContent = user.email
+      document.getElementById('infoNome').textContent  = profile?.name  ?? user.email
+      document.getElementById('infoRole').textContent  = profile?.role  ?? '(sem perfil)'
+      document.getElementById('infoEmail').textContent = user.email
 
-    document.getElementById('btnLogout').addEventListener('click', logout)
+      document.getElementById('btnLogout').addEventListener('click', logout)
+    })()
   </script>
 </body>
 </html>
