@@ -259,6 +259,15 @@ async function api(url,opts={}){
   if(url==='/api/historico_faturacao'){const[r25,r26]=await Promise.all([_SB.from('pag_clientes_2025').select('*'),_SB.from('pag_clientes_2026').select('*')]);return{pag2025:r25.data||[],pag2026:r26.data||[]};}
   if(url==='/api/avaliacoes/lista'){const{data}=await _SB.from('avaliacoes').select('*').order('Data',{ascending:false});return data||[];}
   if(url==='/api/vendas/angariacoes'){const{data}=await _SB.from('vendas_log').select('*');return data||[];}
+  if(url==='/api/falhas/resumo'){
+    const[fs,cat,niv]=await Promise.all([_SB.from('falhas_sancoes').select('*'),_SB.from('catalogo_faltas').select('*'),_SB.from('niveis_sancao').select('*')]);
+    // Agregar pontos por professor
+    const pontos={};
+    (fs.data||[]).forEach(f=>{const p=f['Professor']||'?';const cat_item=(cat.data||[]).find(c=>c['Falta']===f['Falta']);const pts=cat_item?.['Pontos']||0;pontos[p]=(pontos[p]||0)+pts;});
+    const niveis=niv.data||[];
+    const resumo=Object.entries(pontos).map(([prof,pts])=>{const nivel=niveis.find(n=>pts>=n['Pontos Mín']&&pts<=n['Pontos Máx']);return{Professor:prof,Pontos:pts,Nivel:nivel?.['Designação']||'—',Medida:nivel?.['Medida']||'—'};});
+    return{resumo,falhas:fs.data||[],catalogo:cat.data||[],niveis};
+  }
   if(url==='/api/falhas/catalogo'){const[c,n]=await Promise.all([_SB.from('catalogo_faltas').select('*'),_SB.from('niveis_sancao').select('*')]);return{catalogo:c.data||[],niveis:n.data||[]};}
   if(url==='/api/users'){const{data}=await _SB.from('profiles').select('*').order('id');return data||[];}
   if(url==='/api/permissions')return{};
@@ -272,8 +281,8 @@ async function api(url,opts={}){
   const oM=url.match(/^\/api\/on\/(\d+)$/);
   if(oM){const{data}=await _SB.from('pipeline').select('*').eq('N\u00ba ON',parseInt(oM[1])).single();return data||{};}
   const lM=url.match(/^\/api\/lookup\/([^\/]+)\/(.+)$/);
-  if(lM){const f=decodeURIComponent(lM[2]);const{data}=await _SB.from(_TABLE_MAP[lM[1]]||lM[1]).select(f);return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];}
-  if(url.startsWith('/api/autofill')){const p=new URLSearchParams(url.split('?')[1]||'');const f=p.get('return_field');const{data}=await _SB.from(_TABLE_MAP[p.get('src')]||p.get('src')).select(f);return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];}
+  if(lM){const f=decodeURIComponent(lM[2]);const sel=f.includes(' ')?`"${f}"`:f;const{data}=await _SB.from(_TABLE_MAP[lM[1]]||lM[1]).select(sel);return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];}
+  if(url.startsWith('/api/autofill')){const p=new URLSearchParams(url.split('?')[1]||'');const f=p.get('return_field');const sel=f&&f.includes(' ')?`"${f}"`:f;const{data}=await _SB.from(_TABLE_MAP[p.get('src')]||p.get('src')).select(sel);return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];}
   const eM=url.match(/^\/api\/clientes\/(.+)\/estado$/);
   if(eM&&method==='POST'){const nome=decodeURIComponent(eM[1]);const{error}=await _SB.from('clientes').update({'Status':body.status}).eq('Nome',nome);if(error)return{error:error.message};return{ok:true};}
   const dM=url.match(/^\/api\/data\/([^\/]+)(?:\/(\d+))?$/);
@@ -283,7 +292,37 @@ async function api(url,opts={}){
     if(method==='PUT')return _sbUpdate(table,idx,body);
     if(method==='DELETE')return _sbDelete(table,idx);
   }
-  console.warn('api() nao mapeado:',url);return{error:'nao suportado: '+url};
+  // /api/vendas/resumo
+  if(url==='/api/vendas/resumo'){
+    const[vl,vb,dc]=await Promise.all([_SB.from('vendas_log').select('*'),_SB.from('vendas_bonus').select('*'),_SB.from('dados_colaboradores').select('*')]);
+    return{vendas:vl.data||[],bonus:vb.data||[],colaboradores:dc.data||[]};
+  }
+  // /api/colaborador/<nome>
+  const colabM=url.match(/^\/api\/colaborador\/(.+)$/);
+  if(colabM){
+    const nome=decodeURIComponent(colabM[1]);
+    const[dc,lc,pt,fs]=await Promise.all([_SB.from('dados_colaboradores').select('*').eq('Nome Oficial',nome).single(),_SB.from('log_colaboradores').select('*').eq('Colaborador',nome).order('Data',{ascending:false}),_SB.from('pagamentos_treinadores').select('*').eq('Professor',nome),_SB.from('falhas_sancoes').select('*').eq('Professor',nome)]);
+    return{colaborador:dc.data,log:lc.data||[],pagamentos:pt.data||[],falhas:fs.data||[]};
+  }
+  // /api/historico/revert/<id>
+  const revertM=url.match(/^\/api\/historico\/revert\/(.+)$/);
+  if(revertM&&method==='POST'){
+    const{data:hist,error:he}=await _SB.from('historico').select('*').eq('_id',revertM[1]).single();
+    if(he||!hist?.snapshot)return{error:'Snapshot não encontrado'};
+    const table=_TABLE_MAP[hist.colecao]||hist.colecao;
+    const{error}=await _SB.from(table).update(hist.snapshot).eq('id',hist.snapshot.id);
+    if(error)return{error:error.message};
+    await _SB.from('historico').update({revertido:true,revertido_em:new Date().toISOString()}).eq('_id',revertM[1]);
+    return{ok:true};
+  }
+  // /api/users/<uid> PUT/DELETE
+  const userM=url.match(/^\/api\/users\/(\d+)$/);
+  if(userM){
+    const uid=parseInt(userM[1]);
+    if(method==='PUT'){const{error}=await _SB.from('profiles').update(body).eq('id',uid);if(error)return{error:error.message};return{ok:true};}
+    if(method==='DELETE'){const{error}=await _SB.from('profiles').update({active:false}).eq('id',uid);if(error)return{error:error.message};return{ok:true};}
+  }
+    console.warn('api() nao mapeado:',url);return{error:'nao suportado: '+url};
 }
 </script>
 <script>
