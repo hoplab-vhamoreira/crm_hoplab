@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HOP Lab CRM — Entrar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1A2E1A 0%, #2E7D32 60%, #1B5E20 100%);
+      padding: 1rem;
+    }
+
+    .login-wrap {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .login-logo-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px;
+      height: 64px;
+      background: rgba(255,255,255,.15);
+      border: 2px solid rgba(255,255,255,.3);
+      border-radius: 16px;
+      backdrop-filter: blur(8px);
+      margin-bottom: 1rem;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -1px;
+    }
+
+    .login-title {
+      color: #fff;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -.3px;
+    }
+
+    .login-subtitle {
+      color: rgba(255,255,255,.6);
+      font-size: .9rem;
+      margin-top: .25rem;
+    }
+
+    .login-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 24px 64px rgba(0,0,0,.3);
+    }
+
+    .field {
+      margin-bottom: 1.25rem;
+    }
+
+    .field label {
+      display: block;
+      font-weight: 600;
+      font-size: .85rem;
+      margin-bottom: .4rem;
+      color: var(--hop-text);
+    }
+
+    .btn-login {
+      width: 100%;
+      justify-content: center;
+      padding: .75rem;
+      font-size: 1rem;
+      margin-top: .5rem;
+    }
+
+    #errorMsg {
+      display: none;
+    }
+
+    .login-footer {
+      text-align: center;
+      margin-top: 1.5rem;
+      color: rgba(255,255,255,.5);
+      font-size: .8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-logo">
+      <div class="login-logo-mark">HL</div>
+      <div class="login-title">HOP Lab CRM</div>
+      <div class="login-subtitle">Acesso restrito à equipa</div>
+    </div>
+
+    <div class="login-card">
+      <div id="errorMsg" class="alert alert-error"></div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="nome@hoplab.pt" autocomplete="email" autofocus>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <button class="btn btn-primary btn-login" id="btnLogin">
+        <span id="btnText">Entrar</span>
+        <span id="btnSpinner" class="spinner hidden" style="width:1rem;height:1rem;border-width:2px;border-color:#fff3;border-top-color:#fff;"></span>
+      </button>
+    </div>
+
+    <div class="login-footer">
+      © 2026 HOP Lab · CRM v2
+    </div>
+  </div>
+
+  <script type="module">
+    import { login } from './js/auth.js'
+    import { supabase } from './js/supabase-client.js'
+
+    // Se já estiver autenticado, redireciona directamente
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) window.location.href = '/index.html'
+
+    const emailEl    = document.getElementById('email')
+    const passEl     = document.getElementById('password')
+    const btnLogin   = document.getElementById('btnLogin')
+    const btnText    = document.getElementById('btnText')
+    const btnSpinner = document.getElementById('btnSpinner')
+    const errorMsg   = document.getElementById('errorMsg')
+
+    function showError(msg) {
+      errorMsg.textContent = msg
+      errorMsg.style.display = 'block'
+    }
+
+    function setLoading(loading) {
+      btnLogin.disabled = loading
+      btnText.textContent = loading ? 'A entrar…' : 'Entrar'
+      btnSpinner.classList.toggle('hidden', !loading)
+    }
+
+    async function doLogin() {
+      errorMsg.style.display = 'none'
+      const email    = emailEl.value.trim()
+      const password = passEl.value
+
+      if (!email || !password) {
+        showError('Preenche o email e a password.')
+        return
+      }
+
+      setLoading(true)
+      try {
+        await login(email, password)
+        window.location.href = '/index.html'
+      } catch (err) {
+        setLoading(false)
+        const msg = err.message || ''
+        if (msg.includes('Invalid login') || msg.includes('invalid_credentials')) {
+          showError('Email ou password incorrectos.')
+        } else if (msg.includes('Email not confirmed')) {
+          showError('Confirma o teu email antes de entrar.')
+        } else {
+          showError('Erro ao entrar. Tenta novamente.')
+        }
+      }
+    }
+
+    btnLogin.addEventListener('click', doLogin)
+    passEl.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin() })
+    emailEl.addEventListener('keydown', e => { if (e.key === 'Enter') passEl.focus() })
+  </script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HOP Lab CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1.5rem;
+      background: var(--hop-grey);
+    }
+
+    .welcome-card {
+      text-align: center;
+      max-width: 480px;
+      padding: 2.5rem 2rem;
+    }
+
+    .logo-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      background: var(--hop-green);
+      border-radius: 14px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -1px;
+      margin-bottom: 1.25rem;
+    }
+
+    h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: .5rem; }
+    .subtitle { color: var(--hop-muted); margin-bottom: 1.5rem; }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: .5rem 1rem;
+      text-align: left;
+      background: var(--hop-grey);
+      padding: 1rem;
+      border-radius: var(--radius);
+      margin-bottom: 1.5rem;
+      font-size: .875rem;
+    }
+
+    .info-label { color: var(--hop-muted); font-weight: 600; white-space: nowrap; }
+    .info-val   { color: var(--hop-text); }
+
+    #loadingState { color: var(--hop-muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+
+  <div id="loadingState">
+    <span class="spinner"></span>
+  </div>
+
+  <div class="card welcome-card hidden" id="mainCard">
+    <div class="logo-mark">HL</div>
+    <h1>Bem-vindo ao CRM</h1>
+    <p class="subtitle">
+      A migração para a nova versão está em curso.<br>
+      Esta página vai ser substituída pelo CRM completo.
+    </p>
+
+    <div class="info-grid">
+      <span class="info-label">Utilizador</span>
+      <span class="info-val" id="infoNome">—</span>
+
+      <span class="info-label">Role</span>
+      <span class="info-val" id="infoRole">—</span>
+
+      <span class="info-label">Email</span>
+      <span class="info-val" id="infoEmail">—</span>
+    </div>
+
+    <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;">
+      <a href="https://supabase.com/dashboard/project/bocwqacwalzshjkhjzwi" target="_blank" class="btn btn-secondary btn-sm">
+        Supabase Dashboard
+      </a>
+      <button class="btn btn-secondary btn-sm" id="btnLogout">Terminar sessão</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth, logout } from './js/auth.js'
+
+    const loadingEl = document.getElementById('loadingState')
+    const mainCard  = document.getElementById('mainCard')
+
+    const auth = await requireAuth()
+    if (!auth) return // requireAuth faz redirect se não autenticado
+
+    const { user, profile } = auth
+
+    loadingEl.classList.add('hidden')
+    mainCard.classList.remove('hidden')
+
+    document.getElementById('infoNome').textContent  = profile?.name  ?? user.email
+    document.getElementById('infoRole').textContent  = profile?.role  ?? '(sem perfil)'
+    document.getElementById('infoEmail').textContent = user.email
+
+    document.getElementById('btnLogout').addEventListener('click', logout)
+  </script>
+</body>
+</html>

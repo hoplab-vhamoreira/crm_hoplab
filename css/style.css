@@ -1,0 +1,134 @@
+/* css/style.css — HOP Lab CRM */
+/* Design: profissional, limpo, identidade da marca HOP Lab */
+
+:root {
+  --hop-green:     #2E7D32;
+  --hop-green-lt:  #4CAF50;
+  --hop-green-bg:  #E8F5E9;
+  --hop-dark:      #1A1A2E;
+  --hop-grey:      #F5F5F5;
+  --hop-border:    #E0E0E0;
+  --hop-text:      #212121;
+  --hop-muted:     #757575;
+  --hop-danger:    #C62828;
+  --hop-warn:      #F57F17;
+  --hop-info:      #1565C0;
+
+  --radius:  8px;
+  --shadow:  0 2px 8px rgba(0,0,0,.10);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.15);
+
+  --font-body:    'DM Sans', system-ui, sans-serif;
+  --font-display: 'DM Sans', system-ui, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 15px; }
+
+body {
+  font-family: var(--font-body);
+  color: var(--hop-text);
+  background: var(--hop-grey);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--hop-green); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Botões ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .55rem 1.25rem;
+  border: none;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter .15s, transform .1s;
+}
+.btn:hover  { filter: brightness(1.08); }
+.btn:active { transform: scale(.98); }
+
+.btn-primary   { background: var(--hop-green);  color: #fff; }
+.btn-secondary { background: #fff; color: var(--hop-text); border: 1.5px solid var(--hop-border); }
+.btn-danger    { background: var(--hop-danger); color: #fff; }
+.btn-sm        { padding: .35rem .85rem; font-size: .82rem; }
+.btn-icon      { padding: .5rem; border-radius: 50%; }
+
+/* ── Inputs ── */
+.input, input[type=text], input[type=email], input[type=password], select, textarea {
+  width: 100%;
+  padding: .55rem .85rem;
+  border: 1.5px solid var(--hop-border);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: .9rem;
+  color: var(--hop-text);
+  background: #fff;
+  transition: border-color .2s;
+  outline: none;
+}
+.input:focus,
+input:focus, select:focus, textarea:focus {
+  border-color: var(--hop-green);
+  box-shadow: 0 0 0 3px var(--hop-green-bg);
+}
+
+/* ── Cards ── */
+.card {
+  background: #fff;
+  border-radius: var(--radius);
+  border: 1px solid var(--hop-border);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+}
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  padding: .2rem .6rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 600;
+  background: var(--hop-green-bg);
+  color: var(--hop-green);
+}
+.badge-warn   { background: #FFF8E1; color: var(--hop-warn); }
+.badge-danger { background: #FFEBEE; color: var(--hop-danger); }
+.badge-info   { background: #E3F2FD; color: var(--hop-info); }
+.badge-grey   { background: var(--hop-grey); color: var(--hop-muted); }
+
+/* ── Mensagens de erro/sucesso ── */
+.alert {
+  padding: .75rem 1rem;
+  border-radius: var(--radius);
+  font-size: .9rem;
+  margin-bottom: 1rem;
+}
+.alert-error   { background: #FFEBEE; color: var(--hop-danger); border-left: 4px solid var(--hop-danger); }
+.alert-success { background: var(--hop-green-bg); color: var(--hop-green); border-left: 4px solid var(--hop-green); }
+.alert-info    { background: #E3F2FD; color: var(--hop-info); border-left: 4px solid var(--hop-info); }
+
+/* ── Spinner ── */
+.spinner {
+  width: 1.5rem; height: 1.5rem;
+  border: 3px solid var(--hop-border);
+  border-top-color: var(--hop-green);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Utilitários ── */
+.mt-1 { margin-top: .5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.text-muted { color: var(--hop-muted); font-size: .875rem; }
+.text-center { text-align: center; }
+.hidden { display: none !important; }
