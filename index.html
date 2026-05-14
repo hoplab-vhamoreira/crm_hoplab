@@ -4202,13 +4202,13 @@ function _tpCalc(r, periodo, comBonus){
   const meses=_TP_PERIODOS[periodo]||_TP_PERIODOS['Q2'];
   let pag=0,ced=0,net=0; const formas=new Set();
   for(const m of meses){
-    pag+=r[m+' Pagamento']||0;
-    ced+=r[m+' Ced\xeancia']||0;
-    net+=r[m+' Saldo NET']||0;
+    pag+=parseFloat(r[m+' Pagamento'])||0;
+    ced+=parseFloat(r[m+' Ced\xeancia'])||0;
+    net+=parseFloat(r[m+' Saldo NET'])||0;
     const f=r[m+' Forma']; if(f&&f!=='—') formas.add(f);
   }
   let bon=0;
-  if(comBonus) for(const bk of _tpBonusKeys(periodo)) bon+=r[bk]||0;
+  if(comBonus) for(const bk of _tpBonusKeys(periodo)) bon+=parseFloat(r[bk])||0;
   return {pag,ced,net:net+bon,bon,netSemBonus:net,formas:[...formas]};
 }
 
@@ -4232,7 +4232,7 @@ function _tpAreaBadge(area){
   return `<span style="background:${bg};color:${col};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500">${area}</span>`;
 }
 
-function _tpFmt(v){ return v===0?'—':(v<0?`-${Math.abs(v).toFixed(2)}€`:`${v.toFixed(2)}€`); }
+function _tpFmt(v){ return v===0?'—':`${Math.abs(v).toFixed(2)}€`; }
 
 async function renderTotaisPagamentos(el){
   if(!_tpData){
@@ -4383,9 +4383,9 @@ async function abrirTotaisDetalhe(profEnc){
   for(const q of quarters){
     let qPag=0,qCed=0,qNet=0;
     for(const m of q.meses){
-      const pag=r[m+' Pagamento']||0;
-      const ced=r[m+' Ced\xeancia']||0;
-      const net=r[m+' Saldo NET']||0;
+      const pag=parseFloat(r[m+' Pagamento'])||0;
+      const ced=parseFloat(r[m+' Ced\xeancia'])||0;
+      const net=parseFloat(r[m+' Saldo NET'])||0;
       const forma=r[m+' Forma']||'';
       qPag+=pag;qCed+=ced;qNet+=net;
       const nc=net>0?'var(--success)':net<0?'var(--danger)':'var(--text-muted)';
@@ -4393,26 +4393,26 @@ async function abrirTotaisDetalhe(profEnc){
         <td style="font-size:12px;color:var(--text-muted);padding-left:24px">${m}</td>
         <td style="text-align:right">${pag?pag.toFixed(2)+'€':'—'}</td>
         <td style="text-align:right;color:var(--text-muted)">${ced?ced.toFixed(2)+'€':'—'}</td>
-        <td style="text-align:right;font-weight:600;color:${nc}">${net?net.toFixed(2)+'€':'—'}</td>
+        <td style="text-align:right;font-weight:600;color:${nc}">${net?Math.abs(net).toFixed(2)+'€':'—'}</td>
         <td style="font-size:11px">${_tpFormaLabel(forma&&forma!=='—'?[forma]:[])}</td>
       </tr>`;
     }
     aPag+=qPag;aCed+=qCed;aNet+=qNet;
-    const bon=r[q.bKey]||0; aBon+=bon;
-    monthRows+=`<tr style="background:rgba(99,102,241,.07)">
+    const bon=parseFloat(r[q.bKey])||0; aBon+=bon;
+    monthRows+=`<tr style="background:rgba(170,255,0,.07)">
       <td style="font-size:11px;color:var(--primary-text);font-weight:700">${q.lbl} Sub-total</td>
       <td style="text-align:right;font-weight:600;font-size:12px">${qPag?qPag.toFixed(2)+'€':'—'}</td>
       <td style="text-align:right;font-size:12px;color:var(--text-muted)">${qCed?qCed.toFixed(2)+'€':'—'}</td>
-      <td style="text-align:right;font-weight:700;font-size:12px">${qNet?qNet.toFixed(2)+'€':'—'}</td>
+      <td style="text-align:right;font-weight:700;font-size:12px">${qNet?Math.abs(qNet).toFixed(2)+'€':'—'}</td>
       <td style="font-size:11px;color:var(--warning)">${bon?'🎯 B\xf3nus: '+bon.toFixed(2)+'€':'—'}</td>
     </tr>`;
   }
   const totalNetBon=aNet+aBon;
-  monthRows+=`<tr style="background:rgba(99,102,241,.15);font-weight:700;border-top:2px solid var(--primary)">
+  monthRows+=`<tr style="background:rgba(170,255,0,.12);font-weight:700;border-top:2px solid var(--primary)">
     <td style="color:var(--primary-text)">Total Ano</td>
     <td style="text-align:right">${aPag.toFixed(2)}€</td>
     <td style="text-align:right;color:var(--text-muted)">${aCed.toFixed(2)}€</td>
-    <td style="text-align:right;color:${totalNetBon>=0?'var(--success)':'var(--danger)'}">${totalNetBon.toFixed(2)}€</td>
+    <td style="text-align:right;color:${totalNetBon>=0?'var(--success)':'var(--danger)'}">${Math.abs(totalNetBon).toFixed(2)}€</td>
     <td style="color:var(--warning)">${aBon?'B\xf3nus: '+aBon.toFixed(2)+'€':'—'}</td>
   </tr>`;
 
