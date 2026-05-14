@@ -228,7 +228,59 @@ const _SB = supabase.createClient(
 );
 const _TABLE_MAP = {'clientes':'clientes','pipeline':'pipeline','log_comercial':'log_comercial','conversoes':'conversoes','avaliacoes':'avaliacoes','servicos':'servicos','log_operacional':'log_operacional','log_contratos':'log_contratos','parceiros':'parceiros','entidades_faturacao':'entidades_faturacao','falhas_sancoes':'falhas_sancoes','catalogo_faltas':'catalogo_faltas','niveis_sancao':'niveis_sancao','pag_clientes_2025':'pag_clientes_2025','pag_clientes_2026':'pag_clientes_2026','pagamentos_treinadores':'pagamentos_treinadores','totais_pagamentos':'totais_pagamentos','motor2026':'motor2026','dados_colaboradores':'dados_colaboradores','log_colaboradores':'log_colaboradores','ciclos':'ciclos','adesoes_validar':'adesoes_validar','alertas':'alertas','historico':'historico','vendas_log':'vendas_log','vendas_bonus':'vendas_bonus','precario_publico':'precario_publico','calculadora':'calculadora','responsabilidades':'responsabilidades','matriz_partilhas':'matriz_partilhas','users':'profiles'};
 const _idCache = {};
-async function _sbGetAll(t){const{data,error}=await _SB.from(t).select('*');if(error)return{error:error.message};_idCache[t]=data.map(r=>r.id);return data;}
+function _recomputeClienteContacto(r){
+  if(!r) return r;
+  const uc = r['Último Contacto'];
+  if(uc){
+    const diff = Math.floor((Date.now() - new Date(uc).getTime()) / 86400000);
+    r['Dias s/ Contacto'] = Math.max(0, diff);
+  }
+  return r;
+}
+function _recomputeCicloSemana(r){
+  if(!r) return r;
+  const di = r['Data Início']; const df = r['Data Fim']; const tipo = r['Tipo']||'';
+  const m = /^GL(\d+)/i.exec(tipo); const totalSem = m?parseInt(m[1]):null;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  if(!di){ r['Semana Actual'] = '—'; return r; }
+  const dIni = new Date(di); dIni.setHours(0,0,0,0);
+  const dFim = df ? (()=>{const d=new Date(df);d.setHours(0,0,0,0);return d;})() : null;
+  if(hoje < dIni){ r['Semana Actual'] = 'Não iniciado'; return r; }
+  if(dFim && hoje > dFim){ r['Semana Actual'] = 'Terminado'; return r; }
+  const semAtual = Math.floor((hoje - dIni)/(86400000*7)) + 1;
+  if(totalSem && semAtual > totalSem){ r['Semana Actual'] = 'Terminado'; return r; }
+  r['Semana Actual'] = totalSem ? `Semana ${semAtual} de ${totalSem}` : `Semana ${semAtual}`;
+  return r;
+}
+const _AVAL_SUGESTAO_MAP = {
+  'AMR (Aval. Metab. Repouso)':       'PT Nutri Fisioterap',
+  'AMP (Aval. Metab. Performance)':   'PT Nutri Fisioterap',
+  'AM (Avaliação Muscular)':          'PT Fisioterap',
+  'Pack Vitalidade (AM + AMR)':       'PT Nutri',
+  'Pack Performance (AMP + AMR)':     'PT Nutri',
+  'Pack Elite Pro (AM + AMP + AMR)':  'PT Nutri',
+  'Pack Elite (AM + AMP)':            'PT Nutri Fisioterap'
+};
+function _recomputeAvalSugestao(r){
+  if(!r) return r;
+  const sug = _AVAL_SUGESTAO_MAP[r['Serviço']] || null;
+  r['Sugestão Auto'] = sug || '';
+  r['Próx. Serviço Sugerido'] = sug ? 'CF60 - 1ª Consulta Fisiologia' : '';
+  return r;
+}
+const _READ_VIEW_MAP = {totais_pagamentos:'v_totais_pagamentos'};
+async function _sbGetAll(t){
+  const readFrom = _READ_VIEW_MAP[t] || t;
+  const{data,error}=await _SB.from(readFrom).select('*');
+  if(error)return{error:error.message};
+  _idCache[t]=Array.isArray(data)?data.map(r=>r.id):[];
+  if(Array.isArray(data)){
+    if(t==='clientes')        data.forEach(_recomputeClienteContacto);
+    else if(t==='ciclos')     data.forEach(_recomputeCicloSemana);
+    else if(t==='avaliacoes') data.forEach(_recomputeAvalSugestao);
+  }
+  return data;
+}
 async function _sbInsert(t,b){const{data,error}=await _SB.from(t).insert(b).select().single();if(error)return{error:error.message};return data;}
 async function _sbUpdate(t,i,b){const ids=_idCache[t];if(!ids||ids[i]===undefined)return{error:'ID nao encontrado - recarrega'};const{data,error}=await _SB.from(t).update(b).eq('id',ids[i]).select().single();if(error)return{error:error.message};return data;}
 async function _sbDelete(t,i){const ids=_idCache[t];if(!ids||ids[i]===undefined)return{error:'ID nao encontrado'};const{error}=await _SB.from(t).delete().eq('id',ids[i]);if(error)return{error:error.message};return{ok:true};}
@@ -255,7 +307,13 @@ async function api(url,opts={}){
     await Promise.all(Object.entries(_TABLE_MAP).map(async([k,t])=>{const{count}=await _SB.from(t).select('*',{count:'exact',head:true});result[k]=count??0;}));
     return result;
   }
-  if(url==='/api/alertas'){const{data}=await _SB.from('alertas').select('*').order('Prioridade');return data||[];}
+  if(url==='/api/alertas'){
+    const{data}=await _SB.from('v_alertas').select('*').order('Prioridade');
+    const rows=data||[];
+    rows.forEach((r,i)=>r._idx=i);
+    _idCache['alertas']=rows.map(r=>r._source==='manual'?r._manual_id:null);
+    return rows;
+  }
   if(url==='/api/historico_faturacao'){const[r25,r26]=await Promise.all([_SB.from('pag_clientes_2025').select('*'),_SB.from('pag_clientes_2026').select('*')]);return{pag2025:r25.data||[],pag2026:r26.data||[]};}
   if(url==='/api/avaliacoes/lista'){const{data}=await _SB.from('avaliacoes').select('*').order('Data',{ascending:false});return data||[];}
   if(url==='/api/vendas/angariacoes'){const{data}=await _SB.from('vendas_log').select('*');return data||[];}
@@ -276,7 +334,7 @@ async function api(url,opts={}){
   if(cM){
     const nome=decodeURIComponent(cM[1]);
     const[cli,serv,aval,log,pag]=await Promise.all([_SB.from('clientes').select('*').eq('Nome',nome).single(),_SB.from('servicos').select('*').eq('Cliente',nome),_SB.from('avaliacoes').select('*').eq('Nome',nome),_SB.from('historico').select('*').eq('cliente',nome).order('timestamp',{ascending:false}),_SB.from('pag_clientes_2026').select('*').eq('Cliente',nome)]);
-    return{cliente:cli.data,servicos:serv.data||[],avaliacoes:aval.data||[],historico:log.data||[],pagamentos:pag.data||[]};
+    return{cliente:_recomputeClienteContacto(cli.data),servicos:serv.data||[],avaliacoes:aval.data||[],historico:log.data||[],pagamentos:pag.data||[]};
   }
   const oM=url.match(/^\/api\/on\/(\d+)$/);
   if(oM){const{data}=await _SB.from('pipeline').select('*').eq('N\u00ba ON',parseInt(oM[1])).single();return data||{};}
@@ -2299,8 +2357,10 @@ function _renderAlertasView(el, todos){
       <td style="text-align:center">${prioBadge(r.Prioridade)}</td>
       <td>${fonteBadge(r.Fonte||'')}</td>
       <td style="white-space:nowrap">
-        <button onclick="openEditAlerta(${idx})" style="${btnStyle}" title="Editar">✏️</button>
-        <button onclick="resolverAlerta(${idx})" style="${btnStyle};margin-left:4px;color:var(--success)" title="Marcar como resolvido">✓</button>
+        ${r._source==='manual'
+          ? `<button onclick="openEditAlerta(${idx})" style="${btnStyle}" title="Editar">✏️</button>
+             <button onclick="resolverAlerta(${idx})" style="${btnStyle};margin-left:4px;color:var(--success)" title="Marcar como resolvido">✓</button>`
+          : `<span style="font-size:10px;color:var(--text-muted);padding:2px 6px;border:1px solid var(--border);border-radius:4px" title="Alerta automático — resolve-se quando o problema é tratado na tabela de origem">auto</span>`}
       </td>
     </tr>`;
   }).join('');
@@ -2411,11 +2471,14 @@ async function openAddAlerta(){
 }
 
 async function openEditAlerta(idx){
-  const rec = (_alertasTodosDados||[]).find(r=>r._idx===idx)||{};
+  const rec = (_alertasTodosDados||[]).find(r=>r._idx===idx);
+  if(!rec || rec._source!=='manual'){ toast('Alerta automático — não editável','error'); return; }
   await _alertasModalForm('Editar Alerta', rec, body=>api(`/api/data/alertas/${idx}`,{method:'PUT',body}));
 }
 
 async function resolverAlerta(idx){
+  const rec = (_alertasTodosDados||[]).find(r=>r._idx===idx);
+  if(!rec || rec._source!=='manual'){ toast('Alerta automático — resolve-se ao tratar a origem','error'); return; }
   if(!confirm('Marcar como resolvido e eliminar este alerta?')) return;
   const res = await api(`/api/data/alertas/${idx}`,{method:'DELETE'});
   if(res && res.ok){
