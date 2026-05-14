@@ -797,7 +797,7 @@ async function renderDashboard(el){
   const important=[
     {key:'clientes',label:'Clientes',color:'purple'},
     {key:'pipeline',label:'Pipeline',color:'blue'},
-    {key:'conversoes',label:'Conversoes',color:'green'},
+    {key:'conversoes',label:'Conversões',color:'green'},
     {key:'alertas',label:'Alertas',color:'amber'},
     {key:'historico_faturacao',label:'Faturação',color:'blue'},
     {key:'log_operacional',label:'Registos Operacionais',color:'green'},
@@ -2895,7 +2895,7 @@ async function _loadVendasTab(){
           <td style="padding-left:24px">${codBadge(v.codigo)} ${v.codigo}</td>
           <td>${v.cliente||'—'}</td>
           <td style="font-size:12px;color:var(--text-muted)">${v.servico||'—'}</td>
-          <td style="font-size:12px;color:var(--text-muted)">${fmtDate(v.data)}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${v.data||'—'}</td>
           <td style="text-align:right"><strong>${v.valor_total?v.valor_total.toFixed(0)+'€':''}</strong>
             <span style="color:var(--text-muted);font-size:11px"> → ${v.valor_siva.toFixed(2)}€ s/IVA</span>
           </td>
@@ -2924,7 +2924,7 @@ async function _loadVendasTab(){
         </table>
       </div>
       <div style="margin-top:10px;font-size:12px;color:var(--text-muted)">
-        &#x2139;&#xfe0f; Treinador: avaliações (AM*/AMP*/AMR*/PV*) de conversoes com "Venda de" preenchido. Coordenador: PT* mensalidades de serviços com "Venda de" preenchido.
+        &#x2139;&#xfe0f; Treinador: avaliações (AM*/AMP*/AMR*/PV*) de conversões com "Venda de" preenchido. Coordenador: PT* mensalidades de serviços com "Venda de" preenchido.
       </div>`;
 
   /* ── TAB 3: ANGARIAÇÃO PT/DUO ── */
