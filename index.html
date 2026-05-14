@@ -237,7 +237,46 @@ function _recomputeClienteContacto(r){
   }
   return r;
 }
-async function _sbGetAll(t){const{data,error}=await _SB.from(t).select('*');if(error)return{error:error.message};_idCache[t]=data.map(r=>r.id);if(t==='clientes'&&Array.isArray(data))data.forEach(_recomputeClienteContacto);return data;}
+function _recomputeCicloSemana(r){
+  if(!r) return r;
+  const di = r['Data Início']; const df = r['Data Fim']; const tipo = r['Tipo']||'';
+  const m = /^GL(\d+)/i.exec(tipo); const totalSem = m?parseInt(m[1]):null;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  if(!di){ r['Semana Actual'] = '—'; return r; }
+  const dIni = new Date(di); dIni.setHours(0,0,0,0);
+  const dFim = df ? (()=>{const d=new Date(df);d.setHours(0,0,0,0);return d;})() : null;
+  if(hoje < dIni){ r['Semana Actual'] = 'Não iniciado'; return r; }
+  if(dFim && hoje > dFim){ r['Semana Actual'] = 'Terminado'; return r; }
+  const semAtual = Math.floor((hoje - dIni)/(86400000*7)) + 1;
+  if(totalSem && semAtual > totalSem){ r['Semana Actual'] = 'Terminado'; return r; }
+  r['Semana Actual'] = totalSem ? `Semana ${semAtual} de ${totalSem}` : `Semana ${semAtual}`;
+  return r;
+}
+const _AVAL_SUGESTAO_MAP = {
+  'AMR (Aval. Metab. Repouso)': 'PT Nutri Fisioterap',
+  'Pack Vitalidade (AM + AMR)': 'PT Nutri',
+  'Pack Elite Pro (AM + AMP + AMR)': 'PT Nutri'
+};
+function _recomputeAvalSugestao(r){
+  if(!r) return r;
+  const sug = _AVAL_SUGESTAO_MAP[r['Serviço']] || null;
+  r['Sugestão Auto'] = sug || '';
+  r['Próx. Serviço Sugerido'] = sug ? 'CF60 - 1ª Consulta Fisiologia' : '';
+  return r;
+}
+const _READ_VIEW_MAP = {totais_pagamentos:'v_totais_pagamentos'};
+async function _sbGetAll(t){
+  const readFrom = _READ_VIEW_MAP[t] || t;
+  const{data,error}=await _SB.from(readFrom).select('*');
+  if(error)return{error:error.message};
+  _idCache[t]=Array.isArray(data)?data.map(r=>r.id):[];
+  if(Array.isArray(data)){
+    if(t==='clientes')        data.forEach(_recomputeClienteContacto);
+    else if(t==='ciclos')     data.forEach(_recomputeCicloSemana);
+    else if(t==='avaliacoes') data.forEach(_recomputeAvalSugestao);
+  }
+  return data;
+}
 async function _sbInsert(t,b){const{data,error}=await _SB.from(t).insert(b).select().single();if(error)return{error:error.message};return data;}
 async function _sbUpdate(t,i,b){const ids=_idCache[t];if(!ids||ids[i]===undefined)return{error:'ID nao encontrado - recarrega'};const{data,error}=await _SB.from(t).update(b).eq('id',ids[i]).select().single();if(error)return{error:error.message};return data;}
 async function _sbDelete(t,i){const ids=_idCache[t];if(!ids||ids[i]===undefined)return{error:'ID nao encontrado'};const{error}=await _SB.from(t).delete().eq('id',ids[i]);if(error)return{error:error.message};return{ok:true};}
