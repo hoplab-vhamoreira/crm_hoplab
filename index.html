@@ -325,7 +325,25 @@ async function api(url,opts={}){
   }
   if(url==='/api/historico_faturacao'){const[r25,r26]=await Promise.all([_SB.from('pag_clientes_2025').select('*'),_SB.from('pag_clientes_2026').select('*')]);return{pag2025:r25.data||[],pag2026:r26.data||[]};}
   if(url==='/api/avaliacoes/lista'){const{data}=await _SB.from('avaliacoes').select('*').order('Data',{ascending:false});return data||[];}
-  if(url==='/api/vendas/angariacoes'){const{data}=await _SB.from('vendas_log').select('*');return data||[];}
+  if(url==='/api/vendas/angariacoes'){
+    const[sv,dc]=await Promise.all([_SB.from('servicos').select('*'),_SB.from('dados_colaboradores').select('*')]);
+    const colabs=dc.data||[];
+    const rows=(sv.data||[]).filter(r=>{const c=(r['Código']||'').toUpperCase();return c.startsWith('PT')||c.startsWith('DUO');});
+    return rows.map(r=>{
+      const tecnico=r['Técnico Responsável']||'';
+      const col=colabs.find(c=>c['Nome Oficial']===tecnico||c['Nome Operacional']===tecnico);
+      const isCoordenador=(col?.['Cargo']||'Treinador')==='Coordenador';
+      const vendaDe=(r['Venda de']||'').trim();
+      const tipo=!vendaDe?'HOP':vendaDe==='Referência'?'Referência':'Própria';
+      const di=r['Data Marcação/Início'];
+      const dStart=di?new Date(String(di).slice(0,10)+'T00:00:00'):null;
+      const mesParcial=dStart&&dStart.getDate()>1?'Sim':'Não';
+      const mesAngar=dStart?dStart.toLocaleString('pt-PT',{month:'long',year:'numeric'}):'—';
+      return{...r,Treinador:tecnico,'Data Início':di,'Tipo Angariação':tipo,
+        'HOP % normal':isCoordenador?30:35,'HOP % mês angariação':isCoordenador?40:45,
+        'Mês Angariação':mesAngar,'Mês Parcial?':mesParcial};
+    });
+  }
   if(url.startsWith('/api/falhas/resumo')){
     const _trimQ = url.includes('?') ? decodeURIComponent(url.split('trimestre=')[1]||'') : '';
     const[fs,cat,niv]=await Promise.all([_SB.from('falhas_sancoes').select('*'),_SB.from('catalogo_faltas').select('*'),_SB.from('niveis_sancao').select('*')]);
