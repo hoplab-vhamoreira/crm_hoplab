@@ -690,7 +690,7 @@ const SECTIONS = {
       {k:'Nome Oficial',t:'text'},
       {k:'Contacto Telefónico',t:'text'},
       {k:'Contacto Email',t:'text'},
-      {k:'Cargo',t:'text'},
+      {k:'Cargo',t:'multicheck',opts:['Treinador','Coordenador','Nutricionista','Fisioterapeuta','Médico','Comercial','Admin']},
       {k:'Área',t:'text'},
       {k:'Estado',t:'select',opts:['Activo','Suspenso','Cancelado']},
       {k:'Tipo de regime',t:'select',opts:['C/ IVA','S/ IVA']},
@@ -1123,6 +1123,15 @@ async function buildFieldHtml(f, val=''){
   let inner='';
   if(f.t==='textarea'){
     inner=`<textarea id="${safeId}">${val}</textarea>`;
+  } else if(f.t==='multicheck'){
+    const vals=String(val||'').split(',').map(v=>v.trim()).filter(Boolean);
+    const checks=(f.opts||[]).map(o=>{
+      const cid=`${safeId}_${o.replace(/[^a-zA-Z0-9]/g,'_')}`;
+      return `<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-weight:400;font-size:13px">
+        <input type="checkbox" id="${cid}" value="${o}" ${vals.includes(o)?'checked':''} style="width:15px;height:15px;accent-color:var(--primary-text)">
+        ${o}</label>`;
+    }).join('');
+    inner=`<div id="${safeId}" style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;display:flex;flex-wrap:wrap;gap:2px 20px">${checks}</div>`;
   } else if(f.t==='select'){
     inner=`<select id="${safeId}">${(f.opts||[]).map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')}</select>`;
   } else if(f.t==='lookup'){
@@ -1188,6 +1197,10 @@ function runFieldSetups(setups){ setups.forEach(fn=>fn&&fn()); }
 
 function getFieldValue(f){
   const safeId=`field_${f.k.replace(/[^a-zA-Z0-9]/g,'_')}`;
+  if(f.t==='multicheck'){
+    const c=document.getElementById(safeId);
+    return c?[...c.querySelectorAll('input[type="checkbox"]:checked')].map(x=>x.value).join(', '):'';
+  }
   const el=document.getElementById(safeId);
   return el?el.value:'';
 }
