@@ -173,6 +173,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .sort-tog{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;padding:0 2px;vertical-align:middle;opacity:.55;margin-left:2px}
 .sort-tog:hover,.sort-tog.on{opacity:1;color:var(--primary-text)}
 .filter-active-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:rgba(170,255,0,.15);color:var(--primary-text);border:1px solid rgba(170,255,0,.35);border-radius:12px;font-size:11px;font-weight:600}
+/* GREEN DOT on active pill */
+.gtab-active::before,.tab.active::before,.agenda-period-btn.active::before{content:"";display:inline-block;width:7px;height:7px;background:#aaff00;border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -2334,7 +2336,7 @@ function _renderAlertasView(el, todos){
   ];
   const prazoHtml = PRAZO_OPTS.map(p=>`
     <button onclick="_alertasPrazo='${p.k}';_renderAlertasView(document.getElementById('mainContent'),_alertasTodosDados)"
-      style="padding:5px 12px;border-radius:20px;border:1px solid ${_alertasPrazo===p.k?'var(--primary)':'var(--border)'};background:${_alertasPrazo===p.k?'rgba(99,102,241,.12)':'transparent'};color:${_alertasPrazo===p.k?'var(--primary)':'var(--text-muted)'};cursor:pointer;font-size:12px;font-weight:${_alertasPrazo===p.k?'600':'400'}">
+      class="gtab${_alertasPrazo===p.k?' gtab-active':''}">
       ${p.l}
     </button>`).join('');
 
@@ -2387,7 +2389,7 @@ function _renderAlertasView(el, todos){
         style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:6px;font-size:13px;flex:1;min-width:200px">
     </div>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${prazoHtml}</div>
+    <div class="gtab-wrap" style="margin-bottom:10px;flex-wrap:wrap">${prazoHtml}</div>
     <div class="gtab-wrap" style="margin-bottom:20px;flex-wrap:wrap">${tabsHtml}</div>
 
     <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap">
