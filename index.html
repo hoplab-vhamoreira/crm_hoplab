@@ -4104,8 +4104,14 @@ async function openEditColaborador(nome){
 
   document.getElementById('modalSave').onclick=async()=>{
     const updates={};
-    for(const f of sec.fields) updates[f.k]=getFieldValue(f);
-    await api(`/api/data/dados_colaboradores/${idx}`,{method:'PUT',body:updates});
+    for(const f of sec.fields){
+      let v=getFieldValue(f);
+      if(f.t==='number') v=(v===''||v===null)?null:parseFloat(v);
+      else if(v==='') v=null;
+      updates[f.k]=v;
+    }
+    const res=await api(`/api/data/dados_colaboradores/${idx}`,{method:'PUT',body:updates});
+    if(res?.error){ toast('Erro ao guardar: '+res.error,'error'); return; }
     sectionData['dados_colaboradores']=null;
     closeModal();
     toast('Ficha atualizada');
