@@ -375,9 +375,42 @@ async function api(url,opts={}){
     if(method==='DELETE')return _sbDelete(table,idx);
   }
   // /api/vendas/resumo
-  if(url==='/api/vendas/resumo'){
+  if(url.startsWith('/api/vendas/resumo')){
+    const _trimQ = url.includes('trimestre=') ? decodeURIComponent(url.split('trimestre=')[1]||'') : '';
     const[vl,vb,dc]=await Promise.all([_SB.from('vendas_log').select('*'),_SB.from('vendas_bonus').select('*'),_SB.from('dados_colaboradores').select('*')]);
-    return{vendas:vl.data||[],bonus:vb.data||[],colaboradores:dc.data||[]};
+    const vendas=vl.data||[];
+    const bonus=(vb.data||[]).filter(r=>r['Professor']&&r['Professor']!=='TOTAL');
+    const colabs=(dc.data||[]).filter(r=>r['Estado']==='Activo');
+    const trimestres=[...new Set(vendas.map(v=>v['Trimestre']).filter(Boolean))].sort().reverse();
+    const selectedTrim=_trimQ||trimestres[0]||'';
+    const bonusCols=Object.keys(bonus[0]||{}).filter(k=>/^Q\d/.test(k));
+    const bonusCol=bonusCols.find(k=>k.startsWith(selectedTrim))||'';
+    const vendasTrim=vendas.filter(v=>v['Trimestre']===selectedTrim);
+    const resumo=colabs.map(col=>{
+      const nome=col['Nome Oficial'];
+      const cargo=col['Cargo'];
+      const condicoes=parseFloat(col['Condições'])||0;
+      const minhasVendas=vendasTrim.filter(v=>v['Colaborador']===nome);
+      const totalVendas=minhasVendas.reduce((s,v)=>s+(parseFloat(v['Valor s/IVA (€)'])||0),0);
+      const bonusRow=bonus.find(b=>b['Professor']===nome);
+      const isClean=bonusRow?bonusRow[bonusCol]==='true':false;
+      const train=totalVendas*condicoes;
+      const isCoordenador=cargo==='Coordenador';
+      const vendaOk=isCoordenador?true:totalVendas>=750;
+      const elegivel=isClean&&vendaOk;
+      const bonusRate=isCoordenador?0.071:0.077;
+      const bonusVal=elegivel?train*bonusRate:0;
+      const detalhe=minhasVendas.map(v=>({
+        codigo:v['Código Aval']||'—',cliente:v['Cliente']||'—',
+        servico:v['Tipo de Teste']||'—',
+        data:v['Mês da Comissão']?`${v['Mês da Comissão']} ${v['Ano']||''}`:'—',
+        valor_siva:parseFloat(v['Valor s/IVA (€)'])||0,valor_total:null
+      }));
+      return{Professor:nome,Cargo:cargo,Clean:isClean?'Sim':'Não',Vendas:totalVendas,
+        'Condições':condicoes,Train:train,'Elegível':elegivel?'Sim':'Não',
+        'Bónus':bonusVal,DetalheVendas:detalhe};
+    });
+    return{resumo,trimestres,trimestre:selectedTrim};
   }
   // /api/colaborador/<nome>
   const colabM=url.match(/^\/api\/colaborador\/(.+)$/);
