@@ -447,8 +447,12 @@ async function api(url,opts={}){
   const colabM=url.match(/^\/api\/colaborador\/(.+)$/);
   if(colabM){
     const nome=decodeURIComponent(colabM[1]);
-    const[dc,lc,pt,fs]=await Promise.all([_SB.from('dados_colaboradores').select('*').eq('Nome Oficial',nome).single(),_SB.from('log_colaboradores').select('*').eq('Colaborador',nome).order('Data',{ascending:false}),_SB.from('pagamentos_treinadores').select('*').eq('Professor',nome),_SB.from('falhas_sancoes').select('*').eq('Professor',nome)]);
-    return{colaborador:dc.data,log:lc.data||[],pagamentos:pt.data||[],falhas:fs.data||[]};
+    const[dc,lc,hist]=await Promise.all([
+      _SB.from('dados_colaboradores').select('*').eq('Nome Oficial',nome).single(),
+      _SB.from('log_colaboradores').select('*').eq('Colaborador',nome).order('Data',{ascending:false}),
+      _SB.from('historico').select('*').eq('colaborador',nome).order('timestamp',{ascending:false})
+    ]);
+    return{info:dc.data||{},log_colaboradores:lc.data||[],historico:hist.data||[]};
   }
   // /api/historico/revert/<id>
   const revertM=url.match(/^\/api\/historico\/revert\/(.+)$/);
