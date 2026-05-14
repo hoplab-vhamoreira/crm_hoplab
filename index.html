@@ -103,6 +103,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .stat-card .value.green{color:var(--success)}
 .stat-card .value.amber{color:var(--warning)}
 .stat-card .value.blue{color:var(--info)}
+.stat-card .sub{font-size:11px;color:var(--text-muted);margin-top:3px}
+.stat-card.clickable{cursor:pointer;transition:box-shadow .15s}
+.stat-card.clickable:hover{box-shadow:0 4px 14px rgba(0,0,0,.13)}
+.db-section{margin-bottom:28px}
+.db-section-title{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.db-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px}
+@media(max-width:900px){.db-grid-2{grid-template-columns:1fr}}
 /* BACKOFFICE */
 .perm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-top:8px}
 .perm-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:12px}
@@ -828,30 +835,183 @@ async function navigate(section){
 }
 
 // DASHBOARD
+function _dbKpiCard(label,value,sub,color,onclick){
+  const cl=onclick?'stat-card clickable':'stat-card';
+  const oc=onclick?`onclick="${onclick}"`:'';
+  return `<div class="${cl}" ${oc}><div class="label">${label}</div><div class="value ${color||''}">${value??'—'}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
+}
+function _dbMiniTable(title,cols,rows,emptyMsg){
+  const th=cols.map(c=>`<th>${c}</th>`).join('');
+  const tb=rows.length
+    ?rows.map(r=>`<tr>${r.map(c=>`<td>${c??'—'}</td>`).join('')}</tr>`).join('')
+    :`<tr><td colspan="${cols.length}" style="text-align:center;color:var(--text-muted);padding:16px">${emptyMsg||'Sem dados'}</td></tr>`;
+  return `<div class="db-section"><div class="db-section-title">${title}</div><div class="table-wrap"><table class="tbl"><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table></div></div>`;
+}
+
 async function renderDashboard(el){
-  const stats=await api('/api/stats');
-  const important=[
-    {key:'clientes',label:'Clientes',color:'purple'},
-    {key:'pipeline',label:'Pipeline',color:'blue'},
-    {key:'conversoes',label:'Conversões',color:'green'},
-    {key:'alertas',label:'Alertas',color:'amber'},
-    {key:'historico_faturacao',label:'Faturação',color:'blue'},
-    {key:'log_operacional',label:'Registos Operacionais',color:'green'},
-  ];
-  let cards='';
-  for(const c of important){
-    if(stats[c.key]!==undefined) cards+=`<div class="stat-card"><div class="label">${c.label}</div><div class="value ${c.color}">${stats[c.key]}</div></div>`;
-  }
-  let recentHtml='';
-  for(const[k,v] of Object.entries(stats)){
-    const s=SECTIONS[k];
-    if(s) recentHtml+=`<tr><td>${s.icon} ${s.title}</td><td>${v} registos</td><td><button class="btn btn-sm btn-ghost" onclick="navigate('${k}')">Abrir</button></td></tr>`;
-  }
+  el.innerHTML=`<div style="padding:40px;color:var(--text-muted);text-align:center">A carregar...</div>`;
+  const role=currentUser.role||'';
+  if(role==='Direcção') return _dbDireccao(el);
+  if(role==='Comercial') return _dbComercial(el);
+  if(role==='Técnico'||role==='Coordenador') return _dbTecnico(el);
+  return _dbAdmin(el);
+}
+
+async function _dbAdmin(el){
+  const[stats,hist,alrt]=await Promise.all([
+    api('/api/stats'),
+    _SB.from('historico').select('*').order('timestamp',{ascending:false}).limit(5),
+    _SB.from('alertas').select('*').order('DiasAtraso',{ascending:false}).limit(5)
+  ]);
+  const cards=[
+    _dbKpiCard('Clientes',stats.clientes||0,'total','purple',"navigate('clientes')"),
+    _dbKpiCard('Alertas Ativos',stats.alertas||0,'','amber',"navigate('alertas')"),
+    _dbKpiCard('Colaboradores',stats.dados_colaboradores||0,'','blue',"navigate('dados_colaboradores')"),
+    _dbKpiCard('Serviços',stats.servicos||0,'','green',"navigate('servicos')"),
+  ].join('');
+  const histRows=(hist.data||[]).map(h=>[
+    `<span style="font-size:11px">${fmtDate(h.timestamp)}</span>`,
+    h.utilizador||'—',h.acao||'—',
+    SECTIONS[h.colecao]?.title||h.colecao||'—'
+  ]);
+  const alrtRows=(alrt.data||[]).map(a=>[
+    a['Tipo']||'—',a['Cliente']||'—',
+    a['DiasAtraso']!=null?`<span style="color:var(--danger);font-weight:600">${a['DiasAtraso']}d</span>`:'—',
+    a['Responsável']||'—'
+  ]);
+  const secRows=Object.entries(stats).filter(([k])=>SECTIONS[k])
+    .map(([k,v])=>`<tr><td>${SECTIONS[k].icon} ${SECTIONS[k].title}</td><td>${v}</td><td><button class="btn btn-sm btn-ghost" onclick="navigate('${k}')">Abrir</button></td></tr>`).join('');
   el.innerHTML=`
     <div class="page-header"><div><h1>Dashboard</h1><div class="subtitle">Bem-vindo, ${currentUser.name}</div></div></div>
     <div class="stats-grid">${cards}</div>
-    <div class="table-wrap"><div class="table-toolbar"><strong>Todas as Seccoes</strong></div>
-    <div class="tbl-scroll"><table class="tbl"><thead><tr><th>Seccao</th><th>Registos</th><th></th></tr></thead><tbody>${recentHtml}</tbody></table></div></div>`;
+    <div class="db-grid-2">
+      ${_dbMiniTable('Atividade Recente',['Data','Utilizador','Ação','Secção'],histRows,'Sem histórico')}
+      ${_dbMiniTable('Alertas Urgentes',['Tipo','Cliente','Atraso','Responsável'],alrtRows,'Sem alertas')}
+    </div>
+    <div class="db-section"><div class="db-section-title">Todas as Secções</div>
+    <div class="table-wrap"><table class="tbl"><thead><tr><th>Secção</th><th>Registos</th><th></th></tr></thead><tbody>${secRows}</tbody></table></div></div>`;
+}
+
+async function _dbDireccao(el){
+  const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const now=new Date(); const mi=now.getMonth(); const curMonth=MONTHS[mi];
+  const ytdMonths=MONTHS.slice(0,mi+1);
+  const curQ=`Q${Math.ceil((mi+1)/3)} ${now.getFullYear()}`;
+  const[pag,vl,vb,pipe,conv,alrt]=await Promise.all([
+    _SB.from('pag_clientes_2026').select('*'),
+    _SB.from('vendas_log').select('*'),
+    _SB.from('vendas_bonus').select('*'),
+    _SB.from('pipeline').select('*'),
+    _SB.from('conversoes').select('*'),
+    _SB.from('alertas').select('*',{count:'exact',head:true})
+  ]);
+  const pagRows=pag.data||[];
+  const receitaMes=pagRows.reduce((s,r)=>s+(parseFloat(r[`${curMonth} Pagamento`])||0),0);
+  const receitaYTD=pagRows.reduce((s,r)=>s+ytdMonths.reduce((sm,m)=>sm+(parseFloat(r[`${m} Pagamento`])||0),0),0);
+  const pipeAberto=(pipe.data||[]).filter(r=>r['Aberta/Fechada']==='Aberta').length;
+  const convTotal=(conv.data||[]).length;
+  const vendasQ=(vl.data||[]).filter(r=>r['Trimestre']===curQ);
+  const bonusCols=Object.keys(((vb.data||[])[0])||{}).filter(k=>k.startsWith(curQ));
+  const bonusCol=bonusCols[0];
+  const bonusMap={};
+  (vb.data||[]).filter(r=>r['Professor']&&r['Professor']!=='TOTAL').forEach(r=>{bonusMap[r['Professor']]=parseFloat(r[bonusCol])||0;});
+  const perfMap={};
+  vendasQ.forEach(r=>{
+    const p=r['Professor']||'—';
+    if(!perfMap[p]) perfMap[p]={nome:p,n:0,bonus:bonusMap[p]||0};
+    perfMap[p].n++;
+  });
+  const perfRows=Object.values(perfMap).sort((a,b)=>b.n-a.n).slice(0,8)
+    .map(r=>[r.nome,r.n,r.bonus>0?`${r.bonus.toFixed(0)}€`:'—']);
+  const cards=[
+    _dbKpiCard(`Receita ${curMonth}`,`${receitaMes.toFixed(0)}€`,'pag_clientes_2026','green'),
+    _dbKpiCard('Receita YTD',`${receitaYTD.toFixed(0)}€`,`Jan – ${curMonth}`,'purple'),
+    _dbKpiCard('Pipeline Aberto',pipeAberto,'oportunidades','blue',"navigate('pipeline')"),
+    _dbKpiCard('Alertas Ativos',alrt.count||0,'','amber',"navigate('alertas')"),
+    _dbKpiCard('Conversões Total',convTotal,'','green',"navigate('conversoes')"),
+  ].join('');
+  el.innerHTML=`
+    <div class="page-header"><div><h1>Dashboard — Direcção</h1><div class="subtitle">Bem-vindo, ${currentUser.name}</div></div></div>
+    <div class="stats-grid">${cards}</div>
+    ${_dbMiniTable(`Performance Equipa — ${curQ}`,['Colaborador','Nº Vendas','Bónus'],perfRows,'Sem dados para este trimestre')}`;
+}
+
+async function _dbComercial(el){
+  const now=new Date(); const todayStr=now.toISOString().split('T')[0];
+  const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const mi=now.getMonth();
+  const[lc,pipe,conv,alrt]=await Promise.all([
+    _SB.from('log_comercial').select('*').lte('Data Próxima Ação',todayStr).order('Data Próxima Ação',{ascending:true}).limit(30),
+    _SB.from('pipeline').select('*').order('Data',{ascending:false}).limit(20),
+    _SB.from('conversoes').select('*'),
+    _SB.from('alertas').select('*',{count:'exact',head:true})
+  ]);
+  const TERMINAIS=['Fechado','Convertido','Cancelado','Perdido'];
+  const followups=(lc.data||[]).filter(r=>!TERMINAIS.includes(r['Status']||''));
+  const pipeAberto=(pipe.data||[]).filter(r=>r['Aberta/Fechada']==='Aberta');
+  const convMes=(conv.data||[]).filter(r=>{
+    const d=new Date(r['Data']||r['Data Conversão']||'');
+    return !isNaN(d)&&d.getMonth()===mi&&d.getFullYear()===now.getFullYear();
+  }).length;
+  const cards=[
+    _dbKpiCard('Pipeline Aberto',pipeAberto.length,'oportunidades','blue',"navigate('pipeline')"),
+    _dbKpiCard('Follow-ups em Atraso',followups.length,'','amber'),
+    _dbKpiCard(`Conversões ${MONTHS[mi]}`,convMes,'','green',"navigate('conversoes')"),
+    _dbKpiCard('Alertas Ativos',alrt.count||0,'','amber',"navigate('alertas')"),
+  ].join('');
+  const lcRows=followups.slice(0,8).map(r=>[
+    `<span style="color:var(--danger);font-size:11px">${r['Data Próxima Ação']||'—'}</span>`,
+    r['Cliente']||`ON ${r['Nº ON']||''}`,
+    r['Ação']||r['Motivo']||r['Notas']||'—',r['Status']||'—'
+  ]);
+  const pipeRows=pipeAberto.slice(0,8).map(r=>[
+    r['Cliente']||'—',r['Serviço']||r['Produto']||'—',
+    r['Valor']?`${parseFloat(r['Valor']).toFixed(0)}€`:'—',r['Data']||'—'
+  ]);
+  el.innerHTML=`
+    <div class="page-header"><div><h1>Dashboard — Comercial</h1><div class="subtitle">Bem-vindo, ${currentUser.name}</div></div></div>
+    <div class="stats-grid">${cards}</div>
+    <div class="db-grid-2">
+      ${_dbMiniTable('Follow-ups Pendentes',['Data','Cliente','Ação','Estado'],lcRows,'Nenhum follow-up em atraso')}
+      ${_dbMiniTable('Oportunidades Abertas',['Cliente','Serviço','Valor','Data'],pipeRows,'Sem oportunidades abertas')}
+    </div>`;
+}
+
+async function _dbTecnico(el){
+  const nome=currentUser.name;
+  const now=new Date(); const todayStr=now.toISOString().split('T')[0];
+  const in7=new Date(now); in7.setDate(in7.getDate()+7);
+  const in7Str=in7.toISOString().split('T')[0];
+  const[servs,avals,alrts]=await Promise.all([
+    _SB.from('servicos').select('*').eq('Técnico Responsável',nome).neq('Estado do serviço','Concluído'),
+    _SB.from('avaliacoes').select('*').gte('Data',todayStr).lte('Data',in7Str),
+    _SB.from('alertas').select('*').ilike('Responsável',`%${nome.split(' ')[0]}%`)
+  ]);
+  const myServs=servs.data||[];
+  const nomeFirst=nome.split(' ')[0].toLowerCase();
+  const myAvals=(avals.data||[]).filter(r=>
+    Object.values(r).some(v=>typeof v==='string'&&v.toLowerCase().includes(nomeFirst))
+  );
+  const clientes=[...new Set(myServs.map(r=>r['Cliente']).filter(Boolean))].length;
+  const cards=[
+    _dbKpiCard('Os Meus Serviços',myServs.length,'ativos','green',"navigate('servicos')"),
+    _dbKpiCard('Avaliações (7 dias)',myAvals.length,'','blue',"navigate('avaliacoes')"),
+    _dbKpiCard('Clientes Atribuídos',clientes,'','purple',"navigate('clientes')"),
+    _dbKpiCard('Os Meus Alertas',(alrts.data||[]).length,'','amber',"navigate('alertas')"),
+  ].join('');
+  const avalRows=myAvals.sort((a,b)=>new Date(a['Data'])-new Date(b['Data'])).map(r=>[
+    r['Data']||'—',r['Nome']||r['Cliente']||'—',r['Serviço']||'—',r['Apareceu']||'—'
+  ]);
+  const servRows=myServs.slice(0,8).map(r=>[
+    r['Cliente']||'—',r['Serviço']||'—',r['Estado do serviço']||'—',r['Data Conversão']||'—'
+  ]);
+  el.innerHTML=`
+    <div class="page-header"><div><h1>O Meu Dashboard</h1><div class="subtitle">Bem-vindo, ${currentUser.name}</div></div></div>
+    <div class="stats-grid">${cards}</div>
+    <div class="db-grid-2">
+      ${_dbMiniTable('Próximas Avaliações (7 dias)',['Data','Cliente','Serviço','Apareceu'],avalRows,'Sem avaliações nos próximos 7 dias')}
+      ${_dbMiniTable('Os Meus Serviços Ativos',['Cliente','Serviço','Estado','Desde'],servRows,'Nenhum serviço ativo atribuído')}
+    </div>`;
 }
 
 // DATA PAGE
