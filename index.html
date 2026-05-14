@@ -375,8 +375,19 @@ async function api(url,opts={}){
   const cM=url.match(/^\/api\/cliente\/(.+)$/);
   if(cM){
     const nome=decodeURIComponent(cM[1]);
-    const[cli,serv,aval,log,pag]=await Promise.all([_SB.from('clientes').select('*').eq('Nome',nome).single(),_SB.from('servicos').select('*').eq('Cliente',nome),_SB.from('avaliacoes').select('*').eq('Nome',nome),_SB.from('historico').select('*').eq('cliente',nome).order('timestamp',{ascending:false}),_SB.from('pag_clientes_2026').select('*').eq('Cliente',nome)]);
-    return{cliente:_recomputeClienteContacto(cli.data),servicos:serv.data||[],avaliacoes:aval.data||[],historico:log.data||[],pagamentos:pag.data||[]};
+    const[cli,serv,aval,log,pag26,pag25,mot,lc]=await Promise.all([
+      _SB.from('clientes').select('*').eq('Nome',nome).single(),
+      _SB.from('servicos').select('*').eq('Cliente',nome),
+      _SB.from('avaliacoes').select('*').eq('Nome',nome),
+      _SB.from('historico').select('*').eq('cliente',nome).order('timestamp',{ascending:false}),
+      _SB.from('pag_clientes_2026').select('*').eq('Cliente',nome),
+      _SB.from('pag_clientes_2025').select('*').eq('Cliente',nome),
+      _SB.from('motor2026').select('*').eq('Cliente',nome).single(),
+      _SB.from('log_contratos').select('*').eq('Cliente',nome)
+    ]);
+    return{info:_recomputeClienteContacto(cli.data),servicos:serv.data||[],avaliacoes:aval.data||[],
+      historico:log.data||[],pag_2026:pag26.data||[],pag_2025:pag25.data||[],
+      motor:mot.data||null,log_contratos:lc.data||[]};
   }
   const oM=url.match(/^\/api\/on\/(\d+)$/);
   if(oM){const{data}=await _SB.from('pipeline').select('*').eq('N\u00ba ON',parseInt(oM[1])).single();return data||{};}
