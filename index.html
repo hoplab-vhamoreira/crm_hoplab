@@ -53,7 +53,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .btn-primary{background:var(--primary);color:#111827}.btn-primary:hover{background:var(--primary-hover)}
 .btn-sm{padding:5px 10px;font-size:12px}
 .btn-danger{background:var(--danger);color:#fff}
-.btn-ghost{background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:50px}.btn-ghost:hover{border-color:var(--primary);color:var(--primary-text)}
+.btn-ghost{background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:50px}.btn-ghost:hover{border-color:var(--primary-text);color:var(--primary-text)}
 /* GESTÃO DE CLIENTES tabs */
 .gtab-wrap{display:inline-flex;gap:4px;background:#e5e7eb;border-radius:50px;padding:4px}
 .gtab{background:transparent;border:none;color:var(--text-muted);padding:8px 20px;border-radius:50px;cursor:pointer;font-size:13px;transition:.15s;font-weight:600}
@@ -67,7 +67,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .table-toolbar{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)}
 .table-toolbar input{flex:1;max-width:320px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none}
-.table-toolbar input:focus{border-color:var(--primary)}
+.table-toolbar input:focus{border-color:var(--primary-text)}
 .table-count{font-size:12px;color:var(--text-muted);margin-left:auto}
 .tbl{width:100%;border-collapse:collapse}
 .tbl th{padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);background:var(--surface2);border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap;position:sticky;top:0}
@@ -92,7 +92,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .form-group{margin-bottom:16px}
 .form-group label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
 .form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none}
-.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--primary)}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--primary-text)}
 .form-group textarea{min-height:80px;resize:vertical}
 /* CARDS */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:28px}
@@ -106,9 +106,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 /* BACKOFFICE */
 .perm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-top:8px}
 .perm-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:12px}
-.perm-item input[type=checkbox]{accent-color:var(--primary)}
+.perm-item input[type=checkbox]{accent-color:var(--primary-text)}
 .role-tab{display:inline-block;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text-muted);border:1px solid var(--border);margin-right:6px;margin-bottom:8px}
-.role-tab.active{background:var(--primary);color:#111827;border-color:var(--primary)}
+.role-tab.active{background:var(--primary);color:#111827;border-color:var(--primary-text)}
 /* CLIENTE DETALHE */
 .cd-wrap{display:flex;gap:24px;align-items:flex-start}
 .cd-sidebar{width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
@@ -165,12 +165,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 /* PAGINATION */
 .pagination{display:flex;align-items:center;justify-content:center;gap:6px;padding:14px}
 .pagination button{padding:6px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);cursor:pointer;font-size:12px}
-.pagination button.active{background:var(--primary);border-color:var(--primary);color:#111827}
+.pagination button.active{background:var(--primary);border-color:var(--primary-text);color:#111827}
 .pagination button:disabled{opacity:.4;cursor:default}
 /* COLUMN FILTERS — inline no cabeçalho */
 .cfi{display:inline-block;margin-left:5px;padding:1px 4px;background:none;border:1px solid transparent;border-radius:3px;color:var(--text-muted);font-size:10px;cursor:pointer;outline:none;vertical-align:middle;font-family:inherit;max-width:110px}
 .cfi:hover,.cfi:focus{border-color:var(--border);background:var(--surface)}
-.cfi.on{border-color:var(--primary)!important;background:rgba(170,255,0,.15)!important;color:var(--primary-text)!important;font-weight:600}
+.cfi.on{border-color:var(--primary-text)!important;background:rgba(170,255,0,.15)!important;color:var(--primary-text)!important;font-weight:600}
 .sort-tog{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;padding:0 2px;vertical-align:middle;opacity:.55;margin-left:2px}
 .sort-tog:hover,.sort-tog.on{opacity:1;color:var(--primary-text)}
 .filter-active-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:rgba(170,255,0,.15);color:var(--primary-text);border:1px solid rgba(170,255,0,.35);border-radius:12px;font-size:11px;font-weight:600}
@@ -1905,10 +1905,10 @@ async function _loadAvaliacoesList(forceReload){
     const c=a['Cobran\xe7a']||'';
     const v=a['Valor a Cobrar'];
     if(c.includes('inclu\xeddo')) return `<span style="color:var(--text-muted);font-size:11px">Inclu\xeddo</span>`;
-    if(typeof v==='number') return `<span style="font-weight:600;color:var(--primary)">${v}€</span>`;
+    if(typeof v==='number') return `<span style="font-weight:600;color:var(--primary-text)">${v}€</span>`;
     if(c.includes('Cobrar')) {
       const m2=c.match(/\d+/);
-      if(m2) return `<span style="font-weight:600;color:var(--primary)">${m2[0]}€</span>`;
+      if(m2) return `<span style="font-weight:600;color:var(--primary-text)">${m2[0]}€</span>`;
     }
     return `<span style="color:var(--text-muted);font-size:11px">${v||c||'—'}</span>`;
   };
@@ -2024,7 +2024,7 @@ async function abrirEditarAval(idx){
       &nbsp;·&nbsp;${_fmtPtDate((aval['Data']||'').slice(0,10))}
       ${aval['Hora']?`&nbsp;·&nbsp;${aval['Hora']}`:''}
       &nbsp;·&nbsp;${aval['T\xe9cnico Respons\xe1vel']||'—'}
-      ${prec ? `&nbsp;·&nbsp;<span style="color:var(--primary)">PVP: ${prec.pvp ? prec.pvp.toFixed(2)+'€' : '—'}</span>` : ''}
+      ${prec ? `&nbsp;·&nbsp;<span style="color:var(--primary-text)">PVP: ${prec.pvp ? prec.pvp.toFixed(2)+'€' : '—'}</span>` : ''}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -2408,7 +2408,7 @@ function _renderAlertasView(el, todos){
       </div>
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 18px;text-align:center;min-width:90px">
         <div style="font-size:11px;color:var(--text-muted)">Visíveis</div>
-        <div style="font-size:22px;font-weight:700;color:var(--primary)">${visivel.length}</div>
+        <div style="font-size:22px;font-weight:700;color:var(--primary-text)">${visivel.length}</div>
       </div>
     </div>
 
@@ -2761,7 +2761,7 @@ async function _loadVendasTab(){
         <div style="display:flex;gap:12px;margin-left:auto;flex-wrap:wrap">
           <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 18px;text-align:center;min-width:110px">
             <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Avaliações</div>
-            <div style="font-size:20px;font-weight:700;color:var(--primary)">${totalVendas.toFixed(0)}€</div>
+            <div style="font-size:20px;font-weight:700;color:var(--primary-text)">${totalVendas.toFixed(0)}€</div>
           </div>
           <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 18px;text-align:center;min-width:110px">
             <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Bónus Totais</div>
@@ -2833,7 +2833,7 @@ async function _loadVendasTab(){
         <td colspan="5" style="font-weight:700;padding:8px 12px;font-size:12px;color:var(--text-muted)">
           ${r.Professor}
           <span style="background:var(--surface3);border-radius:4px;padding:1px 6px;margin-left:6px;font-size:11px">${r.Cargo}</span>
-          <span style="color:var(--primary);margin-left:6px;font-size:11px">${tipoLabel}</span>
+          <span style="color:var(--primary-text);margin-left:6px;font-size:11px">${tipoLabel}</span>
           &nbsp;·&nbsp; ${countLabel} &nbsp;·&nbsp;
           <strong style="color:${subtotal>threshold?'var(--success)':'var(--text)'}">${subtotal.toFixed(2)}€ s/IVA</strong>
         </td></tr>`;
@@ -2852,7 +2852,7 @@ async function _loadVendasTab(){
 
     const trimestreSel = trimestres.map(t=>`<option value="${t}" ${t===_vendasTrimestre?'selected':''}>${t}</option>`).join('');
     const profTitle = _vendasDetalheProfFilter
-      ? `<span style="margin-left:12px;font-size:13px;font-weight:600;color:var(--primary)">${_vendasDetalheProfFilter}</span>
+      ? `<span style="margin-left:12px;font-size:13px;font-weight:600;color:var(--primary-text)">${_vendasDetalheProfFilter}</span>
          <button onclick="_vendasDetalheProfFilter=null;_loadVendasTab()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:12px;margin-left:6px">✕ ver todos</button>`
       : '';
     const emptyMsg = _vendasDetalheProfFilter
@@ -2895,7 +2895,7 @@ async function _loadVendasTab(){
       const hopCell = isHOP
         ? `<span style="color:var(--warning);font-weight:700">${r['HOP % mês angariação']}%</span>
            <span style="font-size:10px;color:var(--text-muted);display:block">${r['Mês Angariação']}</span>
-           ${r['Mês Parcial?']==='Sim'?`<span style="font-size:10px;color:var(--primary)">⚠ Início parcial</span>`:''}`
+           ${r['Mês Parcial?']==='Sim'?`<span style="font-size:10px;color:var(--primary-text)">⚠ Início parcial</span>`:''}`
         : `<span style="color:var(--text-muted)">${r['HOP % normal']}%</span>`;
       return `<tr class="${isHOP?'row-warn':''}">
         <td><span style="font-size:11px;color:var(--text-muted)">${r.Código||'—'}</span></td>
@@ -2921,7 +2921,7 @@ async function _loadVendasTab(){
         </div>
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center">
           <div style="font-size:11px;color:var(--text-muted)">Referência</div>
-          <div style="font-size:18px;font-weight:700;color:var(--primary)">${nRef}</div>
+          <div style="font-size:18px;font-weight:700;color:var(--primary-text)">${nRef}</div>
         </div>
       </div>
       <div class="table-wrap">
@@ -3178,7 +3178,7 @@ function renderClienteDetalhe(el, nome, d){
       ['PT Híbrido',    info['PT Híbrido']||'—'],
       ['Valor Mensal',  info['Valor Híbrido']!=null ? info['Valor Híbrido']+'€' : '—'],
       ...(info['Par Híbrido'] ? [
-        ['Par DUO',     `<a href="#" onclick="openClienteDetalhe('${(info['Par Híbrido']||'').replace(/'/g,"\\'")}');return false" style="color:var(--primary)">${info['Par Híbrido']}</a>`],
+        ['Par DUO',     `<a href="#" onclick="openClienteDetalhe('${(info['Par Híbrido']||'').replace(/'/g,"\\'")}');return false" style="color:var(--primary-text)">${info['Par Híbrido']}</a>`],
         ['V. Single',   info['Valor Single']!=null ? info['Valor Single']+'€' : '—'],
         ['V. Duo Base', info['Valor Duo Base']!=null ? info['Valor Duo Base']+'€' : '—'],
       ] : []),
@@ -4231,7 +4231,7 @@ function _renderTotaisView(el){
       </div>
       <div style="border-left:1px solid var(--border);padding-left:20px;display:flex;align-items:center;margin-top:16px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-          <input type="checkbox" ${_tpComBonus?'checked':''} onchange="_tpComBonus=this.checked;_renderTotaisView(document.getElementById('mainContent'))" style="accent-color:var(--primary);width:16px;height:16px">
+          <input type="checkbox" ${_tpComBonus?'checked':''} onchange="_tpComBonus=this.checked;_renderTotaisView(document.getElementById('mainContent'))" style="accent-color:var(--primary-text);width:16px;height:16px">
           Incluir B\xf3nus
         </label>
       </div>
@@ -4256,7 +4256,7 @@ function _renderTotaisView(el){
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">B\xf3nus Per\xedodo</div>
-      <div style="font-size:26px;font-weight:700;color:var(--primary)">${_tpFmt(totalBon)}</div>
+      <div style="font-size:26px;font-weight:700;color:var(--primary-text)">${_tpFmt(totalBon)}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${_tpComBonus?'Inclu\xeddo no NET':'Exclu\xeddo do NET'}</div>
     </div>
   </div>
@@ -4324,7 +4324,7 @@ async function abrirTotaisDetalhe(profEnc){
     aPag+=qPag;aCed+=qCed;aNet+=qNet;
     const bon=r[q.bKey]||0; aBon+=bon;
     monthRows+=`<tr style="background:rgba(99,102,241,.07)">
-      <td style="font-size:11px;color:var(--primary);font-weight:700">${q.lbl} Sub-total</td>
+      <td style="font-size:11px;color:var(--primary-text);font-weight:700">${q.lbl} Sub-total</td>
       <td style="text-align:right;font-weight:600;font-size:12px">${qPag?qPag.toFixed(2)+'€':'—'}</td>
       <td style="text-align:right;font-size:12px;color:var(--text-muted)">${qCed?qCed.toFixed(2)+'€':'—'}</td>
       <td style="text-align:right;font-weight:700;font-size:12px">${qNet?qNet.toFixed(2)+'€':'—'}</td>
@@ -4333,7 +4333,7 @@ async function abrirTotaisDetalhe(profEnc){
   }
   const totalNetBon=aNet+aBon;
   monthRows+=`<tr style="background:rgba(99,102,241,.15);font-weight:700;border-top:2px solid var(--primary)">
-    <td style="color:var(--primary)">Total Ano</td>
+    <td style="color:var(--primary-text)">Total Ano</td>
     <td style="text-align:right">${aPag.toFixed(2)}€</td>
     <td style="text-align:right;color:var(--text-muted)">${aCed.toFixed(2)}€</td>
     <td style="text-align:right;color:${totalNetBon>=0?'var(--success)':'var(--danger)'}">${totalNetBon.toFixed(2)}€</td>
