@@ -399,8 +399,10 @@ async function api(url,opts={}){
     const vendas=vl.data||[];
     const bonus=(vb.data||[]).filter(r=>r['Professor']&&r['Professor']!=='TOTAL');
     const colabs=(dc.data||[]).filter(r=>r['Estado']==='Activo');
-    const trimestres=[...new Set(vendas.map(v=>v['Trimestre']).filter(Boolean))].sort().reverse();
-    const selectedTrim=_trimQ||trimestres[0]||'';
+    const _sortTrim=(a,b)=>{const[qa,ya]=a.split(' ');const[qb,yb]=b.split(' ');return ya!==yb?parseInt(yb)-parseInt(ya):parseInt(qb[1])-parseInt(qa[1]);};
+    const trimestres=[...new Set(vendas.map(v=>v['Trimestre']).filter(Boolean))].sort(_sortTrim);
+    const _now=new Date();const _curTrim=`Q${Math.ceil((_now.getMonth()+1)/3)} ${_now.getFullYear()}`;
+    const selectedTrim=_trimQ||(trimestres.includes(_curTrim)?_curTrim:trimestres[0])||'';
     const bonusCols=Object.keys(bonus[0]||{}).filter(k=>/^Q\d/.test(k));
     const bonusCol=bonusCols.find(k=>k.startsWith(selectedTrim))||'';
     const vendasTrim=vendas.filter(v=>v['Trimestre']===selectedTrim);
