@@ -3405,7 +3405,7 @@ function renderClienteDetalhe(el, nome, d){
 
   const totalPago    = (d.pag_2026||[]).reduce((s,p)=>s+(parseFloat(p['Valor Pago'])||0),0);
   const totalPendente= (d.pag_2026||[]).filter(p=>p['_Estado_Pag']&&p['_Estado_Pag'].includes('🔴')).length;
-  const motorTotal   = temMotor ? MESES_S.reduce((s,m)=>s+(parseFloat(d.motor[m])||0),0) : 0;
+  const motorTotal   = temMotor ? MESES_S.slice(0,mesAtualIdx+1).reduce((s,m)=>s+(parseFloat(d.motor[m])||0),0) : 0;
   // Meses passados (incl. actual) sem registo manual — só quando não há pag_2026
   const motorPendentes = !temPag26 && temMotor
     ? MESES_S.slice(0,mesAtualIdx+1).filter(m=>d.motor[m]&&d.motor[m]>0).length : 0;
@@ -3703,7 +3703,7 @@ function renderClienteDetalhe(el, nome, d){
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
       <div class="stat-card"><div class="label">Serviços activos</div><div class="value blue">${nServicos}</div></div>
       <div class="stat-card"><div class="label">Avaliações</div><div class="value green">${nAvals}</div></div>
-      <div class="stat-card"><div class="label">Total pago 2026</div><div class="value purple">${totalPago>0?totalPago.toFixed(0)+'€':motorTotal>0?motorTotal.toFixed(0)+'€ (plano)':'0€'}</div></div>
+      <div class="stat-card"><div class="label">Total pago 2026</div><div class="value purple">${totalPago>0?totalPago.toFixed(0)+'€':motorTotal>0?motorTotal.toFixed(0)+'€ (esperado)':'0€'}</div></div>
       <div class="stat-card"><div class="label">Pagamentos s/ registo</div><div class="value amber">${totalPendente||motorPendentes}</div></div>
     </div>
 
