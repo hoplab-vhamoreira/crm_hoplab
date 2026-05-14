@@ -48,19 +48,20 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .page-header h1{font-size:22px;font-weight:700}
 .page-header .subtitle{font-size:13px;color:var(--text-muted);margin-top:2px}
 /* BUTTONS */
-.btn{padding:8px 16px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.15s}
+.btn{padding:8px 20px;border-radius:50px;border:none;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.15s}
 .btn-primary{background:var(--primary);color:#111827}.btn-primary:hover{background:var(--primary-hover)}
 .btn-sm{padding:5px 10px;font-size:12px}
 .btn-danger{background:var(--danger);color:#fff}
-.btn-ghost{background:none;border:1px solid var(--border);color:var(--text-muted)}.btn-ghost:hover{border-color:var(--primary);color:var(--primary-text)}
+.btn-ghost{background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:50px}.btn-ghost:hover{border-color:var(--primary);color:var(--primary-text)}
 /* GESTÃO DE CLIENTES tabs */
-.gtab{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;transition:.15s}
-.gtab:hover{border-color:var(--primary);color:var(--primary-text)}
-.gtab-active{background:rgba(170,255,0,.15);border-color:var(--primary);color:var(--primary-text);font-weight:600}
+.gtab-wrap{display:inline-flex;gap:4px;background:#e5e7eb;border-radius:50px;padding:4px}
+.gtab{background:transparent;border:none;color:var(--text-muted);padding:8px 20px;border-radius:50px;cursor:pointer;font-size:13px;transition:.15s;font-weight:600}
+.gtab:hover{color:var(--text);background:rgba(0,0,0,.05)}
+.gtab-active{background:#1e2535;color:#ffffff;border:none;font-weight:600}
 /* AGENDA period buttons */
-.agenda-period-btn{background:none;border:none;color:var(--text-muted);padding:7px 14px;cursor:pointer;font-size:13px;transition:.15s}
-.agenda-period-btn:hover{color:var(--text)}
-.agenda-period-btn.active{background:rgba(170,255,0,.15);color:var(--primary-text);font-weight:600}
+.agenda-period-btn{background:none;border:none;color:var(--text-muted);padding:8px 18px;cursor:pointer;font-size:13px;transition:.15s;border-radius:50px;font-weight:600}
+.agenda-period-btn:hover{color:var(--text);background:rgba(0,0,0,.05)}
+.agenda-period-btn.active{background:#1e2535;color:#ffffff;font-weight:600}
 /* TABLE */
 .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .table-toolbar{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)}
@@ -124,10 +125,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .cd-info-row .val{flex:1;word-break:break-word}
 .cd-main{flex:1;min-width:0}
 /* TABS */
-.tabs{display:flex;gap:2px;border-bottom:2px solid var(--border);margin-bottom:20px}
-.tab{padding:10px 18px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:.15s}
-.tab:hover{color:var(--text)}
-.tab.active{color:var(--primary-text);border-bottom-color:var(--primary)}
+.tabs{display:inline-flex;gap:4px;background:#e5e7eb;border-radius:50px;padding:4px;margin-bottom:20px;border-bottom:none}
+.tab{padding:8px 20px;cursor:pointer;font-size:13px;font-weight:600;color:#6b7280;border-bottom:none;margin-bottom:0;border-radius:50px;transition:.15s}
+.tab:hover{color:#374151;background:rgba(0,0,0,.05)}
+.tab.active{color:#ffffff;background:#1e2535;border-bottom-color:transparent}
 .tab-panel{display:none}.tab-panel.active{display:block}
 /* TIMELINE */
 .timeline{display:flex;flex-direction:column;gap:0}
@@ -1271,7 +1272,7 @@ function _renderGestaoInner(inner, ciclos){
 function _renderGestaoContent(el){
   el.innerHTML = `
     <div class="page-header"><div><h1>&#x1f4ca; Gestão de Clientes</h1><div class="subtitle">Acompanhamento de ciclos activos</div></div></div>
-    <div style="display:flex;gap:8px;margin-bottom:20px">
+    <div class="gtab-wrap" style="margin-bottom:20px">
       ${_gestaoTabBtn('GL4','Gestão Light 4 semanas')}
       ${_gestaoTabBtn('GL12','Gestão Light 12 semanas')}
       ${_gestaoTabBtn('GI','Gestão Integral')}
@@ -1679,7 +1680,7 @@ async function renderAgenda(el){
       <div><h1>&#x1f4cb; Avalia\xe7\xf5es</h1><div class="subtitle" id="agendaSubtitle"></div></div>
       ${agendaControls}
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:20px">
+    <div class="gtab-wrap" style="margin-bottom:20px">
       <button class="gtab${_agendaTab==='agenda'?' gtab-active':''}" onclick="switchAgendaTab('agenda',this)">&#x1f4c5; Agenda</button>
       <button class="gtab${_agendaTab==='lista'?' gtab-active':''}" onclick="switchAgendaTab('lista',this)">&#x1f4cb; Lista Operacional</button>
     </div>
@@ -2121,7 +2122,7 @@ async function renderFalhas(el){
     <div class="page-header">
       <div><h1>&#x26a0;&#xfe0f; Falhas e Sanções</h1><div class="subtitle">Registo e resumo por trimestre</div></div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:20px">
+    <div class="gtab-wrap" style="margin-bottom:20px">
       ${['resumo','log','catalogo'].map(t=>`<button class="gtab${_falhasTab===t?' gtab-active':''}" onclick="switchFalhasTab('${t}',this)">${t==='resumo'?'Resumo Trimestral':t==='log'?'Log de Infrações':'Catálogo'}</button>`).join('')}
     </div>
     <div id="falhasInner"><div style="color:var(--text-muted);padding:40px;text-align:center">A carregar...</div></div>`;
@@ -2387,7 +2388,7 @@ function _renderAlertasView(el, todos){
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${prazoHtml}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">${tabsHtml}</div>
+    <div class="gtab-wrap" style="margin-bottom:20px;flex-wrap:wrap">${tabsHtml}</div>
 
     <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap">
       <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px 18px;text-align:center;min-width:90px">
@@ -2681,7 +2682,7 @@ async function renderVendasBonus(el){
     <div class="page-header">
       <div><h1>&#x1f4b0; Vendas e Bónus</h1><div class="subtitle">Elegibilidade trimestral · Angariação PT</div></div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:20px">
+    <div class="gtab-wrap" style="margin-bottom:20px">
       ${['resumo','detalhe','angariacoes'].map(t=>`<button class="gtab${_vendasTab===t?' gtab-active':''}" onclick="switchVendasTab('${t}',this)">${t==='resumo'?'Resumo Trimestral':t==='detalhe'?'Vendas do Trimestre':'Angariação PT/DUO'}</button>`).join('')}
     </div>
     <div id="vendasInner"><div style="color:var(--text-muted);padding:40px;text-align:center">A carregar...</div></div>`;
