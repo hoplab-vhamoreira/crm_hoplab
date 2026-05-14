@@ -228,7 +228,16 @@ const _SB = supabase.createClient(
 );
 const _TABLE_MAP = {'clientes':'clientes','pipeline':'pipeline','log_comercial':'log_comercial','conversoes':'conversoes','avaliacoes':'avaliacoes','servicos':'servicos','log_operacional':'log_operacional','log_contratos':'log_contratos','parceiros':'parceiros','entidades_faturacao':'entidades_faturacao','falhas_sancoes':'falhas_sancoes','catalogo_faltas':'catalogo_faltas','niveis_sancao':'niveis_sancao','pag_clientes_2025':'pag_clientes_2025','pag_clientes_2026':'pag_clientes_2026','pagamentos_treinadores':'pagamentos_treinadores','totais_pagamentos':'totais_pagamentos','motor2026':'motor2026','dados_colaboradores':'dados_colaboradores','log_colaboradores':'log_colaboradores','ciclos':'ciclos','adesoes_validar':'adesoes_validar','alertas':'alertas','historico':'historico','vendas_log':'vendas_log','vendas_bonus':'vendas_bonus','precario_publico':'precario_publico','calculadora':'calculadora','responsabilidades':'responsabilidades','matriz_partilhas':'matriz_partilhas','users':'profiles'};
 const _idCache = {};
-async function _sbGetAll(t){const{data,error}=await _SB.from(t).select('*');if(error)return{error:error.message};_idCache[t]=data.map(r=>r.id);return data;}
+function _recomputeClienteContacto(r){
+  if(!r) return r;
+  const uc = r['Último Contacto'];
+  if(uc){
+    const diff = Math.floor((Date.now() - new Date(uc).getTime()) / 86400000);
+    r['Dias s/ Contacto'] = Math.max(0, diff);
+  }
+  return r;
+}
+async function _sbGetAll(t){const{data,error}=await _SB.from(t).select('*');if(error)return{error:error.message};_idCache[t]=data.map(r=>r.id);if(t==='clientes'&&Array.isArray(data))data.forEach(_recomputeClienteContacto);return data;}
 async function _sbInsert(t,b){const{data,error}=await _SB.from(t).insert(b).select().single();if(error)return{error:error.message};return data;}
 async function _sbUpdate(t,i,b){const ids=_idCache[t];if(!ids||ids[i]===undefined)return{error:'ID nao encontrado - recarrega'};const{data,error}=await _SB.from(t).update(b).eq('id',ids[i]).select().single();if(error)return{error:error.message};return data;}
 async function _sbDelete(t,i){const ids=_idCache[t];if(!ids||ids[i]===undefined)return{error:'ID nao encontrado'};const{error}=await _SB.from(t).delete().eq('id',ids[i]);if(error)return{error:error.message};return{ok:true};}
@@ -282,7 +291,7 @@ async function api(url,opts={}){
   if(cM){
     const nome=decodeURIComponent(cM[1]);
     const[cli,serv,aval,log,pag]=await Promise.all([_SB.from('clientes').select('*').eq('Nome',nome).single(),_SB.from('servicos').select('*').eq('Cliente',nome),_SB.from('avaliacoes').select('*').eq('Nome',nome),_SB.from('historico').select('*').eq('cliente',nome).order('timestamp',{ascending:false}),_SB.from('pag_clientes_2026').select('*').eq('Cliente',nome)]);
-    return{cliente:cli.data,servicos:serv.data||[],avaliacoes:aval.data||[],historico:log.data||[],pagamentos:pag.data||[]};
+    return{cliente:_recomputeClienteContacto(cli.data),servicos:serv.data||[],avaliacoes:aval.data||[],historico:log.data||[],pagamentos:pag.data||[]};
   }
   const oM=url.match(/^\/api\/on\/(\d+)$/);
   if(oM){const{data}=await _SB.from('pipeline').select('*').eq('N\u00ba ON',parseInt(oM[1])).single();return data||{};}
