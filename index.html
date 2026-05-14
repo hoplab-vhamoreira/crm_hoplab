@@ -1924,43 +1924,35 @@ async function _loadAvaliacoesList(forceReload){
       <td>${sinalCell(a)}</td>
       <td>${cobrancaCell(a)}</td>
       <td style="text-align:right">
-        <button onclick="event.stopPropagation();abrirEditarAval(${a._idx})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px" title="Editar" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">&#x270f;</button>
+        <button onclick="event.stopPropagation();abrirEditarAval(${a._idx})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px" title="Editar" onmouseover="this.style.color='var(--primary-text)'" onmouseout="this.style.color='var(--text-muted)'">&#x270f;</button>
       </td>
     </tr>`).join('');
 
   content.innerHTML = `
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
       <select style="${selStyle}" onchange="_avalListMes=this.value;_loadAvaliacoesList()">${mesesOpts}</select>
       <select style="${selStyle}" onchange="_avalListAno=this.value;_loadAvaliacoesList()">${anosOpts}</select>
-      <select style="${selStyle}" onchange="_avalFiltApar=this.value;_loadAvaliacoesList()">
-        ${apareceuOpts.map(([v,l])=>`<option value="${v}" ${v===_avalFiltApar?'selected':''}>${l}</option>`).join('')}
-      </select>
       <select style="${selStyle}" onchange="_avalFiltSinal=this.value;_loadAvaliacoesList()">
         ${sinalOpts.map(([v,l])=>`<option value="${v}" ${v===_avalFiltSinal?'selected':''}>${l}</option>`).join('')}
       </select>
     </div>
-    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px">
-        <span style="color:var(--success)">&#x2705; Apareceu</span> <strong>${totApare}</strong>
-      </div>
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px">
-        <span style="color:var(--danger)">&#x274c; N\xe3o apareceu</span> <strong>${totNaoApare}</strong>
-      </div>
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px">
-        <span style="color:var(--text-muted)">&#x23f3; Pendente</span> <strong>${totPendente}</strong>
-      </div>
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px">
-        <span style="color:var(--success)">&#x1f4b0; Sinal pago</span> <strong>${totSinal}</strong>
-      </div>
+    <div class="gtab-wrap" style="margin-bottom:16px">
+      <button class="gtab${!_avalFiltApar?' gtab-active':''}" onclick="_avalFiltApar='';_loadAvaliacoesList()">Todos <strong>${filtered.length}</strong></button>
+      <button class="gtab${_avalFiltApar==='Sim'?' gtab-active':''}" onclick="_avalFiltApar='Sim';_loadAvaliacoesList()">&#x2705; Apareceu <strong>${totApare}</strong></button>
+      <button class="gtab${_avalFiltApar==='N\xe3o'?' gtab-active':''}" onclick="_avalFiltApar='N\xe3o';_loadAvaliacoesList()">&#x274c; N\xe3o apareceu <strong>${totNaoApare}</strong></button>
+      <button class="gtab${_avalFiltApar==='pendente'?' gtab-active':''}" onclick="_avalFiltApar='pendente';_loadAvaliacoesList()">&#x23f3; Pendente <strong>${totPendente}</strong></button>
+      <button class="gtab${_avalFiltSinal==='J\xe1 Pago'?' gtab-active':''}" onclick="_avalFiltSinal=_avalFiltSinal==='J\xe1 Pago'?'':'J\xe1 Pago';_loadAvaliacoesList()">&#x1f4b0; Sinal pago <strong>${totSinal}</strong></button>
     </div>
     <div class="table-wrap">
+      <div class="tbl-scroll">
       <table class="tbl">
         <thead><tr>
           <th>Data</th><th>Cliente</th><th>Servi\xe7o</th><th>T\xe9cnico</th><th>Origem</th>
-          <th>Apareceu</th><th>Sinal</th><th>Cobran\xe7a</th><th></th>
+          <th>Apareceu</th><th>Sinal</th><th>Valor</th><th></th>
         </tr></thead>
         <tbody>${rows||`<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:32px">Sem avalia\xe7\xf5es para este per\xedodo</td></tr>`}</tbody>
       </table>
+      </div>
     </div>`;
 }
 
