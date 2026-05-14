@@ -4261,8 +4261,8 @@ function _renderTotaisView(el){
     totalPag+=c.pag; totalCed+=c.ced; totalNet+=c.net; totalBon+=c.bon;
   });
 
-  const pChip=k=>`<button onclick="_tpPeriodo='${k}';_renderTotaisView(document.getElementById('mainContent'))" style="padding:5px 12px;border-radius:20px;border:1px solid ${_tpPeriodo===k?'var(--primary)':'var(--border)'};background:${_tpPeriodo===k?'rgba(99,102,241,.15)':'none'};color:${_tpPeriodo===k?'var(--primary)':'var(--text-muted)'};cursor:pointer;font-size:12px;font-weight:${_tpPeriodo===k?600:400}">${k}</button>`;
-  const gChip=k=>`<button onclick="_tpGrupo='${k}';_renderTotaisView(document.getElementById('mainContent'))" style="padding:5px 12px;border-radius:20px;border:1px solid ${_tpGrupo===k?'var(--primary)':'var(--border)'};background:${_tpGrupo===k?'rgba(99,102,241,.15)':'none'};color:${_tpGrupo===k?'var(--primary)':'var(--text-muted)'};cursor:pointer;font-size:12px;font-weight:${_tpGrupo===k?600:400}">${k}</button>`;
+  const pChip=k=>`<button onclick="_tpPeriodo='${k}';_renderTotaisView(document.getElementById('mainContent'))" style="padding:5px 12px;border-radius:20px;border:1px solid ${_tpPeriodo===k?'var(--primary-text)':'var(--border)'};background:${_tpPeriodo===k?'rgba(170,255,0,.12)':'none'};color:${_tpPeriodo===k?'var(--primary-text)':'var(--text-muted)'};cursor:pointer;font-size:12px;font-weight:${_tpPeriodo===k?600:400}">${k}</button>`;
+  const gChip=k=>`<button onclick="_tpGrupo='${k}';_renderTotaisView(document.getElementById('mainContent'))" style="padding:5px 12px;border-radius:20px;border:1px solid ${_tpGrupo===k?'var(--primary-text)':'var(--border)'};background:${_tpGrupo===k?'rgba(170,255,0,.12)':'none'};color:${_tpGrupo===k?'var(--primary-text)':'var(--text-muted)'};cursor:pointer;font-size:12px;font-weight:${_tpGrupo===k?600:400}">${k}</button>`;
 
   let rows='';
   for(const r of filtered){
