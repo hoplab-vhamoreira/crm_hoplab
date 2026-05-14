@@ -253,9 +253,13 @@ function _recomputeCicloSemana(r){
   return r;
 }
 const _AVAL_SUGESTAO_MAP = {
-  'AMR (Aval. Metab. Repouso)': 'PT Nutri Fisioterap',
-  'Pack Vitalidade (AM + AMR)': 'PT Nutri',
-  'Pack Elite Pro (AM + AMP + AMR)': 'PT Nutri'
+  'AMR (Aval. Metab. Repouso)':       'PT Nutri Fisioterap',
+  'AMP (Aval. Metab. Performance)':   'PT Nutri Fisioterap',
+  'AM (Avaliação Muscular)':          'PT Fisioterap',
+  'Pack Vitalidade (AM + AMR)':       'PT Nutri',
+  'Pack Performance (AMP + AMR)':     'PT Nutri',
+  'Pack Elite Pro (AM + AMP + AMR)':  'PT Nutri',
+  'Pack Elite (AM + AMP)':            'PT Nutri Fisioterap'
 };
 function _recomputeAvalSugestao(r){
   if(!r) return r;
