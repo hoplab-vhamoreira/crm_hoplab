@@ -2962,21 +2962,25 @@ async function _loadVendasTab(){
     const nRef     = ang.filter(r=>r['Tipo Angariação']==='Referência').length;
 
     const rows = ang.map(r=>{
-      const isHOP = r['Tipo Angariação']==='HOP';
-      const hopCell = isHOP
-        ? `<span style="color:var(--warning);font-weight:700">${r['HOP % mês angariação']}%</span>
-           <span style="font-size:10px;color:var(--text-muted);display:block">${r['Mês Angariação']}</span>
-           ${r['Mês Parcial?']==='Sim'?`<span style="font-size:10px;color:var(--primary-text)">⚠ Início parcial</span>`:''}`
-        : `<span style="color:var(--text-muted)">${r['HOP % normal']}%</span>`;
+      const tipo = r['Tipo Angariação'];
+      const isHOP = tipo==='HOP';
+      const isPropria = tipo==='Própria';
+      const treinadorCell = `${r.Treinador||'—'}${isPropria?`<br><span style="font-size:10px;color:var(--success)">&#x2713; vendeu</span>`:''}`;
+      const angCell = isHOP
+        ? `${tipoBadge(tipo)}<br><span style="font-size:12px;color:var(--warning);font-weight:600">${r['HOP % mês angariação']}%</span>
+           <span style="font-size:10px;color:var(--text-muted)"> · ${r['Mês Angariação']}</span>
+           ${r['Mês Parcial?']==='Sim'?`<br><span style="font-size:10px;color:var(--primary-text)">⚠ Início parcial</span>`:''}`
+        : `${tipoBadge(tipo)}<br><span style="font-size:12px;color:var(--text-muted)">${r['HOP % normal']}%</span>`;
+      const estadoBadge = r['Estado do serviço']==='Em curso'
+        ? `<span style="font-size:10px;color:var(--success)">● Em curso</span>`
+        : `<span style="font-size:10px;color:var(--text-muted)">${r['Estado do serviço']||'—'}</span>`;
       return `<tr class="${isHOP?'row-warn':''}">
         <td><span style="font-size:11px;color:var(--text-muted)">${r.Código||'—'}</span></td>
         <td>${r.Cliente||'—'}</td>
         <td style="font-size:12px;color:var(--text-muted)">${r.Serviço||'—'}</td>
-        <td>${r.Treinador||'—'}</td>
-        <td>${r['Venda de']&&r['Venda de']!=='—'?`<span style="color:var(--success)">${r['Venda de']}</span>`:`<span style="color:var(--text-muted)">—</span>`}</td>
-        <td style="text-align:center">${tipoBadge(r['Tipo Angariação'])}</td>
-        <td style="text-align:center;font-size:13px">${hopCell}</td>
-        <td>${fmtDate(r['Data Início'])}</td>
+        <td>${treinadorCell}</td>
+        <td style="text-align:center">${angCell}</td>
+        <td style="text-align:center">${estadoBadge}<br><span style="font-size:11px;color:var(--text-muted)">${fmtDate(r['Data Início'])}</span></td>
       </tr>`;
     }).join('');
 
@@ -2999,10 +3003,9 @@ async function _loadVendasTab(){
         <table class="tbl">
           <thead><tr>
             <th>Código</th><th>Cliente</th><th>Serviço</th><th>Treinador</th>
-            <th>Venda de</th><th style="text-align:center">Tipo</th>
-            <th style="text-align:center">Comissão HOP angariação</th><th>Data Início</th>
+            <th style="text-align:center">Angariação</th><th style="text-align:center">Estado / Início</th>
           </tr></thead>
-          <tbody>${rows||'<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">Sem serviços PT/DUO</td></tr>'}</tbody>
+          <tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sem serviços PT/DUO</td></tr>'}</tbody>
         </table>
       </div>
       <div style="margin-top:12px;font-size:12px;color:var(--text-muted);display:flex;gap:20px;flex-wrap:wrap">
