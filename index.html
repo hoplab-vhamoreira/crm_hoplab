@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HOP Lab CRM 2.0</title>
 <style>
-:root{--bg:#f0f2f5;--surface:#ffffff;--surface2:#f7f8fa;--border:#e5e7eb;--primary:#aaff00;--primary-hover:#88cc00;--primary-text:#3d6600;--text:#111827;--text-muted:#6b7280;--success:#16a34a;--warning:#d97706;--danger:#dc2626;--info:#2563eb;--radius:10px;--sidebar-w:260px}
+:root{--bg:#f0f2f5;--surface:#ffffff;--surface2:#f7f8fa;--surface3:#e9ecef;--border:#e5e7eb;--primary:#aaff00;--primary-hover:#88cc00;--primary-text:#3d6600;--text:#111827;--text-muted:#6b7280;--success:#16a34a;--warning:#d97706;--danger:#dc2626;--info:#2563eb;--radius:10px;--sidebar-w:260px}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 /* LOGIN */
@@ -159,7 +159,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
 .badge-ok{background:rgba(34,197,94,.15);color:var(--success)}
 .badge-warn{background:rgba(245,158,11,.15);color:var(--warning)}
-.badge-err{background:rgba(239,68,68,.15);color:var(--danger)}
+.badge-err,.badge-danger{background:rgba(239,68,68,.15);color:var(--danger)}
 .badge-info{background:rgba(170,255,0,.18);color:var(--primary-text)}
 /* LOOKUP hint */
 .form-group input[list]{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M7 14l-7-8h14z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
@@ -237,7 +237,7 @@ const _SB = supabase.createClient(
   'https://bocwqacwalzshjkhjzwi.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvY3dxYWN3YWx6c2hqa2hqendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjYyNTYsImV4cCI6MjA5NDAwMjI1Nn0.0FSXkO69PG4na6XLAOSoJ-r2wNQYwyLoOSMIyDH7AvY'
 );
-const _TABLE_MAP = {'clientes':'clientes','pipeline':'pipeline','log_comercial':'log_comercial','conversoes':'conversoes','avaliacoes':'avaliacoes','servicos':'servicos','log_operacional':'log_operacional','log_contratos':'log_contratos','parceiros':'parceiros','entidades_faturacao':'entidades_faturacao','falhas_sancoes':'falhas_sancoes','catalogo_faltas':'catalogo_faltas','niveis_sancao':'niveis_sancao','pag_clientes_2025':'pag_clientes_2025','pag_clientes_2026':'pag_clientes_2026','pagamentos_treinadores':'pagamentos_treinadores','totais_pagamentos':'totais_pagamentos','motor2026':'motor2026','dados_colaboradores':'dados_colaboradores','log_colaboradores':'log_colaboradores','ciclos':'ciclos','adesoes_validar':'adesoes_validar','alertas':'alertas','historico':'historico','vendas_log':'vendas_log','vendas_bonus':'vendas_bonus','precario_publico':'precario_publico','calculadora':'calculadora','responsabilidades':'responsabilidades','matriz_partilhas':'matriz_partilhas','users':'profiles'};
+const _TABLE_MAP = {'clientes':'clientes','pipeline':'pipeline','log_comercial':'log_comercial','conversoes':'conversoes','avaliacoes':'avaliacoes','servicos':'servicos','log_operacional':'log_operacional','log_contratos':'log_contratos','parceiros':'parceiros','entidades_faturacao':'entidades_faturacao','falhas_sancoes':'falhas_sancoes','catalogo_faltas':'catalogo_faltas','niveis_sancao':'niveis_sancao','pag_clientes_2025':'pag_clientes_2025','pag_clientes_2026':'pag_clientes_2026','totais_pagamentos':'totais_pagamentos','motor2026':'motor2026','dados_colaboradores':'dados_colaboradores','log_colaboradores':'log_colaboradores','ciclos':'ciclos','adesoes_validar':'adesoes_validar','alertas':'alertas','historico':'historico','vendas_log':'vendas_log','vendas_bonus':'vendas_bonus','precario_publico':'precario_publico','calculadora':'calculadora','responsabilidades':'responsabilidades','matriz_partilhas':'matriz_partilhas','users':'profiles'};
 const _idCache = {};
 function _recomputeClienteContacto(r){
   if(!r) return r;
@@ -1395,6 +1395,7 @@ async function openAdd(section){
     const rec={};
     for(const f of sec.fields) rec[f.k]=getFieldValue(f);
     const res=await api(`/api/data/${section}`,{method:'POST',body:rec});
+    if(res?.error){ toast('Erro ao adicionar: '+res.error,'error'); return; }
     _lookupCache[`${section}.`+'x']=null;
     sectionData[section]=null;
     closeModal();
@@ -1428,7 +1429,8 @@ async function openEdit(section,idx){
   document.getElementById('modalSave').onclick=async()=>{
     const updates={};
     for(const f of fields) updates[f.k]=getFieldValue(f);
-    await api(`/api/data/${section}/${idx}`,{method:'PUT',body:updates});
+    const res=await api(`/api/data/${section}/${idx}`,{method:'PUT',body:updates});
+    if(res?.error){ toast('Erro ao guardar: '+res.error,'error'); return; }
     sectionData[section]=null;
     closeModal();
     await renderDataPage(document.getElementById('mainContent'),section);
@@ -1438,7 +1440,8 @@ async function openEdit(section,idx){
 
 async function deleteRec(section,idx){
   if(!confirm('Eliminar este registo?')) return;
-  await api(`/api/data/${section}/${idx}`,{method:'DELETE'});
+  const res=await api(`/api/data/${section}/${idx}`,{method:'DELETE'});
+  if(res?.error){ toast('Erro ao eliminar: '+res.error,'error'); return; }
   sectionData[section]=null;
   await renderDataPage(document.getElementById('mainContent'),section);
   toast('Registo eliminado');
@@ -2068,7 +2071,7 @@ async function _loadAgenda(){
         ? `<td style="text-align:center">${apareceuBadge(e.apareceu)}</td><td style="text-align:center">${sinalBadge(e.sinal)}</td>`
         : `<td></td><td></td>`;
       return `
-      <tr style="cursor:pointer" onclick="${isAval && e._idx!=null ? `abrirEditarAval(${e._idx})` : `if('${encodeURIComponent(e.cliente||'')}') abrirCliente('${encodeURIComponent(e.cliente||'')}')`}">
+      <tr style="cursor:pointer" onclick="${isAval && e._idx!=null ? `abrirEditarAval(${e._idx})` : `if('${(e.cliente||'').replace(/'/g,"\\'")}') openClienteDetalhe('${(e.cliente||'').replace(/'/g,"\\'")}')`}">
         <td><strong>${e.cliente||'—'}</strong>${horaStr}</td>
         <td><span class="badge ${tipoColor(e.tipo)}">${e.tipo}</span></td>
         <td>${e.servico||'—'}</td>
@@ -3284,7 +3287,8 @@ async function savePermissions(){
     if(cb.checked) perms[role].push(col);
   });
   if(perms['Admin']&&!perms['Admin'].includes('backoffice')) perms['Admin'].push('backoffice');
-  await api('/api/permissions',{method:'PUT',body:perms});
+  const resPerm=await api('/api/permissions',{method:'PUT',body:perms});
+  if(resPerm?.error){ toast('Erro ao guardar: '+resPerm.error,'error'); return; }
   toast('Permissoes guardadas');
 }
 
@@ -3300,7 +3304,8 @@ function addUserModal(){
   document.getElementById('modalSave').onclick=async()=>{
     const u={username:document.getElementById('field_username').value,name:document.getElementById('field_name').value,
       password:document.getElementById('field_password').value,role:document.getElementById('field_role').value};
-    await api('/api/users',{method:'POST',body:u});
+    const resUser=await api('/api/users',{method:'POST',body:u});
+    if(resUser?.error){ toast('Erro ao criar utilizador: '+resUser.error,'error'); return; }
     closeModal();renderBackoffice(document.getElementById('mainContent'));
     toast('Utilizador criado');
   };
