@@ -243,17 +243,22 @@ function _recomputeClienteContacto(r){
 }
 function _recomputeCicloSemana(r){
   if(!r) return r;
-  const di = r['Data Início']; const df = r['Data Fim']; const tipo = r['Tipo']||'';
+  const _diKey = Object.keys(r).find(k=>/data.+in/i.test(k)&&!/fim/i.test(k)) || 'Data Início';
+  const _dfKey = Object.keys(r).find(k=>/data.+fim/i.test(k)) || 'Data Fim';
+  const di = r[_diKey]; const df = r[_dfKey]; const tipo = r['Tipo']||'';
   const m = /^GL(\d+)/i.exec(tipo); const totalSem = m?parseInt(m[1]):null;
   const hoje = new Date(); hoje.setHours(0,0,0,0);
-  if(!di){ r['Semana Actual'] = '—'; return r; }
-  const dIni = new Date(di); dIni.setHours(0,0,0,0);
-  const dFim = df ? (()=>{const d=new Date(df);d.setHours(0,0,0,0);return d;})() : null;
-  if(hoje < dIni){ r['Semana Actual'] = 'Não iniciado'; return r; }
-  if(dFim && hoje > dFim){ r['Semana Actual'] = 'Terminado'; return r; }
+  if(!di){ r['Semana Actual'] = '—'; r['Status'] = r['Status']||'—'; return r; }
+  const dIni = new Date(String(di).slice(0,10)+'T00:00:00');
+  const dFim = df ? new Date(String(df).slice(0,10)+'T00:00:00') : null;
+  if(hoje < dIni){ r['Semana Actual'] = 'Não iniciado'; r['Status'] = 'Por iniciar'; r['Validade'] = '—'; return r; }
+  if(dFim && hoje > dFim){ r['Semana Actual'] = 'Terminado'; r['Status'] = '❌ Expirado'; r['Validade'] = '—'; return r; }
   const semAtual = Math.floor((hoje - dIni)/(86400000*7)) + 1;
-  if(totalSem && semAtual > totalSem){ r['Semana Actual'] = 'Terminado'; return r; }
+  if(totalSem && semAtual > totalSem){ r['Semana Actual'] = 'Terminado'; r['Status'] = '❌ Expirado'; r['Validade'] = '—'; return r; }
   r['Semana Actual'] = totalSem ? `Semana ${semAtual} de ${totalSem}` : `Semana ${semAtual}`;
+  r['Status'] = 'Em curso';
+  if(dFim){ const semRest = Math.ceil((dFim - hoje)/(86400000*7)); r['Validade'] = semRest > 0 ? `${semRest} sem. restantes` : '—'; }
+  else { r['Validade'] = '—'; }
   return r;
 }
 const _AVAL_SUGESTAO_MAP = {
@@ -321,14 +326,29 @@ async function api(url,opts={}){
   if(url==='/api/historico_faturacao'){const[r25,r26]=await Promise.all([_SB.from('pag_clientes_2025').select('*'),_SB.from('pag_clientes_2026').select('*')]);return{pag2025:r25.data||[],pag2026:r26.data||[]};}
   if(url==='/api/avaliacoes/lista'){const{data}=await _SB.from('avaliacoes').select('*').order('Data',{ascending:false});return data||[];}
   if(url==='/api/vendas/angariacoes'){const{data}=await _SB.from('vendas_log').select('*');return data||[];}
-  if(url==='/api/falhas/resumo'){
+  if(url.startsWith('/api/falhas/resumo')){
+    const _trimQ = url.includes('?') ? decodeURIComponent(url.split('trimestre=')[1]||'') : '';
     const[fs,cat,niv]=await Promise.all([_SB.from('falhas_sancoes').select('*'),_SB.from('catalogo_faltas').select('*'),_SB.from('niveis_sancao').select('*')]);
-    // Agregar pontos por professor
+    const catalogo=cat.data||[]; const niveis=niv.data||[];
+    // Enrich falhas with Categoria + Pontos from catalogo
+    const enrich=f=>{const ci=catalogo.find(c=>c['Falta']===f['Falta']);return{...f,Categoria:ci?.['Categoria']||'—',Pontos:ci?.['Pontos']||0};};
+    const allFalhas=(fs.data||[]).map(enrich);
+    // Compute trimestres
+    const _toTrim=d=>{if(!d)return null;const dt=new Date(String(d).slice(0,10)+'T00:00:00');const q=Math.ceil((dt.getMonth()+1)/3);return`Q${q} ${dt.getFullYear()}`;};
+    const trimestres=[...new Set(allFalhas.map(f=>_toTrim(f['Data'])).filter(Boolean))].sort().reverse();
+    // Filter by trimestre
+    const filtered=_trimQ?allFalhas.filter(f=>_toTrim(f['Data'])===_trimQ):allFalhas;
+    // Aggregate pontos by professor
     const pontos={};
-    (fs.data||[]).forEach(f=>{const p=f['Professor']||'?';const cat_item=(cat.data||[]).find(c=>c['Falta']===f['Falta']);const pts=cat_item?.['Pontos']||0;pontos[p]=(pontos[p]||0)+pts;});
-    const niveis=niv.data||[];
-    const resumo=Object.entries(pontos).map(([prof,pts])=>{const nivel=niveis.find(n=>pts>=n['Pontos Mín']&&pts<=n['Pontos Máx']);return{Professor:prof,Pontos:pts,Nivel:nivel?.['Designação']||'—',Medida:nivel?.['Medida']||'—'};});
-    return{resumo,falhas:fs.data||[],catalogo:cat.data||[],niveis};
+    filtered.forEach(f=>{const p=f['Professor']||'?';pontos[p]=(pontos[p]||0)+(f.Pontos||0);});
+    // Robust key access for niveis_sancao (accented column names may mismatch encoding)
+    const _nv0=niveis[0]||{};const _nvKeys=Object.keys(_nv0);
+    const _kMin=_nvKeys.find(k=>/pontos/i.test(k)&&/m.n/i.test(k))||'Pontos Mín';
+    const _kMax=_nvKeys.find(k=>/pontos/i.test(k)&&/m.x/i.test(k))||'Pontos Máx';
+    const _kNiv=_nvKeys.find(k=>/n.vel/i.test(k)&&!/pontos/i.test(k))||'Nível';
+    const _kDes=_nvKeys.find(k=>/designa/i.test(k))||'Designação';
+    const resumo=Object.entries(pontos).map(([prof,pts])=>{const nv=niveis.find(n=>pts>=n[_kMin]&&pts<=n[_kMax]);return{Professor:prof,Pontos:pts,Nivel:nv?.[_kNiv]??-1,Designacao:nv?.[_kDes]||'—',Medida:nv?.['Medida']||'—'};});
+    return{resumo,trimestres,falhas:filtered,catalogo,niveis};
   }
   if(url==='/api/falhas/catalogo'){const[c,n]=await Promise.all([_SB.from('catalogo_faltas').select('*'),_SB.from('niveis_sancao').select('*')]);return{catalogo:c.data||[],niveis:n.data||[]};}
   if(url==='/api/users'){const{data}=await _SB.from('profiles').select('*').order('id');return data||[];}
@@ -1176,7 +1196,7 @@ let _gestaoTab = 'GL4';
 async function renderGestaoClientes(el){
   if(!sectionData['ciclos']){
     const d = await api('/api/data/ciclos');
-    sectionData['ciclos'] = d.error ? [] : d;
+    const _cd = d.error ? [] : d; _cd.forEach(_recomputeCicloSemana); sectionData['ciclos'] = _cd;
   }
   _renderGestaoContent(el);
 }
@@ -1230,7 +1250,8 @@ function _renderGestaoInner(inner, ciclos){
     if(st==='Concluído')   return `<span class="badge" style="background:rgba(148,163,184,.15);color:var(--text-muted)">Concluído</span>`;
     if(st==='Por iniciar') return `<span class="badge badge-info">Por iniciar</span>`;
     if(st==='Não iniciado') return `<span class="badge" style="background:rgba(148,163,184,.15);color:var(--text-muted)">Não iniciado</span>`;
-    return `<span class="badge badge-info">${st}</span>`;
+    if(st.includes('Expirado')||st.includes('❌')) return `<span class="badge badge-danger" style="font-size:11px">${st}</span>`;
+    return `<span class="badge badge-info" style="font-size:11px">${st}</span>`;
   };
 
   const rows = filtrados.map(c=>{
@@ -1498,7 +1519,7 @@ async function openAddCicloModal(nomeEnc){
       closeModal(); toast('Ciclo criado');
       sectionData['ciclos']=null;
       const d = await api('/api/data/ciclos');
-      sectionData['ciclos'] = d.error?[]:d;
+      const _cd2 = d.error?[]:d; _cd2.forEach(_recomputeCicloSemana); sectionData['ciclos']=_cd2;
       abrirGestaoCliente(encodeURIComponent(nome));
     } else { toast(res.error||'Erro ao criar ciclo','error'); }
   };
@@ -1514,6 +1535,16 @@ function _cicloAutoFim(){
   else if(tipo==='GL12') d.setDate(d.getDate()+83);
   else return;
   const el = document.getElementById('cc_fim');
+  if(el) el.value = d.toISOString().slice(0,10);
+}
+function _editCicloAutoFim(tipo){
+  const ini = (document.getElementById('ec_inicio')||{}).value;
+  if(!ini||!tipo) return;
+  const d = new Date(ini+'T00:00:00');
+  if(tipo==='GL4')       d.setDate(d.getDate()+27);
+  else if(tipo==='GL12') d.setDate(d.getDate()+83);
+  else return;
+  const el = document.getElementById('ec_fim');
   if(el) el.value = d.toISOString().slice(0,10);
 }
 
@@ -1568,8 +1599,8 @@ async function openEditCicloModal(idx){
   document.getElementById('modalTitle').textContent = `Editar — ${tipo} Ciclo ${ciclo['Ciclo N\xba']||''} (${nome})`;
   document.getElementById('modalBody').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group"><label>Data In\xedcio</label><input type="date" id="ec_inicio" value="${inic}"></div>
-      <div class="form-group"><label>Data Fim</label><input type="date" id="ec_fim" value="${fim}"></div>
+      <div class="form-group"><label>Data In\xedcio</label><input type="date" id="ec_inicio" value="${inic}" onchange="_editCicloAutoFim('${tipo}')"></div>
+      <div class="form-group"><label>Data Fim <span style="font-size:10px;color:var(--text-muted)">(auto)</span></label><input type="date" id="ec_fim" value="${fim}"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group"><label>Wearable</label><input type="number" id="ec_wear" value="${ciclo['Wearable']||0}" min="0"></div>
@@ -1613,7 +1644,7 @@ async function openEditCicloModal(idx){
       closeModal(); toast('Ciclo atualizado');
       sectionData['ciclos']=null;
       const d = await api('/api/data/ciclos');
-      sectionData['ciclos'] = d.error?[]:d;
+      const _cd3 = d.error?[]:d; _cd3.forEach(_recomputeCicloSemana); sectionData['ciclos']=_cd3;
       abrirGestaoCliente(encodeURIComponent(nome));
     } else { toast(res.error||'Erro','error'); }
   };
@@ -1628,7 +1659,7 @@ async function deleteCiclo(idx, nomeEnc){
     toast('Ciclo eliminado');
     sectionData['ciclos']=null;
     const d = await api('/api/data/ciclos');
-    sectionData['ciclos'] = d.error?[]:d;
+    const _cd4 = d.error?[]:d; _cd4.forEach(_recomputeCicloSemana); sectionData['ciclos']=_cd4;
     abrirGestaoCliente(encodeURIComponent(nome));
   } else { toast(res.error||'Erro','error'); }
 }
@@ -2142,8 +2173,9 @@ async function _loadFalhasTab(){
     if(d.error){ inner.innerHTML=`<p style="color:var(--danger)">${d.error}</p>`; return; }
     const resumo = d.resumo || [];
     const trimestres = d.trimestres || [];
+    if(!_falhasTrimestre && trimestres.length){ _falhasTrimestre = trimestres[0]; return _loadFalhasTab(); }
     const nivelBadge = (n, des) => {
-      if(n===0) return `<span class="badge badge-ok">✓ ${des}</span>`;
+      if(n<=0) return `<span class="badge badge-ok">✓ ${des}</span>`;
       if(n===1) return `<span class="badge badge-info">${des}</span>`;
       if(n===2) return `<span class="badge badge-warn">${des}</span>`;
       return `<span class="badge badge-err">${des}</span>`;
@@ -2152,37 +2184,32 @@ async function _loadFalhasTab(){
       <tr>
         <td><strong>${r.Professor}</strong></td>
         <td style="text-align:center"><strong style="font-size:18px;color:${r.Pontos>5?'var(--danger)':r.Pontos>2?'var(--warning)':'var(--success)'}">${r.Pontos}</strong></td>
-        <td>${nivelBadge(r.Nível, r.Designação)}</td>
+        <td>${nivelBadge(r.Nivel, r.Designacao)}</td>
         <td style="font-size:12px;color:var(--text-muted)">${r.Medida||'—'}</td>
-        <td style="text-align:center"><span class="badge ${r.Clean==='Sim'?'badge-ok':'badge-err'}">${r.Clean==='Sim'?'✓ Limpo':'✗'}</span></td>
       </tr>`).join('');
-    const trimestreSel = trimestres.map(t=>`<option value="${t}" ${t===(_falhasTrimestre||trimestres[0])?'selected':''}>${t}</option>`).join('');
+    const trimestreSel = trimestres.map(t=>`<option value="${t}" ${t===_falhasTrimestre?'selected':''}>${t}</option>`).join('');
     inner.innerHTML = `
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
         <label style="font-size:13px;color:var(--text-muted)">Trimestre:</label>
         <select onchange="_falhasTrimestre=this.value;_loadFalhasTab()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px">${trimestreSel}</select>
       </div>
       <div class="table-wrap">
-        <table class="tbl"><thead><tr><th>Colaborador</th><th style="text-align:center">Pontos</th><th>Nível</th><th>Medida</th><th style="text-align:center">Clean?</th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Sem registos</td></tr>'}</tbody></table>
+        <table class="tbl"><thead><tr><th>Colaborador</th><th style="text-align:center">Pontos</th><th>Nível</th><th>Medida</th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Sem registos</td></tr>'}</tbody></table>
       </div>`;
 
   } else if(_falhasTab === 'log'){
-    if(!sectionData['falhas_sancoes']){
-      const d = await api('/api/data/falhas_sancoes');
-      sectionData['falhas_sancoes'] = d.error ? [] : d;
-    }
-    const log = [...(sectionData['falhas_sancoes']||[])].sort((a,b)=>(b.Data||'').localeCompare(a.Data||''));
-    const catBadge = c => c==='Muito Grave'?`<span class="badge badge-err">${c}</span>`:c==='Grave'?`<span class="badge badge-warn">${c}</span>`:`<span class="badge badge-info">${c}</span>`;
-    const rows = log.map((e,i)=>`
-      <tr>
+    const _rd = await api('/api/falhas/resumo');
+    const log = [...(_rd.falhas||[])].sort((a,b)=>(b.Data||'').localeCompare(a.Data||''));
+    const catBadge = c => c==='Grave'||c==='Muito Grave'?`<span class="badge badge-err">${c}</span>`:c==='Não Grave'?`<span class="badge badge-info">${c}</span>`:`<span class="badge badge-warn">${c}</span>`;
+    const rows = log.map((e,i)=>`<tr>
         <td>${fmtDate(e.Data)}</td>
         <td><strong>${e.Professor||'—'}</strong></td>
         <td>${e.Falta||'—'}</td>
         <td>${catBadge(e.Categoria||'—')}</td>
         <td style="text-align:center"><strong>${e.Pontos||0}</strong></td>
-        <td style="font-size:11px;color:var(--text-muted)">${e.Âmbito||'—'}</td>
-        <td>${e.Notas||'—'}</td>
+        <td style="font-size:11px;color:var(--text-muted)">${e['Âmbito']||'—'}</td>
+        <td style="font-size:11px">${e.Notas||'—'}</td>
         <td><button onclick="deleteRec('falhas_sancoes',${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px" title="Eliminar" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">🗑️</button></td>
       </tr>`).join('');
     inner.innerHTML = `
@@ -2195,8 +2222,9 @@ async function _loadFalhasTab(){
       </div>`;
 
   } else { // catalogo
-    const cat = await api('/api/falhas/catalogo');
-    if(cat.error||!cat.length){ inner.innerHTML=`<div style="color:var(--text-muted);padding:40px;text-align:center">Sem dados</div>`; return; }
+    const _catRes = await api('/api/falhas/catalogo');
+    const cat = _catRes.catalogo||[];
+    if(_catRes.error||!cat.length){ inner.innerHTML=`<div style="color:var(--text-muted);padding:40px;text-align:center">Sem dados</div>`; return; }
     const catBadge = c => c==='Muito Grave'?`<span class="badge badge-err">${c}</span>`:c==='Grave'?`<span class="badge badge-warn">${c}</span>`:`<span class="badge badge-info">${c}</span>`;
     let lastAmb = '';
     const rows = cat.map(f=>{
@@ -3081,7 +3109,7 @@ function renderStatusBadges(s){
 
 function fmtDate(d){
   if(!d) return '—';
-  const s=String(d).replace('T',' ').substring(0,16);
+  const s=String(d).slice(0,10);
   return s||'—';
 }
 
