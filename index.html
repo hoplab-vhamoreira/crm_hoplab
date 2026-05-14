@@ -255,7 +255,13 @@ async function api(url,opts={}){
     await Promise.all(Object.entries(_TABLE_MAP).map(async([k,t])=>{const{count}=await _SB.from(t).select('*',{count:'exact',head:true});result[k]=count??0;}));
     return result;
   }
-  if(url==='/api/alertas'){const{data}=await _SB.from('alertas').select('*').order('Prioridade');return data||[];}
+  if(url==='/api/alertas'){
+    const{data}=await _SB.from('v_alertas').select('*').order('Prioridade');
+    const rows=data||[];
+    rows.forEach((r,i)=>r._idx=i);
+    _idCache['alertas']=rows.map(r=>r._source==='manual'?r._manual_id:null);
+    return rows;
+  }
   if(url==='/api/historico_faturacao'){const[r25,r26]=await Promise.all([_SB.from('pag_clientes_2025').select('*'),_SB.from('pag_clientes_2026').select('*')]);return{pag2025:r25.data||[],pag2026:r26.data||[]};}
   if(url==='/api/avaliacoes/lista'){const{data}=await _SB.from('avaliacoes').select('*').order('Data',{ascending:false});return data||[];}
   if(url==='/api/vendas/angariacoes'){const{data}=await _SB.from('vendas_log').select('*');return data||[];}
@@ -2299,8 +2305,10 @@ function _renderAlertasView(el, todos){
       <td style="text-align:center">${prioBadge(r.Prioridade)}</td>
       <td>${fonteBadge(r.Fonte||'')}</td>
       <td style="white-space:nowrap">
-        <button onclick="openEditAlerta(${idx})" style="${btnStyle}" title="Editar">✏️</button>
-        <button onclick="resolverAlerta(${idx})" style="${btnStyle};margin-left:4px;color:var(--success)" title="Marcar como resolvido">✓</button>
+        ${r._source==='manual'
+          ? `<button onclick="openEditAlerta(${idx})" style="${btnStyle}" title="Editar">✏️</button>
+             <button onclick="resolverAlerta(${idx})" style="${btnStyle};margin-left:4px;color:var(--success)" title="Marcar como resolvido">✓</button>`
+          : `<span style="font-size:10px;color:var(--text-muted);padding:2px 6px;border:1px solid var(--border);border-radius:4px" title="Alerta automático — resolve-se quando o problema é tratado na tabela de origem">auto</span>`}
       </td>
     </tr>`;
   }).join('');
@@ -2411,11 +2419,14 @@ async function openAddAlerta(){
 }
 
 async function openEditAlerta(idx){
-  const rec = (_alertasTodosDados||[]).find(r=>r._idx===idx)||{};
+  const rec = (_alertasTodosDados||[]).find(r=>r._idx===idx);
+  if(!rec || rec._source!=='manual'){ toast('Alerta automático — não editável','error'); return; }
   await _alertasModalForm('Editar Alerta', rec, body=>api(`/api/data/alertas/${idx}`,{method:'PUT',body}));
 }
 
 async function resolverAlerta(idx){
+  const rec = (_alertasTodosDados||[]).find(r=>r._idx===idx);
+  if(!rec || rec._source!=='manual'){ toast('Alerta automático — resolve-se ao tratar a origem','error'); return; }
   if(!confirm('Marcar como resolvido e eliminar este alerta?')) return;
   const res = await api(`/api/data/alertas/${idx}`,{method:'DELETE'});
   if(res && res.ok){
