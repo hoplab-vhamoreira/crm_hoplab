@@ -237,7 +237,7 @@ const _SB = supabase.createClient(
   'https://bocwqacwalzshjkhjzwi.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvY3dxYWN3YWx6c2hqa2hqendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjYyNTYsImV4cCI6MjA5NDAwMjI1Nn0.0FSXkO69PG4na6XLAOSoJ-r2wNQYwyLoOSMIyDH7AvY'
 );
-const _TABLE_MAP = {'clientes':'clientes','pipeline':'pipeline','log_comercial':'log_comercial','conversoes':'conversoes','avaliacoes':'avaliacoes','servicos':'servicos','log_operacional':'log_operacional','log_contratos':'log_contratos','parceiros':'parceiros','entidades_faturacao':'entidades_faturacao','falhas_sancoes':'falhas_sancoes','catalogo_faltas':'catalogo_faltas','niveis_sancao':'niveis_sancao','pag_clientes_2025':'pag_clientes_2025','pag_clientes_2026':'pag_clientes_2026','totais_pagamentos':'totais_pagamentos','motor2026':'motor2026','dados_colaboradores':'dados_colaboradores','log_colaboradores':'log_colaboradores','ciclos':'ciclos','adesoes_validar':'adesoes_validar','alertas':'alertas','historico':'historico','vendas_log':'vendas_log','vendas_bonus':'vendas_bonus','precario_publico':'precario_publico','calculadora':'calculadora','responsabilidades':'responsabilidades','matriz_partilhas':'matriz_partilhas','users':'profiles'};
+const _TABLE_MAP = {'clientes':'clientes','pipeline':'pipeline','log_comercial':'log_comercial','conversoes':'conversoes','avaliacoes':'avaliacoes','servicos':'servicos','log_operacional':'log_operacional','log_contratos':'log_contratos','parceiros':'parceiros','entidades_faturacao':'entidades_faturacao','falhas_sancoes':'falhas_sancoes','catalogo_faltas':'catalogo_faltas','niveis_sancao':'niveis_sancao','pag_clientes_2025':'pag_clientes_2025','pag_clientes_2026':'pag_clientes_2026','totais_pagamentos':'totais_pagamentos','motor2026':'motor2026','dados_colaboradores':'dados_colaboradores','log_colaboradores':'log_colaboradores','ciclos':'ciclos','adesoes_validar':'adesoes_validar','alertas':'alertas','historico':'historico','vendas_log':'vendas_log','vendas_bonus':'vendas_bonus','precario_publico':'precario_publico','calculadora':'calculadora','responsabilidades':'responsabilidades','matriz_partilhas':'matriz_partilhas','substituicoes_treino':'substituicoes_treino','users':'profiles'};
 const _idCache = {};
 function _recomputeClienteContacto(r){
   if(!r) return r;
@@ -454,12 +454,15 @@ async function api(url,opts={}){
   const colabM=url.match(/^\/api\/colaborador\/(.+)$/);
   if(colabM){
     const nome=decodeURIComponent(colabM[1]);
-    const[dc,lc,hist]=await Promise.all([
+    const[dc,lc,hist,subOrig,subSubst]=await Promise.all([
       _SB.from('dados_colaboradores').select('*').eq('Nome Oficial',nome).single(),
       _SB.from('log_colaboradores').select('*').eq('Colaborador',nome).order('Data',{ascending:false}),
-      _SB.from('historico').select('*').eq('colaborador',nome).order('timestamp',{ascending:false})
+      _SB.from('historico').select('*').eq('colaborador',nome).order('timestamp',{ascending:false}),
+      _SB.from('substituicoes_treino').select('*').eq('Técnico Original',nome).order('Data Início',{ascending:false}),
+      _SB.from('substituicoes_treino').select('*').eq('Técnico Substituto',nome).order('Data Início',{ascending:false})
     ]);
-    return{info:dc.data||{},log_colaboradores:lc.data||[],historico:hist.data||[]};
+    return{info:dc.data||{},log_colaboradores:lc.data||[],historico:hist.data||[],
+      sub_como_original:subOrig.data||[],sub_como_substituto:subSubst.data||[]};
   }
   // /api/historico/revert/<id>
   const revertM=url.match(/^\/api\/historico\/revert\/(.+)$/);
@@ -4126,6 +4129,8 @@ function renderColaboradorDetalhe(el, nome, d){
   const info = d.info || {};
   const logEv = d.log_colaboradores || [];
   const hist  = d.historico || [];
+  const subOrig  = d.sub_como_original || [];
+  const subSubst = d.sub_como_substituto || [];
   const nomeEsc = nome.replace(/'/g,"\\'");
 
   // ── Ficha de dados ──────────────────────────────────────────────────────────
@@ -4175,6 +4180,46 @@ function renderColaboradorDetalhe(el, nome, d){
     ? `<div class="timeline">${hist.map(h=>buildHistItem(h)).join('')}</div>`
     : `<div class="tl-empty">Sem histórico de sistema.<br><small>Edições à ficha e eventos registados aparecerão aqui automaticamente.</small></div>`;
 
+  // ── Substituições ────────────────────────────────────────────────────────────
+  const _subEstadoBadge = e => e==='Ativo'
+    ? `<span class="badge badge-ok">Ativo</span>`
+    : `<span class="badge" style="background:rgba(148,163,184,.15);color:var(--text-muted)">Concluído</span>`;
+  const _subRow = (r, showComp) => {
+    const vps = parseFloat(r['Valor por Sessão'])||0;
+    const vtot = parseFloat(r['Valor Total'])||0;
+    return `<tr>
+      <td style="font-weight:500">${r['Cliente']||'—'}</td>
+      <td>${r['Técnico Original']||'—'}</td>
+      <td>${r['Técnico Substituto']||'—'}</td>
+      <td style="font-size:12px">${r['Data Início']||'—'} ${r['Data Fim']?'→ '+r['Data Fim']:''}</td>
+      <td style="text-align:center">${r['Frequência Semanal']||'—'}x/sem</td>
+      <td style="text-align:right">${(parseFloat(r['Mensalidade'])||0).toFixed(0)}€</td>
+      <td style="text-align:center">${r['Sessões Dadas']||0}</td>
+      <td style="text-align:right;font-size:11px;color:var(--text-muted)">${vps.toFixed(2)}€/s</td>
+      <td style="text-align:right;font-weight:600;color:var(--success)">${vtot.toFixed(2)}€</td>
+      <td>${_subEstadoBadge(r['Estado']||'Ativo')}</td>
+      <td class="actions">
+        ${r['Estado']==='Ativo'?`<button onclick="editarSubstituicao(${r.id},'${nomeEsc}')" title="Editar">&#x270F;</button>
+        <button onclick="concluirSubstituicao(${r.id},'${nomeEsc}')" title="Concluir e pagar" style="color:var(--success)">✓</button>`:''}
+      </td>
+    </tr>`;
+  };
+  const subThead=`<thead><tr>
+    <th>Cliente</th><th>Original</th><th>Substituto</th><th>Período</th>
+    <th>Freq.</th><th style="text-align:right">Mensalidade</th>
+    <th style="text-align:center">Sessões</th><th style="text-align:right">€/Sessão</th>
+    <th style="text-align:right">Total</th><th>Estado</th><th>Ações</th>
+  </tr></thead>`;
+  const allSubs = [...subSubst,...subOrig.filter(r=>!subSubst.find(s=>s.id===r.id))];
+  const subRows = allSubs.map(r=>_subRow(r,true)).join('');
+  const subHtml = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <button class="btn btn-primary btn-sm" onclick="abrirNovaSubstituicao('${nomeEsc}')">+ Nova Substituição</button>
+    </div>
+    <div class="table-wrap"><table class="tbl">${subThead}<tbody>
+      ${subRows||'<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:16px">Sem substituições registadas</td></tr>'}
+    </tbody></table></div>`;
+
   // ── Layout ───────────────────────────────────────────────────────────────────
   const cargoBadge = cargo => {
     const map = {Treinador:'badge-ok',Coordenador:'badge-info',Técnico:'badge-warn',Comercial:'badge',Direcção:'badge-danger'};
@@ -4203,10 +4248,12 @@ function renderColaboradorDetalhe(el, nome, d){
     <div class="cd-main">
       <div class="tabs" style="margin-bottom:16px">
         <div class="tab active" onclick="switchTab(this,'col-tab-ficha')">👤 Ficha</div>
+        <div class="tab" onclick="switchTab(this,'col-tab-sub')">🔄 Substituições (${allSubs.length})</div>
         <div class="tab" onclick="switchTab(this,'col-tab-log')">📋 Log Eventos (${logEv.length})</div>
         <div class="tab" onclick="switchTab(this,'col-tab-hist')">🕐 Histórico (${hist.length})</div>
       </div>
       <div id="col-tab-ficha" class="tab-panel active">${fichaHtml}</div>
+      <div id="col-tab-sub"   class="tab-panel">${subHtml}</div>
       <div id="col-tab-log"   class="tab-panel">${logEvHtml}</div>
       <div id="col-tab-hist"  class="tab-panel">${histHtml}</div>
     </div>`;
@@ -4284,6 +4331,120 @@ async function openEditColaborador(nome){
     toast('Ficha atualizada');
     await openColaboradorDetalhe(updates['Nome Oficial']||nome);
   };
+}
+
+// ─── SUBSTITUIÇÕES DE TREINO ─────────────────────────────────────────────────
+async function _subModal(title, rec, nomeColab, onSave){
+  const colabs = await getLookup('dados_colaboradores','Nome Oficial');
+  const opts = colabs.map(c=>`<option value="${c}" ${rec[c]===c?'selected':''}>${c}</option>`).join('');
+  const freqs = [1,2,3,4,5].map(n=>`<option value="${n}" ${(rec['Frequência Semanal']||3)==n?'selected':''}>${n}x / semana</option>`).join('');
+  const mensalidade = parseFloat(rec['Mensalidade']||0);
+  const freq = parseInt(rec['Frequência Semanal']||3);
+  const vps = freq>0 ? (mensalidade/(freq*4.3)).toFixed(2) : '—';
+
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = `
+    <div class="form-group"><label>Cliente</label>
+      <input type="text" id="sub_cliente" value="${rec['Cliente']||''}" placeholder="Nome do cliente"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Técnico Original</label>
+        <select id="sub_orig"><option value="">—</option>${colabs.map(c=>`<option value="${c}" ${rec['Técnico Original']===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Técnico Substituto</label>
+        <select id="sub_subst"><option value="">—</option>${colabs.map(c=>`<option value="${c}" ${rec['Técnico Substituto']===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Data Início</label>
+        <input type="date" id="sub_ini" value="${rec['Data Início']||''}"></div>
+      <div class="form-group"><label>Data Fim (opcional)</label>
+        <input type="date" id="sub_fim" value="${rec['Data Fim']||''}"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div class="form-group"><label>Frequência</label>
+        <select id="sub_freq" onchange="_subRecalc()">${freqs}</select></div>
+      <div class="form-group"><label>Mensalidade (€)</label>
+        <input type="number" id="sub_mens" value="${rec['Mensalidade']||''}" step="0.01" oninput="_subRecalc()"></div>
+      <div class="form-group"><label>Sessões Dadas</label>
+        <input type="number" id="sub_sess" value="${rec['Sessões Dadas']||0}" min="0" oninput="_subRecalc()"></div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:14px;display:flex;gap:24px;align-items:center">
+      <div><div style="font-size:11px;color:var(--text-muted)">€ / Sessão</div><div id="sub_vps" style="font-weight:700;font-size:18px">${vps}€</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted)">Total Substituto</div><div id="sub_vtot" style="font-weight:700;font-size:18px;color:var(--success)">0.00€</div></div>
+    </div>
+    <div class="form-group"><label>Notas</label>
+      <textarea id="sub_notas" style="min-height:60px">${rec['Notas']||''}</textarea></div>`;
+  _subRecalc();
+  document.getElementById('modal').classList.add('show');
+  document.getElementById('modalSave').onclick = async()=>{
+    const body = {
+      'Cliente':             document.getElementById('sub_cliente').value.trim(),
+      'Técnico Original':    document.getElementById('sub_orig').value,
+      'Técnico Substituto':  document.getElementById('sub_subst').value,
+      'Data Início':         document.getElementById('sub_ini').value||null,
+      'Data Fim':            document.getElementById('sub_fim').value||null,
+      'Frequência Semanal':  parseInt(document.getElementById('sub_freq').value)||3,
+      'Mensalidade':         parseFloat(document.getElementById('sub_mens').value)||0,
+      'Sessões Dadas':       parseInt(document.getElementById('sub_sess').value)||0,
+      'Notas':               document.getElementById('sub_notas').value||null,
+    };
+    if(!body['Cliente']||!body['Técnico Original']||!body['Técnico Substituto'])
+      return toast('Preenche Cliente, Técnico Original e Técnico Substituto','error');
+    const res = await onSave(body);
+    if(res?.error){ toast('Erro: '+res.error,'error'); return; }
+    closeModal();
+    toast('Substituição guardada');
+    await openColaboradorDetalhe(nomeColab);
+  };
+}
+
+function _subRecalc(){
+  const mens = parseFloat(document.getElementById('sub_mens')?.value)||0;
+  const freq = parseInt(document.getElementById('sub_freq')?.value)||3;
+  const sess = parseInt(document.getElementById('sub_sess')?.value)||0;
+  const vps = freq>0 ? mens/(freq*4.3) : 0;
+  const vtot = vps*sess;
+  const vpsEl=document.getElementById('sub_vps'); if(vpsEl) vpsEl.textContent=vps.toFixed(2)+'€';
+  const vtotEl=document.getElementById('sub_vtot'); if(vtotEl) vtotEl.textContent=vtot.toFixed(2)+'€';
+}
+
+async function abrirNovaSubstituicao(nomeEsc){
+  const nome = nomeEsc.replace(/\\'/g,"'");
+  await _subModal('🔄 Nova Substituição', {'Técnico Original':nome}, nome,
+    body => api('/api/data/substituicoes_treino',{method:'POST',body}));
+}
+
+async function editarSubstituicao(id, nomeEsc){
+  const nome = nomeEsc.replace(/\\'/g,"'");
+  const all = await api('/api/data/substituicoes_treino');
+  const rec = (Array.isArray(all)?all:[]).find(r=>r.id===id);
+  if(!rec) return toast('Registo não encontrado','error');
+  const idx = (Array.isArray(all)?all:[]).findIndex(r=>r.id===id);
+  await _subModal('✏️ Editar Substituição', rec, nome,
+    body => api(`/api/data/substituicoes_treino/${idx}`,{method:'PUT',body}));
+}
+
+async function concluirSubstituicao(id, nomeEsc){
+  const nome = nomeEsc.replace(/\\'/g,"'");
+  if(!confirm('Marcar como concluída e gerar entrada de pagamento?')) return;
+  const all = await api('/api/data/substituicoes_treino');
+  const rec = (Array.isArray(all)?all:[]).find(r=>r.id===id);
+  if(!rec) return toast('Registo não encontrado','error');
+  const idx = (Array.isArray(all)?all:[]).findIndex(r=>r.id===id);
+  const vtot = parseFloat(rec['Valor Total'])||0;
+  const [resUpd, resPag] = await Promise.all([
+    api(`/api/data/substituicoes_treino/${idx}`,{method:'PUT',body:{...rec,'Estado':'Concluído','Data Fim':rec['Data Fim']||new Date().toISOString().slice(0,10)}}),
+    vtot>0 ? _SB.from('pagamentos_treinadores').insert({
+      'Colaborador': rec['Técnico Substituto'],
+      'Cliente':     rec['Cliente'],
+      'Tipo':        'Substituição',
+      'Valor':       vtot,
+      'Data':        new Date().toISOString().slice(0,10),
+      'Notas':       `Subst. de ${rec['Técnico Original']} · ${rec['Sessões Dadas']} sessões`
+    }) : Promise.resolve({})
+  ]);
+  if(resUpd?.error){ toast('Erro: '+resUpd.error,'error'); return; }
+  toast(`Concluído · ${vtot.toFixed(2)}€ registado para ${rec['Técnico Substituto']}`);
+  sectionData['substituicoes_treino']=null;
+  await openColaboradorDetalhe(nome);
 }
 
 async function openEditById(collection, id, nomeColab){
