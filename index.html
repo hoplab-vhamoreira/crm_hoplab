@@ -1811,7 +1811,7 @@ async function _saveSemFeito(cicloIdx, semN, val){
   const updates = {};
   updates[`Sem ${semN} — Feito em`] = val || null;
   const res = await api(`/api/data/ciclos/${cicloIdx}`,{method:'PUT',body:updates});
-  if(res.ok){
+  if(!res.error){
     if(sectionData['ciclos'] && sectionData['ciclos'][cicloIdx]){
       sectionData['ciclos'][cicloIdx][`Sem ${semN} — Feito em`] = val||null;
     }
@@ -1862,11 +1862,11 @@ async function openAddCicloModal(nomeEnc){
       'Data Fim':      document.getElementById('cc_fim').value||null,
       'GP':            document.getElementById('cc_gp').value||null,
       'Wearable':      parseInt(document.getElementById('cc_wear').value)||0,
-      'Check-ins':     document.getElementById('cc_ci').value||null,
+      'Check-ins':     parseInt(document.getElementById('cc_ci').value)||null,
       'Notas':         document.getElementById('cc_notas').value||null,
     };
     const res = await api('/api/data/ciclos',{method:'POST',body});
-    if(res.ok){
+    if(!res.error){
       closeModal(); toast('Ciclo criado');
       sectionData['ciclos']=null;
       const d = await api('/api/data/ciclos');
@@ -1991,7 +1991,7 @@ async function openEditCicloModal(idx){
       updates[`Sem ${n} — Feito em`] = document.getElementById(`ec_fe_${n}`)?.value||null;
     }
     const res = await api(`/api/data/ciclos/${idx}`,{method:'PUT',body:updates});
-    if(res.ok){
+    if(!res.error){
       closeModal(); toast('Ciclo atualizado');
       sectionData['ciclos']=null;
       const d = await api('/api/data/ciclos');
@@ -2987,7 +2987,7 @@ async function fatAdd(){
     const rec={};
     for(const f of sec.fields) rec[f.k]=getFieldValue(f);
     const res = await api('/api/data/pag_clientes_2026',{method:'POST',body:rec});
-    if(res.ok){ sectionData['pag_clientes_2026']=null; closeModal(); toast('Registo adicionado'); await renderHistoricoFaturacao(document.getElementById('mainContent')); }
+    if(!res.error){ sectionData['pag_clientes_2026']=null; closeModal(); toast('Registo adicionado'); await renderHistoricoFaturacao(document.getElementById('mainContent')); }
     else toast(res.error||'Erro','error');
   };
 }
