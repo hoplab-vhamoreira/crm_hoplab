@@ -1126,6 +1126,22 @@ function toggleFilterOrd(section,col,ev){
   renderTable(document.getElementById('mainContent'),section,sec,data,allCols);
 }
 
+function _fmtCellVal(v){
+  if(v===null||v===undefined||v==='') return '';
+  const s=String(v);
+  // ISO datetime: 2025-07-17T00:00:00 or 2025-07-17T00:00:00.000Z → DD/MM/YYYY
+  if(/^\d{4}-\d{2}-\d{2}T/.test(s)){
+    const [y,m,d]=s.slice(0,10).split('-');
+    return `${d}/${m}/${y}`;
+  }
+  // ISO date only: 2025-07-17 → DD/MM/YYYY
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
+    const [y,m,d]=s.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  return s;
+}
+
 function renderTable(el,section,sec,data,allCols){
   const page=sectionPage[section]||0;
   const search=(document.getElementById('search_'+section)||{}).value||'';
@@ -1246,7 +1262,8 @@ function renderTable(el,section,sec,data,allCols){
         const cor = n>60?'var(--danger)':n>30?'var(--warning)':'';
         return `<td style="text-align:right${cor?';color:'+cor+';font-weight:600':''}">${n}d</td>`;
       }
-      return `<td title="${String(v).replace(/"/g,'&quot;')}">${v}</td>`;
+      const disp=_fmtCellVal(v);
+      return `<td title="${String(v).replace(/"/g,'&quot;')}">${disp}</td>`;
     }).join('');
     if(section==='clientes'){
       const nome=r['Nome']||'';
