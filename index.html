@@ -183,6 +183,44 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .filter-active-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:rgba(170,255,0,.15);color:var(--primary-text);border:1px solid rgba(170,255,0,.35);border-radius:12px;font-size:11px;font-weight:600}
 /* GREEN DOT on active pill */
 .gtab-active::before,.tab.active::before,.agenda-period-btn.active::before{content:"";display:inline-block;width:7px;height:7px;background:#aaff00;border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0}
+/* RESPONSIVE — MOBILE & TABLET */
+.hamburger{display:none;position:fixed;top:12px;left:12px;z-index:200;background:#141720;border:1px solid #2a3050;color:#aaff00;padding:8px 11px;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99}
+.sidebar-overlay.show{display:block}
+@media(max-width:768px){
+  .hamburger{display:block}
+  .sidebar{transform:translateX(-100%);transition:transform .25s ease;z-index:101}
+  .sidebar.mob-open{transform:translateX(0)}
+  .main{margin-left:0!important;padding:60px 14px 24px}
+  .modal{width:92%;max-width:560px}
+  .login-box{width:90%;max-width:400px;padding:32px 20px}
+  .stats-grid{grid-template-columns:repeat(2,1fr)!important}
+  .db-grid-2{grid-template-columns:1fr}
+  .cd-wrap{flex-direction:column}
+  .cd-sidebar{width:100%}
+  .page-header{flex-wrap:wrap;gap:10px}
+  .table-toolbar{flex-wrap:wrap}
+  .tbl th,.tbl td{padding:7px 8px;font-size:12px}
+  .tabs{flex-wrap:wrap;border-radius:12px;gap:3px}
+  .tab{padding:6px 12px;font-size:12px}
+  .tbl .actions button{padding:6px 8px;font-size:14px;min-width:30px;min-height:30px}
+  .btn{min-height:36px}
+  .btn-sm{min-height:30px}
+  .form-grid-2{grid-template-columns:1fr!important}
+}
+@media(max-width:480px){
+  .stats-grid{grid-template-columns:1fr!important}
+  .modal-body{padding:16px}
+  .modal-header,.modal-footer{padding:14px 16px}
+  .stat-card{padding:14px}
+  .stat-card .value{font-size:22px}
+}
+@media(min-width:769px) and (max-width:1024px){
+  :root{--sidebar-w:220px}
+  .main{padding:20px 24px}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .modal{max-width:500px}
+}
 </style>
 </head>
 <body>
@@ -201,8 +239,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 
 <!-- APP -->
 <div class="app" id="app">
+  <!-- HAMBURGER (mobile only) -->
+  <button class="hamburger" id="hamburger" onclick="toggleSidebar()" aria-label="Menu">&#9776;</button>
+  <!-- SIDEBAR OVERLAY (mobile) -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebarMobile()"></div>
   <!-- SIDEBAR -->
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <h2>HOP Lab CRM</h2>
       <small>v2.0 &mdash; 2026</small>
@@ -797,6 +839,16 @@ function showApp(){
   navigate('dashboard');
 }
 
+// MOBILE SIDEBAR
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('mob-open');
+  document.getElementById('sidebarOverlay').classList.toggle('show');
+}
+function closeSidebarMobile(){
+  document.getElementById('sidebar').classList.remove('mob-open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
 // SIDEBAR
 function buildSidebar(){
   const nav=document.getElementById('sidebarNav');
@@ -813,7 +865,7 @@ function buildSidebar(){
   for(const[g,items] of Object.entries(groups)){
     html+=`<div class="nav-group"><div class="nav-group-title">${g}</div>`;
     for(const it of items){
-      html+=`<div class="nav-item" data-key="${it.key}" onclick="navigate('${it.key}')"><span class="icon">${it.icon}</span>${it.title}</div>`;
+      html+=`<div class="nav-item" data-key="${it.key}" onclick="navigate('${it.key}');closeSidebarMobile()"><span class="icon">${it.icon}</span>${it.title}</div>`;
     }
     html+='</div>';
   }
