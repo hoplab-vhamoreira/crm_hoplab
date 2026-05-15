@@ -1513,6 +1513,9 @@ function _plUpdateSubStatus(){
     const inativoW=document.getElementById('pl_inativo_wrap');
     if(ativoW)  ativoW.style.display=status==='Ativo'?'':'none';
     if(inativoW)inativoW.style.display=status==='Inativo'?'':'none';
+    // inicializar blocos de próximo contacto com o valor atual dos selects
+    if(status==='Ativo')   _plUpdateAtivoRes();
+    if(status==='Inativo') _plUpdateInativoMot();
   }
 }
 function _plUpdateAtivoRes(){
