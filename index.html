@@ -539,7 +539,17 @@ const SECTIONS = {
     cols:['Tipo','Cliente','Detalhe','Responsável','DataLimite','DiasAtraso','Prioridade','Fonte']},
   pipeline: {title:'Pipeline Comercial',icon:'&#x1f4c8;',group:'Comercial',
     cols:['Nº ON','Contacto','Status','Aberta/Fechada','Tipo','Comercial','Fonte Aquisição','Canal Contacto'],
-    fields:[{k:'Tipo',t:'select',opts:['Studio','Lab']},{k:'Comercial',t:'text'},{k:'Contacto',t:'text'},{k:'Fonte Aquisição',t:'text'},{k:'Canal Contacto',t:'select',opts:['Chamada Telefónica','WhatsApp','Email','Presencial','Instagram','Website']},{k:'Parceiro',t:'text'},{k:'Segmento Mercado',t:'text'}]},
+    fields:[
+      {k:'Contacto',t:'text'},
+      {k:'Tipo',t:'select',opts:['Studio','Lab','Lab + Studio']},
+      {k:'Comercial',t:'text'},
+      {k:'Status',t:'select',opts:['Em Análise','Ganho','Perdido','Não Avançou']},
+      {k:'Aberta/Fechada',t:'select',opts:['Aberta','Fechada']},
+      {k:'Fonte Aquisição',t:'select',opts:['Prospeção','Recomendação PT','Inscrição','Website','Voucher','HOP Studio','Cadastro retroactivo']},
+      {k:'Canal Contacto',t:'select',opts:['Chamada Telefónica','WhatsApp','Email','Presencial','Instagram','Website']},
+      {k:'Parceiro',t:'text'},
+      {k:'Segmento Mercado',t:'text'}
+    ]},
   log_comercial: {title:'Log Comercial',icon:'&#x1f4dd;',group:'Comercial',hidden:true,
     cols:['Nº ON','Contacto','Data Ação','Dias Atrás','Canal','Tipo Ação','Resumo','Resultado'],
     fields:[
