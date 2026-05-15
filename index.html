@@ -1529,7 +1529,10 @@ function _plUpdateInativoMot(){
   if(pb) pb.style.display=mot==='Agendado'?'':'none';
 }
 async function openAddPipeline(){
-  const colabs=await getLookup('dados_colaboradores','Nome Oficial');
+  const [colabs,parcs]=await Promise.all([
+    getLookup('dados_colaboradores','Nome Oficial'),
+    getLookup('parceiros','Nome / Empresa')
+  ]);
   const dlColabs=colabs.map(c=>`<option>${c}</option>`).join('');
   const existing=sectionData['pipeline']||[];
   const nextON=existing.reduce((m,r)=>Math.max(m,parseInt(r['N\xba ON'])||0),0)+1;
@@ -1550,7 +1553,9 @@ async function openAddPipeline(){
           <option>Prospe\xe7\xe3o</option><option>Recomenda\xe7\xe3o PT</option><option>Inscri\xe7\xe3o</option>
           <option>Website</option><option>Voucher</option><option>HOP Studio</option><option>Cadastro retroactivo</option>
         </select></div>
-      <div class="form-group"><label>Parceiro</label><input type="text" id="pl_parceiro" placeholder="(opcional)"></div>
+      <div class="form-group"><label>Parceiro</label>
+        <input type="text" id="pl_parceiro" list="dl_pl_parc" placeholder="(opcional)" autocomplete="off">
+        <datalist id="dl_pl_parc"></datalist></div>
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:8px 0 16px">
     <div class="form-group"><label>Aberta/Fechada</label>
@@ -1614,6 +1619,9 @@ async function openAddPipeline(){
       </div>
     </div>`;
   document.getElementById('modal').classList.add('show');
+  const dlParc=document.getElementById('dl_pl_parc');
+  if(dlParc) dlParc.innerHTML=parcs.map(p=>`<option>${p}</option>`).join('');
+  document.getElementById('modalSave').textContent='Guardar';
   document.getElementById('modalSave').onclick=async()=>{
     const contacto=document.getElementById('pl_contacto').value.trim();
     if(!contacto) return toast('Preenche o Contacto','error');
@@ -4344,7 +4352,10 @@ function renderONDetalhe(el, nON, d){
           </div>
         </div>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="openAddParaON(${nONEsc},'${contactoEsc}')">📞 Registar contacto</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${ultimoResultado==='Ganho'&&fechado?`<button class="btn btn-ghost btn-sm" onclick="converterON(${nONEsc},'${contactoEsc}')" style="border-color:var(--primary-text);color:var(--primary-text)">&#x1F4C4; Converter</button>`:''}
+        <button class="btn btn-primary btn-sm" onclick="openAddParaON(${nONEsc},'${contactoEsc}')">📞 Registar contacto</button>
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
@@ -4370,6 +4381,42 @@ function renderONDetalhe(el, nON, d){
         <div id="tab-on-hist" class="tab-panel">${histHtml}</div>
       </div>
     </div>`;
+}
+
+async function converterON(nON, contacto){
+  document.getElementById('modalTitle').textContent=`Converter ON ${nON} — ${contacto}`;
+  document.getElementById('modalBody').innerHTML=`
+    <p style="color:var(--text-muted);margin-bottom:16px;font-size:13px">Escolhe para onde converter <strong>${contacto}</strong>. Será criado um registo novo com os dados do ON.</p>
+    <div class="form-group"><label>Converter em</label>
+      <select id="conv_tipo">
+        <option value="cliente">&#x1F465; Cliente</option>
+        <option value="parceiro">&#x1F91D; Parceiro</option>
+      </select></div>`;
+  document.getElementById('modalSave').textContent='Converter';
+  document.getElementById('modal').classList.add('show');
+  document.getElementById('modalSave').onclick=async()=>{
+    const tipo=document.getElementById('conv_tipo').value;
+    if(tipo==='cliente'){
+      const clData=sectionData['clientes']||(await api('/api/data/clientes'));
+      const maxID=(Array.isArray(clData)?clData:[]).reduce((m,c)=>Math.max(m,parseInt(c['ID'])||0),0);
+      const novoID=maxID+1;
+      const cr=await api('/api/data/clientes',{method:'POST',body:{
+        'Nome':contacto,'ID':novoID,'Status':'Ativo',
+        'Data Cria\xe7\xe3o':new Date().toISOString().slice(0,10)
+      }});
+      sectionData['clientes']=null;
+      closeModal();
+      if(!cr.error) toast(`Cliente "${contacto}" criado com ID ${novoID} ✓`,'success');
+      else toast('Erro ao criar cliente: '+cr.error,'error');
+    } else {
+      const pr=await api('/api/data/parceiros',{method:'POST',body:{'Nome / Empresa':contacto}});
+      sectionData['parceiros']=null;
+      closeModal();
+      if(!pr.error) toast(`Parceiro "${contacto}" criado ✓`,'success');
+      else toast('Erro ao criar parceiro: '+pr.error,'error');
+    }
+    await openONDetalhe(nON);
+  };
 }
 
 async function openAddParaON(nON, contacto){
