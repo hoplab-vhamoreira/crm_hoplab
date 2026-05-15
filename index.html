@@ -1547,6 +1547,7 @@ async function openAddPipeline(){
     if(!aberta) return toast('Seleciona Aberta ou Fechada','error');
     const status=(document.getElementById('pl_status')||{}).value||'';
     const converter=(document.getElementById('pl_converter')||{}).value||'';
+    if(status==='Ganho'&&!converter) return toast('Seleciona em quem converter (Cliente ou Parceiro)','error');
     const outras=(document.getElementById('pl_outras_motivo')||{}).value||'';
     const rec={
       'N\xba ON': nextON,
