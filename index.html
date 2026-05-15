@@ -1698,6 +1698,142 @@ async function openAddPipeline(){
   };
 }
 
+async function openEditPipeline(idx){
+  const data=sectionData['pipeline'];
+  if(!data||!data[idx]) return;
+  const rec=data[idx];
+  const [colabs,parcs]=await Promise.all([
+    getLookup('dados_colaboradores','Nome Oficial'),
+    getLookup('parceiros','Nome / Empresa')
+  ]);
+  const dlColabs=colabs.map(c=>`<option>${c}</option>`).join('');
+  const nON=rec['Nº ON']||'';
+  document.getElementById('modalTitle').textContent=`Editar — Pipeline ON ${nON}`;
+  const fAqOpts=['Prospeção','Recomendação PT','Inscrição','Website','Voucher','HOP Studio','Cadastro retroactivo'];
+  const mkSel=(id,opts,val,onch='')=>`<select id="${id}" ${onch?`onchange="${onch}"`:''}>${opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>`;
+  document.getElementById('modalBody').innerHTML=`
+    <div class="form-group"><label>Contacto</label><input type="text" id="pl_contacto" value="${(rec['Contacto']||'').replace(/"/g,'&quot;')}"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Tipo</label>${mkSel('pl_tipo',['Studio','Lab','Lab + Studio'],rec['Tipo']||'Studio')}</div>
+      <div class="form-group"><label>Comercial</label>
+        <input type="text" id="pl_comercial" list="dl_pl_col" value="${(rec['Comercial']||'').replace(/"/g,'&quot;')}" placeholder="Colaborador">
+        <datalist id="dl_pl_col">${dlColabs}</datalist></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Fonte Aquisição</label>${mkSel('pl_fonte',fAqOpts,rec['Fonte Aquisição']||fAqOpts[0])}</div>
+      <div class="form-group"><label>Parceiro</label>
+        <input type="text" id="pl_parceiro" list="dl_pl_parc" value="${(rec['Parceiro']||'').replace(/"/g,'&quot;')}" autocomplete="off">
+        <datalist id="dl_pl_parc"></datalist></div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:8px 0 16px">
+    <div class="form-group"><label>Aberta/Fechada</label>
+      <select id="pl_aberta" onchange="_plEditUpdateStatus()">
+        <option value="">— seleciona —</option>
+        <option${rec['Aberta/Fechada']==='Aberta'?' selected':''}>Aberta</option>
+        <option${rec['Aberta/Fechada']==='Fechada'?' selected':''}>Fechada</option>
+      </select></div>
+    <div id="pl_status_wrap" style="display:none">
+      <div class="form-group"><label>Status</label>
+        <select id="pl_status" onchange="_plEditUpdateSub()"></select></div>
+    </div>
+    <div id="pl_outras_wrap" style="display:none">
+      <div class="form-group"><label>Motivo</label>
+        <input type="text" id="pl_outras_motivo" placeholder="Motivo de não conversão"></div>
+    </div>
+    <div id="pl_converter_wrap" style="display:none">
+      <div class="form-group" style="background:rgba(170,255,0,.08);border:1px solid rgba(170,255,0,.3);border-radius:8px;padding:14px">
+        <label style="color:var(--primary-text)">📄 Converter em</label>
+        <select id="pl_converter">
+          <option value="">— só fechar ON —</option>
+          <option value="cliente">👤 Cliente</option>
+          <option value="parceiro">🤝 Parceiro</option>
+        </select>
+      </div>
+    </div>`;
+  document.getElementById('modal').classList.add('show');
+  const dlParc=document.getElementById('dl_pl_parc');
+  if(dlParc) dlParc.innerHTML=parcs.map(p=>`<option>${p}</option>`).join('');
+
+  // Current status value (may include "Outras — motivo")
+  const curStatus=rec['Status']||'';
+  const curAberta=rec['Aberta/Fechada']||'';
+
+  window._plEditUpdateStatus=function(){
+    const ab=document.getElementById('pl_aberta').value;
+    const sw=document.getElementById('pl_status_wrap');
+    const sel=document.getElementById('pl_status');
+    if(!ab){sw.style.display='none';return;}
+    sw.style.display='';
+    const opts= ab==='Aberta'
+      ? ['Ativo','Inativo']
+      : ['Ganho','Outras'];
+    let selVal= opts.includes(curStatus)?curStatus: ab==='Fechada'&&curStatus.startsWith('Outras')?'Outras':opts[0];
+    sel.innerHTML=opts.map(o=>`<option${o===selVal?' selected':''}>${o}</option>`).join('');
+    _plEditUpdateSub();
+  };
+  window._plEditUpdateSub=function(){
+    const st=document.getElementById('pl_status').value;
+    const outW=document.getElementById('pl_outras_wrap');
+    const convW=document.getElementById('pl_converter_wrap');
+    const motI=document.getElementById('pl_outras_motivo');
+    outW.style.display= st==='Outras'?'':'none';
+    convW.style.display= st==='Ganho'?'':'none';
+    if(st==='Outras'&&motI){
+      const m=curStatus.startsWith('Outras — ')?curStatus.slice(9):'';
+      if(!motI.value&&m) motI.value=m;
+    }
+  };
+
+  // Init
+  if(curAberta) _plEditUpdateStatus();
+
+  document.getElementById('modalSave').textContent='Guardar';
+  const hoje=new Date().toISOString().slice(0,10);
+  document.getElementById('modalSave').onclick=async()=>{
+    const contacto=document.getElementById('pl_contacto').value.trim();
+    if(!contacto) return toast('Preenche o Contacto','error');
+    const aberta=document.getElementById('pl_aberta').value;
+    if(!aberta) return toast('Seleciona Aberta ou Fechada','error');
+    const status=(document.getElementById('pl_status')||{}).value||'';
+    const converter=(document.getElementById('pl_converter')||{}).value||'';
+    if(status==='Ganho'&&!converter) return toast('Seleciona em quem converter (Cliente ou Parceiro)','error');
+    const outras=(document.getElementById('pl_outras_motivo')||{}).value||'';
+    const updates={
+      'Contacto':contacto,
+      'Tipo':document.getElementById('pl_tipo').value,
+      'Comercial':document.getElementById('pl_comercial').value||null,
+      'Aberta/Fechada':aberta,
+      'Status':outras?`Outras — ${outras}`:status,
+      'Fonte Aquisição':document.getElementById('pl_fonte').value,
+      'Parceiro':document.getElementById('pl_parceiro').value||null,
+    };
+    const res=await api(`/api/data/pipeline/${idx}`,{method:'PUT',body:updates});
+    if(res?.error){toast('Erro ao guardar: '+res.error,'error');return;}
+    sectionData['pipeline']=null;
+    if(status==='Ganho'&&converter==='cliente'){
+      const clData=sectionData['clientes']||(await api('/api/data/clientes'));
+      const maxID=(Array.isArray(clData)?clData:[]).reduce((m,c)=>Math.max(m,parseInt(c['ID'])||0),0);
+      const novoID=maxID+1;
+      const cr=await api('/api/data/clientes',{method:'POST',body:{
+        'Nome':contacto,'ID':novoID,'Status':'Ativo',
+        'Segmento':updates['Tipo']||null,'Data Criação':hoje
+      }});
+      sectionData['clientes']=null;
+      closeModal();
+      toast(cr.error?`ON atualizado · Erro cliente: ${cr.error}`:`ON atualizado · Cliente "${contacto}" ID ${novoID} criado ✓`,cr.error?'error':'success');
+    } else if(status==='Ganho'&&converter==='parceiro'){
+      const pr=await api('/api/data/parceiros',{method:'POST',body:{'Nome / Empresa':contacto}});
+      sectionData['parceiros']=null;
+      closeModal();
+      toast(pr.error?`ON atualizado · Erro parceiro: ${pr.error}`:`ON atualizado · Parceiro "${contacto}" criado ✓`,pr.error?'error':'success');
+    } else {
+      closeModal();
+      toast('ON atualizado ✓');
+    }
+    await renderDataPage(document.getElementById('mainContent'),'pipeline');
+  };
+}
+
 async function openAdd(section){
   if(section==='pipeline') return openAddPipeline();
   const sec=SECTIONS[section];
@@ -1736,6 +1872,7 @@ async function openAdd(section){
 }
 
 async function openEdit(section,idx){
+  if(section==='pipeline') return openEditPipeline(idx);
   const sec=SECTIONS[section];
   const data=sectionData[section];
   if(!data||!data[idx]) return;
