@@ -4466,12 +4466,9 @@ function renderONDetalhe(el, nON, d){
 
   const logTable = log.length
     ? `<table class="mini-table"><thead><tr><th>Data</th><th>Canal</th><th>Tipo</th><th>Resumo</th><th>Resultado</th><th>Há</th><th></th></tr></thead><tbody>${logRows}</tbody></table>`
-    : `<div class="tl-empty">Sem contactos registados. Clica em "+ Registar contacto" para começar.</div>`;
+    : `<div class="tl-empty">Sem contactos registados. Clica em "📞 Registar contacto" para começar.</div>`;
 
-  const logHtml=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-    <span style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Histórico de contactos</span>
-    <button class="btn btn-primary btn-sm" onclick="openAddParaON(${nONEsc},'${contactoEsc}')">+ Registar contacto</button>
-  </div>${logTable}`;
+  const logHtml=`<div style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Histórico de contactos</div>${logTable}`;
 
   // Tab: Histórico timeline
   const histHtml = hist.length
@@ -4557,45 +4554,204 @@ async function converterON(nON, contacto){
 }
 
 async function openAddParaON(nON, contacto){
-  const sec=SECTIONS['log_comercial'];
-  if(!sec||!sec.fields) return toast('Campos não definidos','error');
+  const hoje=new Date().toISOString().slice(0,10);
+  const colabs=await getLookup('dados_colaboradores','Nome Oficial');
+  const dlColabs=colabs.map(c=>`<option>${c}</option>`).join('');
 
   document.getElementById('modalTitle').textContent=`📞 Registar contacto — ON ${nON}`;
-  document.getElementById('modalBody').innerHTML='<div style="color:var(--text-muted);padding:20px 0">A carregar...</div>';
+  document.getElementById('modalBody').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div class="form-group" style="margin:0"><label>Data</label><input type="date" id="on_data" value="${hoje}"></div>
+      <div class="form-group" style="margin:0"><label>Hora</label><input type="time" id="on_hora" value="09:00"></div>
+    </div>
+    <div class="form-group"><label>Canal</label>
+      <select id="on_canal">${_plCanalOpts()}</select></div>
+    <div class="form-group"><label>Tipo de ação</label>
+      <select id="on_tipo_acao">
+        <option>Follow-up</option><option>Reunião</option><option>Proposta</option>
+        <option>Demonstração</option><option>Email</option><option>Chamada</option><option>Outro</option>
+      </select></div>
+    <div class="form-group"><label>Resumo</label>
+      <textarea id="on_resumo" rows="2" placeholder="Resumo do contacto..."></textarea></div>
+    <div class="form-group"><label>Comercial</label>
+      <input type="text" id="on_comercial" list="dl_on_col" placeholder="(opcional)" autocomplete="off">
+      <datalist id="dl_on_col">${dlColabs}</datalist></div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:8px 0 16px">
+    <div class="form-group"><label>Estado da oportunidade</label>
+      <select id="on_aberta" onchange="_onUpdStatus()">
+        <option value="Aberta" selected>Aberta</option>
+        <option value="Fechada">Fechada</option>
+      </select></div>
+    <div id="on_status_wrap">
+      <div class="form-group"><label>Status</label>
+        <select id="on_status" onchange="_onUpdSub()">
+          <option>Ativo</option><option>Inativo</option>
+        </select></div>
+    </div>
+    <!-- Ativo -->
+    <div id="on_ativo_wrap">
+      <div class="form-group"><label>Resultado</label>
+        <select id="on_ativo_res" onchange="_onUpdAtivoRes()">
+          <option>Pendente</option><option>Agendado</option><option>Sem resposta</option>
+          <option>Perdido</option><option>Não Avançou</option>
+        </select></div>
+      ${_plProxBlock('on_ativo_prox')}
+    </div>
+    <!-- Inativo -->
+    <div id="on_inativo_wrap" style="display:none">
+      <div class="form-group"><label>Motivo</label>
+        <select id="on_inativo_mot" onchange="_onUpdInativoMot()">
+          <option>Agendado</option><option>Sem interesse</option><option>Outras</option>
+        </select></div>
+      ${_plProxBlock('on_inativo_prox')}
+    </div>
+    <!-- Fechada: Ganho / Outras -->
+    <div id="on_fechada_wrap" style="display:none">
+      <div id="on_outras_wrap" style="display:none">
+        <div class="form-group"><label>Motivo</label>
+          <input type="text" id="on_outras_motivo" placeholder="Motivo de não conversão"></div>
+      </div>
+      <div id="on_converter_wrap" style="display:none">
+        <div class="form-group" style="background:rgba(170,255,0,.08);border:1px solid rgba(170,255,0,.3);border-radius:8px;padding:14px">
+          <label style="color:var(--primary-text)">📄 Converter em</label>
+          <select id="on_converter">
+            <option value="">— só fechar ON —</option>
+            <option value="cliente">👤 Cliente</option>
+            <option value="parceiro">🤝 Parceiro</option>
+          </select>
+        </div>
+      </div>
+    </div>`;
   document.getElementById('modal').classList.add('show');
 
-  let html=''; const setups=[];
-  for(const f of sec.fields){
-    if(f.k==='Nº ON'){
-      html+=`<div class="form-group"><label>Nº ON</label>
-        <input type="text" id="field_N__ON" value="${nON}" readonly style="opacity:.65;cursor:not-allowed;border-style:dashed">
-      </div>`;
-    } else if(f.k==='Contacto'){
-      html+=`<div class="form-group"><label>Contacto</label>
-        <input type="text" id="field_Contacto" value="${contacto}" readonly style="opacity:.65;cursor:not-allowed;border-style:dashed">
-      </div>`;
+  window._onUpdStatus=function(){
+    const ab=document.getElementById('on_aberta').value;
+    const sw=document.getElementById('on_status_wrap');
+    const sel=document.getElementById('on_status');
+    const fecW=document.getElementById('on_fechada_wrap');
+    if(ab==='Fechada'){
+      sw.style.display='';
+      fecW.style.display='';
+      sel.innerHTML='<option>Ganho</option><option>Outras</option>';
+      document.getElementById('on_ativo_wrap').style.display='none';
+      document.getElementById('on_inativo_wrap').style.display='none';
+      _onUpdSub();
     } else {
-      const r=await buildFieldHtml(f,''); html+=r.html; if(r.setup) setups.push(r.setup);
+      sel.innerHTML='<option>Ativo</option><option>Inativo</option>';
+      fecW.style.display='none';
+      _onUpdSub();
     }
-  }
-  document.getElementById('modalBody').innerHTML=html;
-  runFieldSetups(setups);
+  };
+  window._onUpdSub=function(){
+    const ab=document.getElementById('on_aberta').value;
+    const st=document.getElementById('on_status').value;
+    if(ab==='Aberta'){
+      document.getElementById('on_ativo_wrap').style.display= st==='Ativo'?'':'none';
+      document.getElementById('on_inativo_wrap').style.display= st==='Inativo'?'':'none';
+      document.getElementById('on_fechada_wrap').style.display='none';
+    } else {
+      document.getElementById('on_outras_wrap').style.display= st==='Outras'?'':'none';
+      document.getElementById('on_converter_wrap').style.display= st==='Ganho'?'':'none';
+    }
+  };
+  window._onUpdAtivoRes=function(){
+    const r=document.getElementById('on_ativo_res').value;
+    const p=document.getElementById('on_ativo_prox');
+    if(p) p.style.display= r==='Agendado'?'':'none';
+  };
+  window._onUpdInativoMot=function(){
+    const m=document.getElementById('on_inativo_mot').value;
+    const p=document.getElementById('on_inativo_prox');
+    if(p) p.style.display= m==='Agendado'?'':'none';
+  };
 
+  // Init: Aberta/Ativo is default, hide prox blocks
+  document.getElementById('on_ativo_prox').style.display='none';
+  document.getElementById('on_inativo_prox').style.display='none';
+
+  document.getElementById('modalSave').textContent='Guardar';
   document.getElementById('modalSave').onclick=async()=>{
-    const rec={};
-    for(const f of sec.fields) rec[f.k]=getFieldValue(f);
-    rec['Nº ON']=Number(nON)||nON;
-    rec['Contacto']=contacto;
-    const res=await api('/api/data/log_comercial',{method:'POST',body:rec});
+    const dataAcao=document.getElementById('on_data').value||hoje;
+    const horaAcao=document.getElementById('on_hora').value||'';
+    const canal=document.getElementById('on_canal').value;
+    const tipoAcao=document.getElementById('on_tipo_acao').value;
+    const resumo=document.getElementById('on_resumo').value||'';
+    const comercial=document.getElementById('on_comercial').value||null;
+    const aberta=document.getElementById('on_aberta').value;
+    const status=document.getElementById('on_status').value;
+    const outras=(document.getElementById('on_outras_motivo')||{}).value||'';
+    const converter=(document.getElementById('on_converter')||{}).value||'';
+
+    if(status==='Ganho'&&aberta==='Fechada'&&!converter) return toast('Seleciona em quem converter (ou "só fechar ON")','error');
+
+    let resultado='';
+    let proxData=null, proxHora=null, proxCanal=null;
+    if(aberta==='Aberta'){
+      if(status==='Ativo'){
+        resultado=(document.getElementById('on_ativo_res')||{}).value||'Pendente';
+        if(resultado==='Agendado'){
+          proxData=(document.getElementById('on_ativo_prox_data')||{}).value||null;
+          proxHora=(document.getElementById('on_ativo_prox_hora')||{}).value||null;
+          proxCanal=(document.getElementById('on_ativo_prox_canal')||{}).value||null;
+        }
+      } else {
+        resultado=(document.getElementById('on_inativo_mot')||{}).value||'Inativo';
+        if(resultado==='Agendado'){
+          proxData=(document.getElementById('on_inativo_prox_data')||{}).value||null;
+          proxHora=(document.getElementById('on_inativo_prox_hora')||{}).value||null;
+          proxCanal=(document.getElementById('on_inativo_prox_canal')||{}).value||null;
+        }
+      }
+    } else {
+      resultado= outras?`Outras — ${outras}`:status;
+    }
+
+    const logRec={
+      'Nº ON':String(nON),'Contacto':contacto,
+      'Data Ação':horaAcao?`${dataAcao}T${horaAcao}`:dataAcao,
+      'Canal':canal,'Tipo Ação':tipoAcao,
+      'Resumo':resumo||tipoAcao,'Resultado':resultado,
+      'Comercial':comercial,
+      'Data Próxima Ação':proxData||null,
+      'Resumo Próxima':proxData?`${proxCanal||''} ${proxHora||''}`.trim():null,
+    };
+    const logRes=await api('/api/data/log_comercial',{method:'POST',body:logRec});
+    if(logRes.error){toast('Erro ao registar: '+logRes.error,'error');return;}
     sectionData['log_comercial']=null;
-    closeModal();
-    // Feedback de conversão automática
-    if(res.extra){
-      const e=res.extra;
-      if(e.criado==='parceiro')     toast(`✅ Contacto registado · Parceiro "${e.nome}" criado`);
-      else if(e.criado==='cliente') toast(`✅ Contacto registado · Cliente "${e.nome}" criado`);
-      else toast('Contacto registado');
-    } else { toast('Contacto registado'); }
+
+    // Actualizar o pipeline se mudar de estado
+    const plData=sectionData['pipeline']||(await api('/api/data/pipeline'));
+    const plArr=Array.isArray(plData)?plData:[];
+    const plIdx=plArr.findIndex(r=>String(r['Nº ON'])===String(nON));
+    if(plIdx>=0){
+      const upd={'Aberta/Fechada':aberta,'Status':outras?`Outras — ${outras}`:status};
+      await api(`/api/data/pipeline/${plIdx}`,{method:'PUT',body:upd});
+      sectionData['pipeline']=null;
+    }
+
+    // Converter em cliente ou parceiro
+    if(aberta==='Fechada'&&status==='Ganho'&&converter){
+      const hoje2=new Date().toISOString().slice(0,10);
+      if(converter==='cliente'){
+        const clData=sectionData['clientes']||(await api('/api/data/clientes'));
+        const maxID=(Array.isArray(clData)?clData:[]).reduce((m,c)=>Math.max(m,parseInt(c['ID'])||0),0);
+        const novoID=maxID+1;
+        const cr=await api('/api/data/clientes',{method:'POST',body:{
+          'Nome':contacto,'ID':novoID,'Status':'Ativo','Data Criação':hoje2
+        }});
+        sectionData['clientes']=null;
+        closeModal();
+        toast(cr.error?`Contacto registado · Erro cliente: ${cr.error}`:`Contacto registado · Cliente "${contacto}" ID ${novoID} ✓`,cr.error?'error':'success');
+      } else {
+        const pr=await api('/api/data/parceiros',{method:'POST',body:{'Nome / Empresa':contacto}});
+        sectionData['parceiros']=null;
+        closeModal();
+        toast(pr.error?`Contacto registado · Erro parceiro: ${pr.error}`:`Contacto registado · Parceiro "${contacto}" criado ✓`,pr.error?'error':'success');
+      }
+    } else {
+      closeModal();
+      toast('Contacto registado ✓');
+    }
     await openONDetalhe(nON);
   };
 }
