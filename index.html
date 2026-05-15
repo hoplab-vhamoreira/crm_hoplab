@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HOP Lab CRM 2.0</title>
 <style>
 :root{--bg:#f0f2f5;--surface:#ffffff;--surface2:#f7f8fa;--surface3:#e9ecef;--border:#e5e7eb;--primary:#aaff00;--primary-hover:#88cc00;--primary-text:#3d6600;--text:#111827;--text-muted:#6b7280;--success:#16a34a;--warning:#d97706;--danger:#dc2626;--info:#2563eb;--radius:10px;--sidebar-w:260px}
@@ -191,7 +191,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   .hamburger{display:block}
   .sidebar{transform:translateX(-100%);transition:transform .25s ease;z-index:101}
   .sidebar.mob-open{transform:translateX(0)}
-  .main{margin-left:0!important;padding:60px 14px 24px}
+  .main{margin-left:0!important;padding:60px 14px calc(24px + env(safe-area-inset-bottom,16px))}
   .modal{width:92%;max-width:560px}
   .login-box{width:90%;max-width:400px;padding:32px 20px}
   .stats-grid{grid-template-columns:repeat(2,1fr)!important}
@@ -200,13 +200,18 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   .cd-sidebar{width:100%}
   .page-header{flex-wrap:wrap;gap:10px}
   .table-toolbar{flex-wrap:wrap}
-  .tbl th,.tbl td{padding:7px 8px;font-size:12px}
+  .tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tbl{min-width:480px}
+  .tbl th,.tbl td{padding:7px 10px;font-size:12px;white-space:nowrap}
+  .tbl td{max-width:160px}
   .tabs{flex-wrap:wrap;border-radius:12px;gap:3px}
   .tab{padding:6px 12px;font-size:12px}
   .tbl .actions button{padding:6px 8px;font-size:14px;min-width:30px;min-height:30px}
   .btn{min-height:36px}
   .btn-sm{min-height:30px}
   .form-grid-2{grid-template-columns:1fr!important}
+  .pagination{padding:10px 14px;padding-bottom:calc(10px + env(safe-area-inset-bottom,16px));flex-wrap:wrap;gap:4px}
+  .pagination button{padding:8px 14px;min-height:36px}
 }
 @media(max-width:480px){
   .stats-grid{grid-template-columns:1fr!important}
