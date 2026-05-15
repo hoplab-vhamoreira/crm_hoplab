@@ -1467,7 +1467,128 @@ function getFieldValue(f){
   return el?el.value:'';
 }
 
+// ─── PIPELINE: formulário dinâmico ───────────────────────────────────────────
+function _plUpdateStatus(){
+  const aberta=document.getElementById('pl_aberta').value;
+  const wrap=document.getElementById('pl_status_wrap');
+  const sel=document.getElementById('pl_status');
+  if(!aberta){wrap.style.display='none';_plUpdateConverter();return;}
+  wrap.style.display='';
+  if(aberta==='Aberta'){
+    sel.innerHTML='<option value="Ativo">Ativo</option><option value="Inativo">Inativo</option>';
+  } else {
+    sel.innerHTML='<option value="Ganho">Ganho</option><option value="Outras">Outras</option>';
+  }
+  _plUpdateConverter();
+}
+function _plUpdateConverter(){
+  const status=(document.getElementById('pl_status')||{}).value||'';
+  const cw=document.getElementById('pl_converter_wrap');
+  const ow=document.getElementById('pl_outras_wrap');
+  if(cw) cw.style.display=status==='Ganho'?'':'none';
+  if(ow) ow.style.display=status==='Outras'?'':'none';
+}
+async function openAddPipeline(){
+  const colabs=await getLookup('dados_colaboradores','Nome Oficial');
+  const dlColabs=colabs.map(c=>`<option>${c}</option>`).join('');
+  const existing=sectionData['pipeline']||[];
+  const nextON=existing.reduce((m,r)=>Math.max(m,parseInt(r['N\xba ON'])||0),0)+1;
+  document.getElementById('modalTitle').textContent=`Adicionar — Pipeline Comercial (ON ${nextON})`;
+  document.getElementById('modalBody').innerHTML=`
+    <div class="form-group"><label>Contacto</label><input type="text" id="pl_contacto" placeholder="Nome do lead"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Tipo</label>
+        <select id="pl_tipo"><option>Studio</option><option>Lab</option><option>Lab + Studio</option></select></div>
+      <div class="form-group"><label>Comercial</label>
+        <input type="text" id="pl_comercial" list="dl_pl_col" placeholder="Colaborador">
+        <datalist id="dl_pl_col">${dlColabs}</datalist></div>
+    </div>
+    <div class="form-group"><label>Aberta/Fechada</label>
+      <select id="pl_aberta" onchange="_plUpdateStatus()">
+        <option value="">— seleciona primeiro —</option>
+        <option>Aberta</option><option>Fechada</option>
+      </select></div>
+    <div id="pl_status_wrap" style="display:none">
+      <div class="form-group"><label>Status</label>
+        <select id="pl_status" onchange="_plUpdateConverter()"></select></div>
+    </div>
+    <div id="pl_outras_wrap" style="display:none">
+      <div class="form-group"><label>Motivo / detalhe</label>
+        <input type="text" id="pl_outras_motivo" placeholder="Motivo de não conversão"></div>
+    </div>
+    <div id="pl_converter_wrap" style="display:none">
+      <div class="form-group" style="background:rgba(170,255,0,.08);border:1px solid rgba(170,255,0,.3);border-radius:8px;padding:14px">
+        <label style="color:var(--primary-text)">&#x1F4C4; Converter em</label>
+        <select id="pl_converter">
+          <option value="">— s\xf3 fechar ON —</option>
+          <option value="cliente">&#x1F465; Cliente</option>
+          <option value="parceiro">&#x1F91D; Parceiro</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Fonte Aquisi\xe7\xe3o</label>
+        <select id="pl_fonte">
+          <option>Prospe\xe7\xe3o</option><option>Recomenda\xe7\xe3o PT</option><option>Inscri\xe7\xe3o</option>
+          <option>Website</option><option>Voucher</option><option>HOP Studio</option><option>Cadastro retroactivo</option>
+        </select></div>
+      <div class="form-group"><label>Canal Contacto</label>
+        <select id="pl_canal">
+          <option>Chamada Telef\xf3nica</option><option>WhatsApp</option><option>Email</option>
+          <option>Presencial</option><option>Instagram</option><option>Website</option>
+        </select></div>
+    </div>
+    <div class="form-group"><label>Parceiro</label><input type="text" id="pl_parceiro" placeholder="(opcional)"></div>`;
+  document.getElementById('modal').classList.add('show');
+  document.getElementById('modalSave').onclick=async()=>{
+    const contacto=document.getElementById('pl_contacto').value.trim();
+    if(!contacto) return toast('Preenche o Contacto','error');
+    const aberta=document.getElementById('pl_aberta').value;
+    if(!aberta) return toast('Seleciona Aberta ou Fechada','error');
+    const status=(document.getElementById('pl_status')||{}).value||'';
+    const converter=(document.getElementById('pl_converter')||{}).value||'';
+    const outras=(document.getElementById('pl_outras_motivo')||{}).value||'';
+    const rec={
+      'N\xba ON': nextON,
+      'Contacto': contacto,
+      'Tipo': document.getElementById('pl_tipo').value,
+      'Comercial': document.getElementById('pl_comercial').value||null,
+      'Aberta/Fechada': aberta,
+      'Status': outras ? `Outras — ${outras}` : status,
+      'Fonte Aquisi\xe7\xe3o': document.getElementById('pl_fonte').value,
+      'Canal Contacto': document.getElementById('pl_canal').value,
+      'Parceiro': document.getElementById('pl_parceiro').value||null,
+    };
+    const res=await api('/api/data/pipeline',{method:'POST',body:rec});
+    if(res.error){toast('Erro ao criar ON: '+res.error,'error');return;}
+    sectionData['pipeline']=null;
+    // Converter em cliente ou parceiro
+    if(status==='Ganho' && converter==='cliente'){
+      const clData=sectionData['clientes']||(await api('/api/data/clientes'));
+      const maxID=(Array.isArray(clData)?clData:[]).reduce((m,c)=>Math.max(m,parseInt(c['ID'])||0),0);
+      const novoID=maxID+1;
+      const cr=await api('/api/data/clientes',{method:'POST',body:{
+        'Nome':contacto,'ID':novoID,'Status':'Ativo',
+        'Segmento':rec['Tipo']||null,'Data Cria\xe7\xe3o':new Date().toISOString().slice(0,10)
+      }});
+      sectionData['clientes']=null;
+      closeModal();
+      toast(cr.error?`ON ${nextON} criado · Erro cliente: ${cr.error}`:`ON ${nextON} criado · Cliente "${contacto}" ID ${novoID} ✓`,cr.error?'error':'success');
+    } else if(status==='Ganho' && converter==='parceiro'){
+      const pr=await api('/api/data/parceiros',{method:'POST',body:{'Nome / Empresa':contacto}});
+      sectionData['parceiros']=null;
+      closeModal();
+      toast(pr.error?`ON ${nextON} criado · Erro parceiro: ${pr.error}`:`ON ${nextON} criado · Parceiro "${contacto}" criado ✓`,pr.error?'error':'success');
+    } else {
+      closeModal();
+      toast(`ON ${nextON} criado ✓`);
+    }
+    await renderDataPage(document.getElementById('mainContent'),'pipeline');
+  };
+}
+
 async function openAdd(section){
+  if(section==='pipeline') return openAddPipeline();
   const sec=SECTIONS[section];
   if(!sec||!sec.fields) return toast('Secção sem campos definidos','error');
   document.getElementById('modalTitle').textContent='Adicionar — '+sec.title;
