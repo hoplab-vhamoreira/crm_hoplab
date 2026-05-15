@@ -444,7 +444,16 @@ async function api(url,opts={}){
       motor:mot.data||null,log_contratos:lc.data||[]};
   }
   const oM=url.match(/^\/api\/on\/(\d+)$/);
-  if(oM){const{data}=await _SB.from('pipeline').select('*').eq('N\u00ba ON',parseInt(oM[1])).single();return data||{};}
+  if(oM){
+    const nONInt=parseInt(oM[1]);
+    const[plRes,logRes]=await Promise.all([
+      _SB.from('pipeline').select('*').eq('N\u00ba ON',nONInt).single(),
+      _SB.from('log_comercial').select('*').eq('N\u00ba ON',String(nONInt)).order('Data A\xe7\xe3o',{ascending:false})
+    ]);
+    const info=plRes.data||{};
+    const log=(logRes.data||[]).map((l,i)=>({...l,_idx:i,'Dias Atrás':l['Data Ação']?Math.floor((new Date()-new Date(String(l['Data Ação']).slice(0,10)))/86400000):null}));
+    return{info,log_comercial:log,historico:[]};
+  }
   const lM=url.match(/^\/api\/lookup\/([^\/]+)\/(.+)$/);
   if(lM){const f=decodeURIComponent(lM[2]);const sel=f.includes(' ')?`"${f}"`:f;const{data}=await _SB.from(_TABLE_MAP[lM[1]]||lM[1]).select(sel);return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];}
   if(url.startsWith('/api/autofill')){const p=new URLSearchParams(url.split('?')[1]||'');const f=p.get('return_field');const sel=f&&f.includes(' ')?`"${f}"`:f;const{data}=await _SB.from(_TABLE_MAP[p.get('src')]||p.get('src')).select(sel);return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];}
