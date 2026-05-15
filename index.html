@@ -3891,9 +3891,45 @@ async function openAddParaCliente(section, clienteNome){
   document.getElementById('modalSave').onclick=async()=>{
     const rec={};
     for(const f of sec.fields) rec[f.k]=getFieldValue(f);
-    await api(`/api/data/${section}`,{method:'POST',body:rec});
+    const res = await api(`/api/data/${section}`,{method:'POST',body:rec});
+    if(res?.error){ toast('Erro ao adicionar: '+res.error,'error'); return; }
     sectionData[section]=null;
     closeModal();
+
+    // Serviço de gestão → criar ciclo automaticamente
+    if(section==='servicos'){
+      const precData = sectionData['precario_publico'] || (await api('/api/data/precario_publico'));
+      const precItem = (Array.isArray(precData)?precData:[]).find(p=>p['Servi\xe7o']===rec['Servi\xe7o']);
+      const codigo = precItem?.['C\xf3digo']||'';
+      if(['GL4','GL12','GI'].includes(codigo)){
+        const todosC = sectionData['ciclos'] || (await api('/api/data/ciclos'));
+        const clientCiclos = (Array.isArray(todosC)?todosC:[]).filter(c=>c['Cliente']===clienteNome);
+        const proxNum = clientCiclos.reduce((m,c)=>Math.max(m,parseInt(c['Ciclo N\xba'])||0),0)+1;
+        const dataIni = rec['Data Marca\xe7\xe3o/In\xedcio']||null;
+        let dataFim = null;
+        if(dataIni){
+          const d = new Date(dataIni);
+          if(codigo==='GL4')  d.setDate(d.getDate()+28);
+          if(codigo==='GL12') d.setDate(d.getDate()+84);
+          if(codigo!=='GI') dataFim = d.toISOString().slice(0,10);
+        }
+        const cicloBody = {
+          'Cliente': clienteNome,
+          'Tipo': codigo,
+          'Ciclo N\xba': proxNum,
+          'Data In\xedcio': dataIni||null,
+          'Data Fim': dataFim,
+          'GP': rec['T\xe9cnico Respons\xe1vel']||null,
+        };
+        const cr = await api('/api/data/ciclos',{method:'POST',body:cicloBody});
+        sectionData['ciclos']=null;
+        if(!cr.error) toast(`Servi\xe7o adicionado \xb7 Ciclo ${codigo} #${proxNum} criado ✓`);
+        else toast(`Servi\xe7o adicionado \xb7 Erro ao criar ciclo: ${cr.error}`,'error');
+        await openClienteDetalhe(clienteNome);
+        return;
+      }
+    }
+
     toast('Registo adicionado');
     await openClienteDetalhe(clienteNome);
   };
