@@ -1421,8 +1421,19 @@ async function _dbAdmin(el){
             <div class="db-hc-body">
               <div class="db-hc-label">Clientes Ativos</div>
               <div class="db-hc-value" style="color:var(--info)">${cliAtivos}</div>
-              <span class="db-hc-badge" style="background:rgba(37,99,235,.1);color:var(--info)"> ${cliStudio} Studio ·  ${cliLab} Lab</span>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:4px">${cliSusp} susp · ${cliCanc} canc</div>
+              <span class="db-hc-badge" style="background:rgba(37,99,235,.1);color:var(--info)">${cliStudio} Studio · ${cliLab} Lab</span>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px">
+                <div style="background:var(--surface2);border-radius:6px;padding:4px 8px;font-size:10px">
+                  <span style="color:var(--text-muted)">Gestão</span><br><strong style="color:#7c3aed">${cliGestao}</strong> <span style="color:var(--text-muted);font-size:9px">(${emCursoGestao} em curso)</span>
+                </div>
+                <div style="background:var(--surface2);border-radius:6px;padding:4px 8px;font-size:10px">
+                  <span style="color:var(--text-muted)">Consultas</span><br><strong style="color:var(--success)">${cliConsulta}</strong> <span style="color:var(--text-muted);font-size:9px">(${emCursoConsulta} em curso)</span>
+                </div>
+              </div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:6px;display:flex;gap:8px">
+                <span>${cliSusp} suspensos</span><span>·</span><span>${cliCanc} cancelados</span>
+                ${novasAdes>0?`<span>·</span><span style="color:var(--success)">+${novasAdes} novos</span>`:''}
+              </div>
             </div>
           </div>
           <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('pipeline')">
@@ -1430,7 +1441,14 @@ async function _dbAdmin(el){
             <div class="db-hc-body">
               <div class="db-hc-label">Pipeline Aberto</div>
               <div class="db-hc-value" style="color:#7c3aed">${pipeAberto}</div>
-              <span class="db-hc-badge" style="background:rgba(124,58,237,.1);color:#7c3aed">${alertasN} alertas · clique p/ detalhe</span>
+              <span class="db-hc-badge" style="background:rgba(124,58,237,.1);color:#7c3aed">${alertasN} alertas ativos</span>
+              <div style="margin-top:8px;display:flex;flex-direction:column;gap:3px">
+                ${pip.filter(p=>p['Aberta/Fechada']==='Aberta').slice(0,3).map(p=>`
+                  <div style="display:flex;align-items:center;justify-content:space-between;font-size:10px">
+                    <span style="color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${p['Contacto']||p['Nome']||'—'}</span>
+                    <span style="color:var(--text-muted);flex-shrink:0;margin-left:6px">${p['Status']||p['Origem']||'—'}</span>
+                  </div>`).join('')}
+              </div>
             </div>
           </div>
           <div class="db-hero-card" style="grid-column:span 1;align-items:center;justify-content:center;flex-direction:column;gap:6px;padding:12px 16px">
@@ -4217,37 +4235,67 @@ function _calcPrecToggle(header){
   if(arrow) arrow.style.transform=open?'rotate(180deg)':'';
 }
 
+function _descToggle(header){
+  const panel=header.nextElementSibling;
+  if(!panel) return;
+  const open=panel.style.display==='none';
+  panel.style.display=open?'block':'none';
+  const arrow=header.querySelector('.desc-arrow');
+  if(arrow) arrow.style.transform=open?'rotate(180deg)':'';
+}
+function _filterDescontos(q){
+  const sq=q.toLowerCase();
+  document.querySelectorAll('#desc-cards > div').forEach(card=>{
+    const txt=card.textContent.toLowerCase();
+    card.style.display=!sq||txt.includes(sq)?'':'none';
+  });
+}
 async function _renderCalcDescontos(){return renderDescontos(document.getElementById('calc-descontos'));}
 async function renderDescontos(el){
   el.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--text-muted);font-size:14px">A carregar descontos...</div>`;
-  const {data,error}=await _SB.from('descontos').select('*').order('created_at',{ascending:false});
+  const {data,error}=await _SB.from('descontos').select('*').order('tipo').order('nome');
   if(error){el.innerHTML=`<div style="padding:40px;color:var(--danger)">Erro: ${error.message}</div>`;return;}
   const tipoBadge=t=>({cliente:'Tipo de cliente',promocional:'Promocional',servico:'Por serviço'}[t]||t||'—');
   const tipoCor=t=>({cliente:'var(--info)',promocional:'var(--warning)',servico:'var(--success)'}[t]||'var(--text-muted)');
-  const rows=(data||[]).map(d=>`
-    <tr>
-      <td><strong>${d.nome||'—'}</strong>${d.descricao?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${d.descricao}</div>`:''}</td>
-      <td><span style="background:var(--surface2);padding:2px 8px;border-radius:6px;font-size:12px;font-family:monospace">${d.codigo||'—'}</span></td>
-      <td><span style="font-size:11px;font-weight:600;color:${tipoCor(d.tipo)}">${tipoBadge(d.tipo)}</span></td>
-      <td style="font-weight:700">${d.valor!=null?(d.tipo_valor==='fixo'?d.valor+'€':d.valor+'%'):'—'}</td>
-      <td>${d.ativo?'<span style="color:var(--success);font-weight:600">Ativo</span>':'<span style="color:var(--text-muted)">Inativo</span>'}</td>
-      <td style="font-size:12px;color:var(--text-muted)">${d.data_inicio||''}${d.data_fim?' → '+d.data_fim:''}</td>
-      <td>
-        <button class="btn btn-ghost btn-sm" onclick="abrirEditDesconto(${d.id})">Editar</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="eliminarDesconto(${d.id},'${(d.nome||'').replace(/'/g,"\\'")}')">Eliminar</button>
-      </td>
-    </tr>`).join('');
+  const valStr=d=>d.valor!=null?(d.tipo_valor==='fixo'?'-'+d.valor+'€':'-'+d.valor+'%'):'variável';
+  const cards=(data||[]).map(d=>`
+    <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:6px;overflow:hidden;opacity:${d.ativo?1:.5}">
+      <div onclick="_descToggle(this)" style="display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;background:var(--surface)"
+        onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+            <span style="font-weight:700;font-size:14px">${d.nome}</span>
+            ${d.codigo?`<span style="font-size:11px;font-family:monospace;background:var(--surface2);padding:1px 6px;border-radius:4px;color:var(--text-muted)">${d.codigo}</span>`:''}
+            <span style="font-size:11px;padding:1px 8px;border-radius:10px;border:1px solid var(--border);color:${tipoCor(d.tipo)};font-weight:600">${tipoBadge(d.tipo)}</span>
+            ${!d.ativo?`<span style="font-size:11px;color:var(--text-muted);font-style:italic">Inativo</span>`:''}
+          </div>
+          ${d.descricao?`<div style="font-size:12px;color:var(--text-muted);margin-top:3px">${d.descricao}</div>`:''}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-weight:700;font-size:16px;color:${d.valor!=null?'var(--success)':'var(--text-muted)'}">${valStr(d)}</div>
+          ${d.data_fim?`<div style="font-size:11px;color:var(--text-muted)">até ${d.data_fim}</div>`:''}
+        </div>
+        <span style="color:var(--text-muted);font-size:12px;transition:transform .2s;display:inline-block" class="desc-arrow"></span>
+      </div>
+      <div style="display:none;padding:14px 16px;border-top:1px solid var(--border);background:var(--surface2)">
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);margin-bottom:12px">
+          ${d.data_inicio?`<span><strong>Início:</strong> ${d.data_inicio}</span>`:''}
+          ${d.data_fim?`<span><strong>Fim:</strong> ${d.data_fim}</span>`:''}
+          <span><strong>Estado:</strong> ${d.ativo?'Ativo':'Inativo'}</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="abrirEditDesconto(${d.id});event.stopPropagation()">Editar</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="eliminarDesconto(${d.id},'${(d.nome||'').replace(/'/g,"\\'")}');event.stopPropagation()">Eliminar</button>
+        </div>
+      </div>
+    </div>`).join('');
   el.innerHTML=`
-    <div class="page-header">
-      <div><h1>Descontos</h1><div class="subtitle">${(data||[]).length} regras definidas</div></div>
-      <button class="btn btn-primary" onclick="abrirNovoDesconto()">+ Novo Desconto</button>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+      <input type="text" placeholder="Filtrar descontos..." oninput="_filterDescontos(this.value)"
+        style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px">
+      <button class="btn btn-primary btn-sm" onclick="abrirNovoDesconto()">+ Novo Desconto</button>
     </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Nome</th><th>Código</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Validade</th><th>Ações</th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--text-muted)">Nenhum desconto definido. Cria o primeiro.</td></tr>'}</tbody>
-      </table>
-    </div>`;
+    <div id="desc-cards">${cards||'<div style="padding:40px;text-align:center;color:var(--text-muted)">Nenhum desconto definido.</div>'}</div>`;
 }
 function _descontoModal(d){
   const tipos=[['cliente','Tipo de cliente'],['promocional','Promocional'],['servico','Por serviço']];
@@ -7069,9 +7117,8 @@ async function abrirTotaisDetalhe(profEnc){
   if (session) {
     const { data: profile } = await _SB.from('profiles').select('*').eq('user_id', session.user.id).single();
     if (profile && profile.active) {
-      const allRoles = ['Admin','Comercial','Coordenador','Técnico','Direcção'];
       currentUser = { username: profile.username, name: profile.name, role: profile.role };
-      currentPerms = profile.role === 'Admin' ? Object.keys(_TABLE_MAP) : allRoles;
+      currentPerms = Object.keys(_TABLE_MAP);
       showApp();
       return;
     }
