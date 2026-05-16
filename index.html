@@ -3079,10 +3079,10 @@ async function renderResponsabilidadesMatriz(el){
     <div id="rm-resp">${_mkTable(colsR,Array.isArray(resp)?resp:[])}</div>
     <div id="rm-matr" style="display:none">${_mkTable(colsM,Array.isArray(matr)?matr:[])}</div>`;
 }
-function switchGtab(btn,id){
+function switchGtab(btn,id,panels){
   btn.closest('.gtab-wrap').querySelectorAll('.gtab').forEach(b=>b.classList.remove('gtab-active'));
   btn.classList.add('gtab-active');
-  ['rm-resp','rm-matr'].forEach(k=>{const el=document.getElementById(k);if(el)el.style.display=k===id?'':'none';});
+  (panels||['rm-resp','rm-matr']).forEach(k=>{const el=document.getElementById(k);if(el)el.style.display=k===id?'':'none';});
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3100,8 +3100,8 @@ async function renderCalculadora(el){
   el.innerHTML=`
     <div class="page-header"><div><h1>🖩 Calculadora de Serviços</h1><div class="subtitle">Constrói uma proposta a partir do preçário</div></div></div>
     <div class="gtab-wrap" style="margin-bottom:20px">
-      <button class="gtab gtab-active" id="calc-tab-btn" onclick="switchGtab(this,'calc-main');_renderCalcLista()">🖩 Calculadora</button>
-      <button class="gtab" onclick="switchGtab(this,'calc-precario');_renderCalcPrecario()">📋 Preçário</button>
+      <button class="gtab gtab-active" id="calc-tab-btn" onclick="switchGtab(this,'calc-main',['calc-main','calc-precario']);_renderCalcLista()">🖩 Calculadora</button>
+      <button class="gtab" onclick="switchGtab(this,'calc-precario',['calc-main','calc-precario']);_renderCalcPrecario()">📋 Preçário</button>
     </div>
     <div id="calc-main">
       <div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start">
