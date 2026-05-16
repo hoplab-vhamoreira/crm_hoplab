@@ -3648,7 +3648,7 @@ async function renderCalculadora(el){
   // só serviços com preço numérico positivo — exclui linhas de cabeçalho e tabelas internas
   _calcPrecarioData=Array.isArray(pr)?pr.filter(p=>{const v=parseFloat(p['PVP Base (c/IVA)']);return p['Serviço']&&p['Código']&&!isNaN(v)&&v!==0;}):[];
   const {data:_dsD}=await _SB.from('descontos').select('*').eq('ativo',true).order('nome');
-  _calcDescontosCache=_dsD||[];
+  _calcDescontosCache=(_dsD||[]).filter(d=>d.valor!=null&&d.valor>0);
 
   el.innerHTML=`
     <div class="page-header"><div><h1>Calculadora de Serviços</h1><div class="subtitle">Constrói uma proposta a partir do preçário</div></div></div>
