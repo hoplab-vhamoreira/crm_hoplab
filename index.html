@@ -180,6 +180,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .cfi.on{border-color:var(--primary-text)!important;background:rgba(170,255,0,.15)!important;color:var(--primary-text)!important;font-weight:600}
 .sort-tog{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;padding:0 2px;vertical-align:middle;opacity:.55;margin-left:2px}
 .sort-tog:hover,.sort-tog.on{opacity:1;color:var(--primary-text)}
+.sort-label{color:inherit}
+.sort-label.on{color:var(--primary-text)}
 .filter-active-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:rgba(170,255,0,.15);color:var(--primary-text);border:1px solid rgba(170,255,0,.35);border-radius:12px;font-size:11px;font-weight:600}
 /* GREEN DOT on active pill */
 .gtab-active::before,.tab.active::before,.agenda-period-btn.active::before{content:"";display:inline-block;width:7px;height:7px;background:#aaff00;border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0}
@@ -1250,16 +1252,15 @@ function renderTable(el,section,sec,data,allCols){
 
     const opts=raw.map(v=>`<option value="${v.replace(/"/g,'&quot;')}"${v===cur?' selected':''}>${v}</option>`).join('');
 
-    // Botão de ordenação — só para colunas não-status
+    // Ordenação integrada no nome da coluna (só para colunas não-status)
     const curOrd=ordMap[c]||'';
     const isNameCol=['Nome','Nome / Empresa','Nome Oficial','Contacto','Cliente'].includes(c);
-    let sortBtn='';
-    if(!isStatusCol){
-      let sortIcon = curOrd==='desc' ? '↓' : curOrd==='date' ? '📅' : '↑';
-      sortBtn=`<button class="sort-tog${curOrd?' on':''}" onclick="toggleFilterOrd('${section}','${colEsc}',event)" title="${isNameCol?'Ordem alfabética / criação':'Ordenar'}">${sortIcon}</button>`;
-    }
+    const sortInd=curOrd==='desc'?' ↓':curOrd==='date'?' 📅':curOrd==='asc'?' ↑':'';
+    const colLabel=isStatusCol
+      ? `<span>${c}</span>`
+      : `<span class="sort-label${curOrd?' on':''}" onclick="toggleFilterOrd('${section}','${colEsc}',event)" title="${isNameCol?'Ordem alfabética / criação':'Ordenar'}" style="cursor:pointer;user-select:none">${c}${sortInd}</span>`;
 
-    return `<th>${c}<select id="${id}" class="cfi${cur?' on':''}" onchange="doColumnFilter('${section}','${colEsc}',this.value)"><option value="">▼</option>${opts}</select>${sortBtn}</th>`;
+    return `<th>${colLabel}<select id="${id}" class="cfi${cur?' on':''}" onchange="doColumnFilter('${section}','${colEsc}',this.value)"><option value=""></option>${opts}</select></th>`;
   }).join('')+'<th>Ações</th>';
   let tbHtml='';
   for(let i=0;i<pageData.length;i++){
