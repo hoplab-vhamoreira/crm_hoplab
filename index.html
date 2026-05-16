@@ -1031,7 +1031,7 @@ async function _dbAdmin(el){
   const now=new Date(); const mi=now.getMonth();
   const curMonth=MONTHS[mi]; const prevMonth=mi>0?MONTHS[mi-1]:null;
 
-  const[stats,hist,alrtTop,cliRes,servsRes,pag26Res,pipRes,alrtCount]=await Promise.all([
+  const[stats,hist,alrtTop,cliRes,servsRes,pag26Res,pipRes,alrtCount,avalRes]=await Promise.all([
     api('/api/stats'),
     _SB.from('historico').select('*').order('timestamp',{ascending:false}).limit(5),
     _SB.from('v_alertas').select('*').order('DiasAtraso',{ascending:false}).limit(5),
@@ -1039,10 +1039,11 @@ async function _dbAdmin(el){
     _SB.from('servicos').select('*'),
     _SB.from('pag_clientes_2026').select('*'),
     _SB.from('pipeline').select('*'),
-    _SB.from('v_alertas').select('*',{count:'exact',head:true})
+    _SB.from('v_alertas').select('*',{count:'exact',head:true}),
+    _SB.from('avaliacoes').select('Nome')
   ]);
 
-  const cli=cliRes.data||[], servs=servsRes.data||[], pag=pag26Res.data||[], pip=pipRes.data||[];
+  const cli=cliRes.data||[], servs=servsRes.data||[], pag=pag26Res.data||[], pip=pipRes.data||[], avals=avalRes.data||[];
 
   // Status do cliente: valor pode ser "Ativo · ⚠️ Sem Avaliação", "Híbrido ativo ·...", etc.
   const isCliAtivo=c=>/^Ativo|^Híbrido ativo/i.test(c['Status']||'');
@@ -1068,20 +1069,24 @@ async function _dbAdmin(el){
   const giAt=servs.filter(s=>isGI(s)&&emCurso(s)).length;
   const consultAt=servs.filter(s=>isConsulta(s)&&emCurso(s)).length;
 
-  // Clientes ativos por tipo (baseado em todos os serviços, não só Em curso)
+  // Clientes ativos por tipo
   const cliActivosSet=new Set(cli.filter(isCliAtivo).map(c=>c['Nome']));
+  // Studio: clientes ativos com serviço Studio (qualquer estado — PT, Duo, Pilates, etc.)
   const cliStudio=new Set(servs.filter(s=>isStudio(s)&&cliActivosSet.has(s['Cliente'])).map(s=>s['Cliente'])).size;
-  const cliLab=new Set(servs.filter(s=>isLab(s)&&cliActivosSet.has(s['Cliente'])).map(s=>s['Cliente'])).size;
+  // Lab: clientes ativos com avaliação registada (tabela avaliacoes, campo Nome)
+  const cliLab=new Set(avals.filter(a=>cliActivosSet.has(a['Nome'])).map(a=>a['Nome'])).size;
 
   // Receita a partir de pag_clientes_2026 (estrutura: Mês, Estado, Valor Pago)
   const pagCurMonth=pag.filter(r=>r['Mês']===curMonth);
   const pagPrevMonth=prevMonth?pag.filter(r=>r['Mês']===prevMonth):[];
   const receitaMes=pagCurMonth.filter(r=>r['Estado']==='Pago').reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
 
-  // Pagamentos em atraso: clientes com Estado='Ativo' em meses passados (deviam ter pago)
-  const pastMonths=MONTHS.slice(0,mi);
-  const emAtrasoRows=pag.filter(r=>pastMonths.includes(r['Mês'])&&r['Estado']==='Ativo');
-  const emAtrasoClientes=new Set(emAtrasoRows.map(r=>r['Cliente'])).size;
+  // Suspensões: clientes com Estado='Suspendeu' em pag_clientes_2026 (sinal claro de problema)
+  const suspRows=pag.filter(r=>r['Estado']==='Suspendeu');
+  const suspClientes=new Set(suspRows.map(r=>r['Cliente'])).size;
+  // Cancelamentos no período
+  const cancRows=pag.filter(r=>r['Estado']==='Cancelou');
+  const cancClientes=new Set(cancRows.map(r=>r['Cliente'])).size;
 
   // Retenção: clientes ativos/pagos no mês anterior vs atual
   let retPct=null, desist=0, novasAdes=0;
@@ -1174,11 +1179,11 @@ async function _dbAdmin(el){
             </div>
           </div>
           <div class="db-hero-card" style="cursor:pointer" onclick="navigate('totais_pagamentos')">
-            <div class="db-hc-icon" style="background:rgba(220,38,38,.1)">⚠️</div>
+            <div class="db-hc-icon" style="background:rgba(220,38,38,.1)">⏸️</div>
             <div class="db-hc-body">
-              <div class="db-hc-label">Pag. em Atraso</div>
-              <div class="db-hc-value" style="color:var(--danger)">${emAtrasoClientes}</div>
-              <span class="db-hc-badge" style="background:rgba(220,38,38,.1);color:var(--danger)">${emAtrasoRows.length} meses por regularizar</span>
+              <div class="db-hc-label">Suspensões</div>
+              <div class="db-hc-value" style="color:var(--danger)">${suspClientes}</div>
+              <span class="db-hc-badge" style="background:rgba(220,38,38,.1);color:var(--danger)">${cancClientes} cancelamentos</span>
             </div>
           </div>
           <div class="db-hero-card" style="cursor:pointer" onclick="navigate('clientes')">
