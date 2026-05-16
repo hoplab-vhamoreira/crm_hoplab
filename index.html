@@ -1198,10 +1198,9 @@ async function _dbAdmin(el){
     {key:'gestao',nome:'Gestão',n:cliGestao,sub:`${emCursoGestao} em curso · GL4:${gl4At} GL12:${gl12At} GI:${giAt}`,color:'#7c3aed',bg:'rgba(124,58,237,.12)'},
     {key:'consultas',nome:'Consultas',n:cliConsulta,sub:`${emCursoConsulta} em curso`,color:'#16a34a',bg:'rgba(22,163,74,.12)'},
   ];
-  // Add gestao and consultas to _dbCache (defined after srvs)
-  _dbCache.gestao={title:'Clientes Gestão',kpis:[{label:'Total',val:cliGestao,color:'#7c3aed'},{label:'Em curso',val:emCursoGestao,color:'var(--success)'}],rows:servs.filter(s=>(isGL4(s)||isGL12(s)||isGI(s))&&cliActivosSet.has(s['Cliente'])).reduce((acc,s)=>{if(!acc.find(r=>r.name===s['Cliente']))acc.push({name:s['Cliente'],sub:s['Serviço'],badge:s['Estado do serviço'],bc:'rgba(124,58,237,.1)',tc:'#7c3aed'});return acc;},[])};
-  _dbCache.consultas={title:'Clientes Consultas',kpis:[{label:'Total',val:cliConsulta,color:'var(--success)'},{label:'Em curso',val:emCursoConsulta,color:'var(--success)'}],rows:servs.filter(s=>isConsulta(s)&&cliActivosSet.has(s['Cliente'])).reduce((acc,s)=>{if(!acc.find(r=>r.name===s['Cliente']))acc.push({name:s['Cliente'],sub:s['Serviço'],badge:s['Estado do serviço'],bc:'rgba(22,163,74,.1)',tc:'var(--success)'});return acc;},[])};
-  _dbCache.alertas.rows=(alrtTop.data||[]).map(a=>({name:a['Cliente']||'—',sub:a['Tipo']||'—',badge:a['DiasAtraso']!=null?a['DiasAtraso']+'d':'—',bc:'rgba(220,38,38,.1)',tc:'var(--danger)'}));
+  // gestao/consultas drawer rows — built after srvs, merged into _dbCache below
+  const _gestaoRows=servs.filter(s=>(isGL4(s)||isGL12(s)||isGI(s))&&cliActivosSet.has(s['Cliente'])).reduce((acc,s)=>{if(!acc.find(r=>r.name===s['Cliente']))acc.push({name:s['Cliente'],sub:s['Serviço'],badge:s['Estado do serviço'],bc:'rgba(124,58,237,.1)',tc:'#7c3aed'});return acc;},[]);
+  const _consultaRows=servs.filter(s=>isConsulta(s)&&cliActivosSet.has(s['Cliente'])).reduce((acc,s)=>{if(!acc.find(r=>r.name===s['Cliente']))acc.push({name:s['Cliente'],sub:s['Serviço'],badge:s['Estado do serviço'],bc:'rgba(22,163,74,.1)',tc:'var(--success)'});return acc;},[]);
 
   // Gauge: retention or client health
   const gaugeVal=retPct!=null?retPct:cliAtivos+cliSusp+cliCanc>0?Math.round((cliAtivos/(cliAtivos+cliSusp+cliCanc))*100):0;
@@ -1251,6 +1250,8 @@ async function _dbAdmin(el){
       rows:servs.filter(s=>isStudio(s)&&cliActivosSet.has(s['Cliente'])).reduce((acc,s)=>{if(!acc.find(r=>r.name===s['Cliente']))acc.push({name:s['Cliente'],sub:s['Serviço'],badge:s['Estado do serviço']==='Em curso'?'Em curso':'Concluído',bc:s['Estado do serviço']==='Em curso'?'rgba(170,255,0,.2)':'var(--surface3)',tc:s['Estado do serviço']==='Em curso'?'var(--primary-text)':'var(--text-muted)'});return acc;},[])},
     lab:{title:'Clientes Lab & Avaliações',kpis:[{label:'Clientes',val:cliLab,color:'var(--info)'},{label:'Avaliações totais',val:avalsAtivos,color:'var(--info)'},{label:'Repetiram',val:labRepPct+'%',color:'#7c3aed'},{label:'Sessões/cliente',val:cliLab>0?(avalsAtivos/cliLab).toFixed(1):'—',color:'var(--text-muted)'}],
       rows:avals.filter(a=>cliActivosSet.has(a['Nome'])).reduce((acc,a)=>{if(!acc.find(r=>r.name===a['Nome']))acc.push({name:a['Nome'],sub:'Avaliação registada',badge:'Lab',bc:'rgba(37,99,235,.1)',tc:'var(--info)'});return acc;},[])},
+    gestao:{title:'Clientes Gestão',kpis:[{label:'Total',val:cliGestao,color:'#7c3aed'},{label:'Em curso',val:emCursoGestao,color:'var(--success)'}],rows:_gestaoRows},
+    consultas:{title:'Clientes Consultas',kpis:[{label:'Total',val:cliConsulta,color:'var(--success)'},{label:'Em curso',val:emCursoConsulta,color:'var(--success)'}],rows:_consultaRows},
   };
 
   el.innerHTML=`
