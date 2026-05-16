@@ -3636,6 +3636,8 @@ let _calcDestinatarios = null; // cache {cli:[],pip:[]}
 let _calcEnvTab = 'cli'; // 'cli' | 'pip'
 let _calcPickerAction = 'enviar'; // 'enviar' | 'aplicar'
 const _EVAL_CODES = new Set(['AM','AMP','AMR','PE','PEP','PP','PV']);
+let _calcDescontoId = null;
+let _calcDescontosCache = [];
 
 async function renderCalculadora(el){
   el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted)">A carregar preçário...</div>`;
@@ -3645,6 +3647,8 @@ async function renderCalculadora(el){
   sectionData['precario_publico']=pr;
   // só serviços com preço numérico positivo — exclui linhas de cabeçalho e tabelas internas
   _calcPrecarioData=Array.isArray(pr)?pr.filter(p=>{const v=parseFloat(p['PVP Base (c/IVA)']);return p['Serviço']&&p['Código']&&!isNaN(v)&&v!==0;}):[];
+  const {data:_dsD}=await _SB.from('descontos').select('*').eq('ativo',true).order('nome');
+  _calcDescontosCache=_dsD||[];
 
   el.innerHTML=`
     <div class="page-header"><div><h1>Calculadora de Serviços</h1><div class="subtitle">Constrói uma proposta a partir do preçário</div></div></div>
@@ -3787,6 +3791,9 @@ function _renderCalcProposta(){
   const totalPromo=totalServicos+totalCreditos;
   const totalSinal=_calcProposta.filter(x=>x.pvpBase>=0).reduce((s,x)=>s+x.sinal,0);
   const poupanca=totalBase-totalServicos;
+  const descSel=_calcDescontosCache.find(d=>d.id===_calcDescontoId)||null;
+  const descVal=descSel?(descSel.tipo_valor==='fixo'?Math.min(descSel.valor,totalPromo):totalPromo*(descSel.valor/100)):0;
+  const totalFinal=totalPromo-descVal;
 
   // CRED-AMR só pode ser aplicado com avaliação ou pack de avaliação
   const hasCredit=_calcProposta.some(x=>x.codigo==='CRED-AMR');
@@ -3821,7 +3828,15 @@ function _renderCalcProposta(){
         <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);margin-bottom:4px"><span>Subtotal</span><span>${totalServicos.toFixed(0)}€</span></div>
         ${poupanca>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--primary-text);margin-bottom:4px"><span>Poupança promo</span><span>-${poupanca.toFixed(0)}€</span></div>`:''}
         ${totalCreditos<0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--success);margin-bottom:4px"><span>Crédito troca</span><span>${totalCreditos.toFixed(0)}€</span></div>`:''}
-        <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;margin-top:6px;padding-top:8px;border-top:2px solid var(--border)"><span>Total</span><span>${totalPromo.toFixed(0)}€</span></div>
+        <div style="margin:10px 0 6px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);margin-bottom:4px">Desconto</div>
+          <select onchange="_calcSetDesconto(this.value)" style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px">
+            <option value="">Sem desconto</option>
+            ${_calcDescontosCache.map(d=>`<option value="${d.id}" ${d.id===_calcDescontoId?'selected':''}>${d.nome} (${d.tipo_valor==='fixo'?'-'+d.valor+'€':'-'+d.valor+'%'})</option>`).join('')}
+          </select>
+        </div>
+        ${descVal>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--success);margin-bottom:4px"><span>Desconto (${descSel.nome})</span><span>-${descVal.toFixed(0)}€</span></div>`:''}
+        <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;margin-top:6px;padding-top:8px;border-top:2px solid var(--border)"><span>Total</span><span>${totalFinal.toFixed(0)}€</span></div>
         ${totalSinal>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-top:6px"><span>Sinal total</span><span>${totalSinal.toFixed(0)}€</span></div>`:''}
       </div>
       <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
@@ -3833,8 +3848,14 @@ function _renderCalcProposta(){
     </div>`;
 }
 
+function _calcSetDesconto(val){
+  _calcDescontoId=val?parseInt(val):null;
+  _renderCalcProposta();
+}
+
 function _calcLimpar(){
   _calcProposta=[];
+  _calcDescontoId=null;
   _calcDestinatarios=null;_calcEnvTab='cli';
   _renderCalcLista((document.getElementById('calc-search')||{}).value||'');
   _renderCalcProposta();
