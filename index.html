@@ -1044,8 +1044,6 @@ async function _dbAdmin(el){
 
   const cli=cliRes.data||[], servs=servsRes.data||[], pag=pag26Res.data||[], pip=pipRes.data||[];
 
-  // Clientes
-  const cliAtivos=cli.filter(c=>c['Status']==='Ativo').length;
   // Status do cliente: valor pode ser "Ativo · ⚠️ Sem Avaliação", "Híbrido ativo ·...", etc.
   const isCliAtivo=c=>/^Ativo|^Híbrido ativo/i.test(c['Status']||'');
   const isCliSusp=c=>/suspenso/i.test(c['Status']||'');
