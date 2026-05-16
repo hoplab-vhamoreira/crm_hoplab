@@ -425,6 +425,8 @@ async function api(url,opts={}){
     return{resumo,trimestres,falhas:filtered,catalogo,niveis};
   }
   if(url==='/api/falhas/catalogo'){const[c,n]=await Promise.all([_SB.from('catalogo_faltas').select('*'),_SB.from('niveis_sancao').select('*')]);return{catalogo:c.data||[],niveis:n.data||[]};}
+  const falhaDelM=url.match(/^\/api\/falha\/(\d+)$/);
+  if(falhaDelM&&method==='DELETE'){const{error}=await _SB.from('falhas_sancoes').delete().eq('id',parseInt(falhaDelM[1]));if(error)return{error:error.message};return{ok:true};}
   if(url==='/api/users'){const{data}=await _SB.from('profiles').select('*').order('id');return data||[];}
   if(url==='/api/permissions')return{};
   if(url.startsWith('/api/agenda')){const{data}=await _SB.from('avaliacoes').select('*').order('Data');return data||[];}
@@ -514,15 +516,28 @@ async function api(url,opts={}){
   const colabM=url.match(/^\/api\/colaborador\/(.+)$/);
   if(colabM){
     const nome=decodeURIComponent(colabM[1]);
-    const[dc,lc,hist,subOrig,subSubst]=await Promise.all([
+    const[dc,lc,hist,subOrig,subSubst,fs,cat,niv]=await Promise.all([
       _SB.from('dados_colaboradores').select('*').eq('Nome Oficial',nome).single(),
       _SB.from('log_colaboradores').select('*').eq('Colaborador',nome).order('Data',{ascending:false}),
       _SB.from('historico').select('*').eq('colaborador',nome).order('timestamp',{ascending:false}),
       _SB.from('substituicoes_treino').select('*').eq('Técnico Original',nome).order('Data Início',{ascending:false}),
-      _SB.from('substituicoes_treino').select('*').eq('Técnico Substituto',nome).order('Data Início',{ascending:false})
+      _SB.from('substituicoes_treino').select('*').eq('Técnico Substituto',nome).order('Data Início',{ascending:false}),
+      _SB.from('falhas_sancoes').select('*').eq('Professor',nome).order('Data',{ascending:false}),
+      _SB.from('catalogo_faltas').select('*'),
+      _SB.from('niveis_sancao').select('*')
     ]);
+    const catalogo=cat.data||[]; const niveis=niv.data||[];
+    const falhas=(fs.data||[]).map(f=>{const ci=catalogo.find(c=>c['Falta']===f['Falta']);return{...f,Categoria:ci?.['Categoria']||'—',Pontos:ci?.['Pontos']||0};});
+    const totalPontos=falhas.reduce((s,f)=>s+(f.Pontos||0),0);
+    const _nvKeys=niveis[0]?Object.keys(niveis[0]):[];
+    const _kMin=_nvKeys.find(k=>/pontos/i.test(k)&&/m.n/i.test(k))||'Pontos Mín';
+    const _kMax=_nvKeys.find(k=>/pontos/i.test(k)&&/m.x/i.test(k))||'Pontos Máx';
+    const _kNiv=_nvKeys.find(k=>/n.vel/i.test(k)&&!/pontos/i.test(k))||'Nível';
+    const _kDes=_nvKeys.find(k=>/designa/i.test(k))||'Designação';
+    const nivelAtual=niveis.find(n=>totalPontos>=n[_kMin]&&totalPontos<=n[_kMax]);
     return{info:dc.data||{},log_colaboradores:lc.data||[],historico:hist.data||[],
-      sub_como_original:subOrig.data||[],sub_como_substituto:subSubst.data||[]};
+      sub_como_original:subOrig.data||[],sub_como_substituto:subSubst.data||[],
+      falhas,totalPontos,nivelAtual:{nivel:nivelAtual?.[_kNiv]??0,designacao:nivelAtual?.[_kDes]||'—',medida:nivelAtual?.['Medida']||'—'},catalogo};
   }
   // /api/historico/revert/<id>
   const revertM=url.match(/^\/api\/historico\/revert\/(.+)$/);
@@ -712,7 +727,7 @@ const SECTIONS = {
     ]},
   ciclos: {title:'Gestão de Clientes',icon:'&#x1f4ca;',group:'Gestão',
     cols:['Cliente','Tipo','Ciclo Nº','Data Início','Data Fim','Semana Actual']},
-  falhas_sancoes: {title:'Falhas e Sanções',icon:'&#x26a0;',group:'Gestão',
+  falhas_sancoes: {title:'Falhas e Sanções',icon:'&#x26a0;',group:'Gestão',hidden:true,
     cols:['Data','Professor','Falta','Categoria','Pontos','Âmbito'],
     fields:[
       {k:'Data',t:'date'},
@@ -4886,6 +4901,10 @@ function renderColaboradorDetalhe(el, nome, d){
   const subOrig  = d.sub_como_original || [];
   const subSubst = d.sub_como_substituto || [];
   const nomeEsc = nome.replace(/'/g,"\\'");
+  const falhas = d.falhas || [];
+  const totalPontos = d.totalPontos || 0;
+  const nivelAtual = d.nivelAtual || {nivel:0,designacao:'—',medida:'—'};
+  const catalogo = d.catalogo || [];
 
   // ── Ficha de dados ──────────────────────────────────────────────────────────
   const CAMPOS_FICHA = [
@@ -4974,6 +4993,42 @@ function renderColaboradorDetalhe(el, nome, d){
       ${subRows||'<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:16px">Sem substituições registadas</td></tr>'}
     </tbody></table></div>`;
 
+  // ── Falhas e Sanções ─────────────────────────────────────────────────────────
+  const _nivelBadge=(pts,des)=>{
+    if(pts<=0) return `<span class="badge badge-ok">✓ ${des}</span>`;
+    if(pts<=2) return `<span class="badge badge-info">${des}</span>`;
+    if(pts<=4) return `<span class="badge badge-warn">${des}</span>`;
+    return `<span class="badge badge-err">${des}</span>`;
+  };
+  const _catBadge=c=>c==='Grave'||c==='Muito Grave'?`<span class="badge badge-err">${c}</span>`:c==='Não Grave'?`<span class="badge badge-info">${c}</span>`:`<span class="badge badge-warn">${c}</span>`;
+  const falhasRows=falhas.map((f,i)=>`<tr>
+    <td style="white-space:nowrap;font-size:12px">${f['Data']?_fmtCellVal(f['Data']):'—'}</td>
+    <td>${f['Falta']||'—'}</td>
+    <td>${_catBadge(f['Categoria']||'—')}</td>
+    <td style="text-align:center;font-weight:600;color:${(f['Pontos']||0)>0?'var(--danger)':'var(--success)'}">${f['Pontos']||0}</td>
+    <td style="font-size:12px;color:var(--text-muted)">${f['Âmbito']||'—'}</td>
+    <td style="font-size:12px">${f['Notas']||'—'}</td>
+    <td class="actions"><button class="del" onclick="deleteFalha(${f.id||0},'${nomeEsc}')" title="Eliminar">&#x1f5d1;</button></td>
+  </tr>`).join('');
+  const falhasHtml=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:16px">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Pontos totais</div>
+          <div style="font-size:28px;font-weight:800;color:${totalPontos>4?'var(--danger)':totalPontos>2?'var(--warning)':'var(--success)'}">${totalPontos}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Nível atual</div>
+          ${_nivelBadge(totalPontos,nivelAtual.designacao)}
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${nivelAtual.medida}</div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openAtribuirFalha('${nomeEsc}')">⚠️ Atribuir falha</button>
+    </div>
+    ${falhasRows
+      ? `<div class="table-wrap"><table class="mini-table"><thead><tr><th>Data</th><th>Falta</th><th>Categoria</th><th style="text-align:center">Pts</th><th>Âmbito</th><th>Notas</th><th></th></tr></thead><tbody>${falhasRows}</tbody></table></div>`
+      : `<div class="tl-empty">Sem infrações registadas.</div>`}`;
+
   // ── Layout ───────────────────────────────────────────────────────────────────
   const cargoBadge = cargo => {
     const map = {Treinador:'badge-ok',Coordenador:'badge-info',Técnico:'badge-warn',Comercial:'badge',Direcção:'badge-danger'};
@@ -5004,13 +5059,60 @@ function renderColaboradorDetalhe(el, nome, d){
         <div class="tab active" onclick="switchTab(this,'col-tab-ficha')">👤 Ficha</div>
         <div class="tab" onclick="switchTab(this,'col-tab-sub')">🔄 Substituições (${allSubs.length})</div>
         <div class="tab" onclick="switchTab(this,'col-tab-log')">📋 Log Eventos (${logEv.length})</div>
+        <div class="tab" onclick="switchTab(this,'col-tab-falhas')">⚠️ Falhas (${falhas.length})</div>
         <div class="tab" onclick="switchTab(this,'col-tab-hist')">🕐 Histórico (${hist.length})</div>
       </div>
-      <div id="col-tab-ficha" class="tab-panel active">${fichaHtml}</div>
-      <div id="col-tab-sub"   class="tab-panel">${subHtml}</div>
-      <div id="col-tab-log"   class="tab-panel">${logEvHtml}</div>
-      <div id="col-tab-hist"  class="tab-panel">${histHtml}</div>
+      <div id="col-tab-ficha"   class="tab-panel active">${fichaHtml}</div>
+      <div id="col-tab-sub"     class="tab-panel">${subHtml}</div>
+      <div id="col-tab-log"     class="tab-panel">${logEvHtml}</div>
+      <div id="col-tab-falhas"  class="tab-panel">${falhasHtml}</div>
+      <div id="col-tab-hist"    class="tab-panel">${histHtml}</div>
     </div>`;
+}
+
+async function openAtribuirFalha(nome){
+  const catData=sectionData['catalogo_faltas']||(await api('/api/data/catalogo_faltas'));
+  const catalogo=Array.isArray(catData)?catData:[];
+  const faltaOpts=catalogo.map(f=>{
+    const pts=f['Pontos']?` (${f['Pontos']}pts)`:'';
+    return `<option value="${String(f['Falta']||'').replace(/"/g,'&quot;')}" data-pontos="${f['Pontos']||0}">${f['Falta']}${pts}</option>`;
+  }).join('');
+  const hoje=new Date().toISOString().slice(0,10);
+  document.getElementById('modalTitle').textContent='Atribuir Falha — '+nome;
+  document.getElementById('modalBody').innerHTML=`
+    <div class="form-group"><label>Data</label><input type="date" id="af_data" value="${hoje}"></div>
+    <div class="form-group"><label>Falta</label><select id="af_falta"><option value=""></option>${faltaOpts}</select></div>
+    <div class="form-group"><label>Âmbito</label><select id="af_ambito"><option>Treinador</option><option>Coordenador</option></select></div>
+    <div class="form-group"><label>Notas</label><textarea id="af_notas" rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);resize:vertical"></textarea></div>
+  `;
+  document.getElementById('modal').classList.add('show');
+  document.getElementById('modalSave').onclick=async()=>{
+    const faltaVal=document.getElementById('af_falta').value;
+    if(!faltaVal) return toast('Seleciona uma falta','error');
+    const rec={
+      'Professor':nome,
+      'Data':document.getElementById('af_data').value||null,
+      'Falta':faltaVal,
+      'Âmbito':document.getElementById('af_ambito').value,
+      'Tipo Entrada':'Manual',
+      'Notas':document.getElementById('af_notas').value||null,
+    };
+    const res=await api('/api/data/falhas_sancoes',{method:'POST',body:rec});
+    if(res?.error){toast('Erro ao registar: '+res.error,'error');return;}
+    sectionData['falhas_sancoes']=null;
+    closeModal();
+    toast('Falha registada ✓');
+    await openColaboradorDetalhe(nome);
+  };
+}
+
+async function deleteFalha(id, nome){
+  if(!confirm('Eliminar esta falha?')) return;
+  const res=await api(`/api/falha/${id}`,{method:'DELETE'});
+  if(res?.error){toast('Erro ao eliminar: '+res.error,'error');return;}
+  sectionData['falhas_sancoes']=null;
+  toast('Falha eliminada');
+  await openColaboradorDetalhe(nome);
 }
 
 async function openAddColabLog(nomeColab){
