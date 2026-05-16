@@ -779,7 +779,7 @@ const SECTIONS = {
       {k:'Desconto',t:'number'},
       {k:'Sinal',t:'number'}
     ]},
-  dados_colaboradores: {title:'Dados Colaboradores',icon:'&#x1f464;',group:'Equipa',
+  dados_colaboradores: {title:'Colaboradores',icon:'&#x1f464;',group:'Equipa',
     cols:['Nome Oficial','Cargo','Estado','Contacto Telefónico','Contacto Email','Tipo de Contrato','Tipo de Cedência','Valor da Cedência'],
     fields:[
       {k:'Nome Oficial',t:'text'},
@@ -808,9 +808,9 @@ const SECTIONS = {
       {k:'Notas',t:'textarea'},
       {k:'Registado por',t:'lookup',src:'dados_colaboradores',sf:'Nome Oficial'}
     ]},
-  responsabilidades: {title:'Responsabilidades',icon:'&#x1f4cc;',group:'Equipa',
+  responsabilidades: {title:'Responsabilidades & Matriz',icon:'&#x1f4cc;',group:'Equipa',
     cols:['#','Área','Responsável(eis)','O que faz','Sheets onde actua','Reporta a']},
-  matriz_partilhas: {title:'Matriz Partilhas',icon:'&#x1f517;',group:'Equipa',
+  matriz_partilhas: {title:'Matriz Partilhas',icon:'&#x1f517;',group:'Equipa',hidden:true,
     cols:['Cód. Origem','Tipo Info Partilhada','Destino: PT','Destino: Nutri','Destino: Fisiologista','Destino: Médico']},
   adesoes_validar: {title:'Adesões a Validar',icon:'&#x1f527;',group:'Admin',
     cols:['Nº','Cliente','Plano (mais recente)','Valor base','Data Início (proposta)','Tipo','Acção sugerida'],
@@ -922,8 +922,9 @@ async function navigate(section){
   const main=document.getElementById('mainContent');
   if(section==='dashboard')  return renderDashboard(main);
   if(section==='backoffice') return renderBackoffice(main);
-  if(section==='ciclos')         return renderGestaoClientes(main);
-  if(section==='avaliacoes')     return renderAgenda(main);
+  if(section==='ciclos')            return renderGestaoClientes(main);
+  if(section==='avaliacoes')        return renderAgenda(main);
+  if(section==='responsabilidades') return renderResponsabilidadesMatriz(main);
   if(section==='falhas_sancoes') return renderFalhas(main);
   if(section==='vendas_bonus')        return renderVendasBonus(main);
   if(section==='historico_faturacao') return renderHistoricoFaturacao(main);
@@ -3039,6 +3040,37 @@ function _alertasPrazoFilter(prazo, r){
   if(prazo==='7d')       return diff >= 0 && diff <= 7;
   if(prazo==='30d')      return diff >= 0 && diff <= 30;
   return true; // todos
+}
+
+async function renderResponsabilidadesMatriz(el){
+  el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted)">A carregar...</div>`;
+  const[resp,matr]=await Promise.all([
+    sectionData['responsabilidades']||api('/api/data/responsabilidades'),
+    sectionData['matriz_partilhas']||api('/api/data/matriz_partilhas')
+  ]);
+  if(!sectionData['responsabilidades']) sectionData['responsabilidades']=resp;
+  if(!sectionData['matriz_partilhas'])  sectionData['matriz_partilhas']=matr;
+  const secR=SECTIONS['responsabilidades']; const secM=SECTIONS['matriz_partilhas'];
+  const colsR=secR.cols; const colsM=secM.cols;
+  const _mkTable=(cols,data)=>{
+    if(!Array.isArray(data)||!data.length) return `<div class="tl-empty">Sem dados</div>`;
+    const thead=`<thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>`;
+    const tbody=data.map(r=>`<tr>${cols.map(c=>`<td>${_fmtCellVal(r[c])}</td>`).join('')}</tr>`).join('');
+    return `<div class="table-wrap"><table class="tbl">${thead}<tbody>${tbody}</tbody></table></div>`;
+  };
+  el.innerHTML=`
+    <div class="page-header"><div><h1>📌 Responsabilidades & Matriz</h1></div></div>
+    <div class="gtab-wrap" style="margin-bottom:20px">
+      <button class="gtab gtab-active" onclick="switchGtab(this,'rm-resp')">📌 Responsabilidades</button>
+      <button class="gtab" onclick="switchGtab(this,'rm-matr')">🔗 Matriz Partilhas</button>
+    </div>
+    <div id="rm-resp">${_mkTable(colsR,Array.isArray(resp)?resp:[])}</div>
+    <div id="rm-matr" style="display:none">${_mkTable(colsM,Array.isArray(matr)?matr:[])}</div>`;
+}
+function switchGtab(btn,id){
+  btn.closest('.gtab-wrap').querySelectorAll('.gtab').forEach(b=>b.classList.remove('gtab-active'));
+  btn.classList.add('gtab-active');
+  ['rm-resp','rm-matr'].forEach(k=>{const el=document.getElementById(k);if(el)el.style.display=k===id?'':'none';});
 }
 
 async function renderAlertas(el){
