@@ -3646,7 +3646,7 @@ function _renderCalcPrecario(q=''){
     const uid=`prec-${p['Código'].replace(/[^a-z0-9]/gi,'_')}`;
     return`
       <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:6px;overflow:hidden">
-        <div onclick="_calcPrecToggle('${uid}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;background:var(--surface)"
+        <div onclick="_calcPrecToggle(this)" style="display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;background:var(--surface)"
           onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
@@ -3664,7 +3664,7 @@ function _renderCalcPrecario(q=''){
               ?`<div style="font-weight:700;color:var(--success)">${promo.toFixed(0)}€</div><div style="font-size:11px;text-decoration:line-through;color:var(--text-muted)">${base.toFixed(0)}€</div>`
               :`<div style="font-weight:700">${base<0?base.toFixed(0)+'€':base.toFixed(0)+'€'}</div>`}
           </div>
-          <span id="${uid}-arrow" style="color:var(--text-muted);font-size:12px;transition:transform .2s">▼</span>
+          <span class="prec-arrow" style="color:var(--text-muted);font-size:12px;transition:transform .2s;display:inline-block">▼</span>
         </div>
         <div id="${uid}" style="display:none;padding:14px 16px;border-top:1px solid var(--border);background:var(--surface2)">
           ${p['Descrição']?`<p style="font-size:13px;color:var(--text);margin:0 0 10px">${p['Descrição']}</p>`:'<p style="font-size:13px;color:var(--text-muted);margin:0 0 10px;font-style:italic">Sem descrição — edita para adicionar.</p>'}
@@ -3692,12 +3692,12 @@ function _renderCalcPrecario(q=''){
     ${items.length?rows:`<div class="tl-empty">Sem resultados para "${q}"</div>`}`;
 }
 
-function _calcPrecToggle(uid){
-  const panel=document.getElementById(uid);
-  const arrow=document.getElementById(uid+'-arrow');
+function _calcPrecToggle(header){
+  const panel=header.nextElementSibling;
   if(!panel) return;
   const open=panel.style.display==='none';
-  panel.style.display=open?'':'none';
+  panel.style.display=open?'block':'none';
+  const arrow=header.querySelector('.prec-arrow');
   if(arrow) arrow.style.transform=open?'rotate(180deg)':'';
 }
 
