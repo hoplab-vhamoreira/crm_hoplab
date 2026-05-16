@@ -96,9 +96,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .form-group textarea{min-height:80px;resize:vertical}
 /* CARDS */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:28px}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-.stat-card .label{font-size:12px;color:var(--text-muted);margin-bottom:4px}
-.stat-card .value{font-size:28px;font-weight:700}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.stat-card .label{font-size:12px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px}
+.stat-card .value{font-size:32px;font-weight:700;line-height:1}
 .stat-card .value.purple{color:#7c3aed}
 .stat-card .value.green{color:var(--success)}
 .stat-card .value.amber{color:var(--warning)}
@@ -966,42 +966,121 @@ async function renderDashboard(el){
 }
 
 async function _dbAdmin(el){
-  const[stats,hist,alrt]=await Promise.all([
+  const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const now=new Date(); const mi=now.getMonth();
+  const curMonth=MONTHS[mi]; const prevMonth=mi>0?MONTHS[mi-1]:null;
+
+  const[stats,hist,alrtTop,cliRes,servsRes,pag26Res,pipRes]=await Promise.all([
     api('/api/stats'),
     _SB.from('historico').select('*').order('timestamp',{ascending:false}).limit(5),
-    _SB.from('alertas').select('*').order('DiasAtraso',{ascending:false}).limit(5)
+    _SB.from('alertas').select('*').order('DiasAtraso',{ascending:false}).limit(5),
+    _SB.from('clientes').select('Status'),
+    _SB.from('servicos').select('Serviço,Cliente,Estado do serviço'),
+    _SB.from('pag_clientes_2026').select('*'),
+    _SB.from('pipeline').select('Aberta/Fechada,Status')
   ]);
-  const cards=[
-    _dbKpiCard('Clientes',stats.clientes||0,'total','purple',"navigate('clientes')"),
-    _dbKpiCard('Alertas Ativos',stats.alertas||0,'','amber',"navigate('alertas')"),
-    _dbKpiCard('Colaboradores',stats.dados_colaboradores||0,'','blue',"navigate('dados_colaboradores')"),
-    _dbKpiCard('Serviços',stats.servicos||0,'','green',"navigate('servicos')"),
-  ].join('');
+
+  const cli=cliRes.data||[], servs=servsRes.data||[], pag=pag26Res.data||[], pip=pipRes.data||[];
+
+  // Clientes
+  const cliAtivos=cli.filter(c=>c['Status']==='Ativo').length;
+  const cliSusp=cli.filter(c=>c['Status']==='Suspenso').length;
+  const cliCanc=cli.filter(c=>c['Status']==='Cancelado').length;
+
+  // Categorização de serviços
+  const ativo=s=>s['Estado do serviço']==='Em curso';
+  const isStudio=s=>/^PT\d|Avulso|Pack 10|Planos Treinos/i.test(s['Serviço']||'');
+  const isLab=s=>/Avalia[cç]|Pack Elite|Pack Performance|Pack Vitalidade/i.test(s['Serviço']||'');
+  const isGL4=s=>/Gestão Light.*4|4 semanas/i.test(s['Serviço']||'');
+  const isGL12=s=>/Gestão Light.*12|12 semanas/i.test(s['Serviço']||'');
+  const isGI=s=>/Gestão Integral/i.test(s['Serviço']||'');
+  const isConsulta=s=>/Consulta/i.test(s['Serviço']||'');
+
+  const studioAt=servs.filter(s=>isStudio(s)&&ativo(s)).length;
+  const labAt=servs.filter(s=>isLab(s)&&ativo(s)).length;
+  const gl4At=servs.filter(s=>isGL4(s)&&ativo(s)).length;
+  const gl12At=servs.filter(s=>isGL12(s)&&ativo(s)).length;
+  const giAt=servs.filter(s=>isGI(s)&&ativo(s)).length;
+  const consultAt=servs.filter(s=>isConsulta(s)&&ativo(s)).length;
+
+  // Retenção a partir de pag_clientes_2026
+  let retPct=null, desist=0, novasAdes=0;
+  if(prevMonth&&pag.length){
+    const campoAtual=`${curMonth} Pagamento`, campoPrev=`${prevMonth} Pagamento`;
+    const nomeKey=Object.keys(pag[0]||{}).find(k=>k==='Nome'||k==='Cliente'||k==='nome')||'Nome';
+    const pagPrev=pag.filter(r=>parseFloat(r[campoPrev])>0);
+    const pagCurSet=new Set(pag.filter(r=>parseFloat(r[campoAtual])>0).map(r=>r[nomeKey]));
+    const retidos=pagPrev.filter(r=>pagCurSet.has(r[nomeKey])).length;
+    desist=pagPrev.length-retidos;
+    novasAdes=pag.filter(r=>parseFloat(r[campoAtual])>0&&!(parseFloat(r[campoPrev])>0)).length;
+    retPct=pagPrev.length>0?Math.round((retidos/pagPrev.length)*100):null;
+  }
+
+  // Repetição Lab
+  const labPorCliente={};
+  servs.filter(isLab).forEach(s=>{const c=s['Cliente']||'';if(c)labPorCliente[c]=(labPorCliente[c]||0)+1;});
+  const labTotalCli=Object.keys(labPorCliente).length;
+  const labRepet=Object.values(labPorCliente).filter(v=>v>1).length;
+  const labRepPct=labTotalCli>0?Math.round((labRepet/labTotalCli)*100):0;
+
+  // Pipeline
+  const pipeAberto=pip.filter(p=>p['Aberta/Fechada']==='Aberta').length;
+  const alertasN=stats.alertas||0;
+
+  // Receita mês atual
+  const receitaMes=pag.reduce((s,r)=>s+(parseFloat(r[`${curMonth} Pagamento`])||0),0);
+
+  // Render
+  const kpi=(label,val,sub,color,onclick,icon='')=>{
+    const cl=onclick?'stat-card clickable':'stat-card';
+    const oc=onclick?`onclick="${onclick}"`:'';
+    return`<div class="${cl}" ${oc}>
+      <div class="label">${icon?icon+' ':''}${label}</div>
+      <div class="value ${color||''}">${val??'—'}</div>
+      ${sub?`<div class="sub">${sub}</div>`:''}
+    </div>`;
+  };
+
   const histRows=(hist.data||[]).map(h=>[
     `<span style="font-size:11px">${fmtDate(h.timestamp)}</span>`,
-    h.utilizador||'—',h.acao||'—',
-    SECTIONS[h.colecao]?.title||h.colecao||'—'
+    h.utilizador||'—',h.acao||'—',SECTIONS[h.colecao]?.title||h.colecao||'—'
   ]);
-  const alrtRows=(alrt.data||[]).map(a=>[
+  const alrtRows=(alrtTop.data||[]).map(a=>[
     a['Tipo']||'—',a['Cliente']||'—',
     a['DiasAtraso']!=null?`<span style="color:var(--danger);font-weight:600">${a['DiasAtraso']}d</span>`:'—',
     a['Responsável']||'—'
   ]);
-  const secRows=Object.entries(stats).filter(([k])=>SECTIONS[k])
-    .map(([k,v])=>`<tr><td>${SECTIONS[k].icon} ${SECTIONS[k].title}</td><td>${v}</td><td><button class="btn btn-sm btn-ghost" onclick="navigate('${k}')">Abrir</button></td></tr>`).join('');
+
   el.innerHTML=`
-    <div class="page-header"><div><h1>Dashboard</h1><div class="subtitle">Bem-vindo, ${currentUser.name}</div></div></div>
-    <div class="stats-grid">${cards}</div>
+    <div class="page-header">
+      <div><h1>Dashboard</h1><div class="subtitle">Bem-vindo, ${currentUser.name} · ${curMonth} ${now.getFullYear()}</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="navigate('totais_pagamentos')">💵 Pagamentos</button>
+    </div>
+
+    <div class="db-section-title">Visão Geral</div>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:24px">
+      ${kpi('Clientes Ativos',cliAtivos,`${cliSusp} susp · ${cliCanc} canc`,'purple',"navigate('clientes')",'👤')}
+      ${kpi('Studio (PT)',studioAt,'serviços em curso','blue','','🏋️')}
+      ${kpi('Lab Avaliações',labAt,'serviços em curso','green','','🔬')}
+      ${kpi('Gestão',gl4At+gl12At+giAt,`GL4: ${gl4At} · GL12: ${gl12At} · GI: ${giAt}`,'purple','','')}
+      ${kpi('Consultas',consultAt,'em curso','blue','','')}
+      ${kpi('Receita '+curMonth,receitaMes>0?receitaMes.toFixed(0)+'€':'—','pag_clientes_2026','green',"navigate('totais_pagamentos')",'💶')}
+    </div>
+
+    <div class="db-section-title">Saúde do Negócio — ${curMonth}</div>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:24px">
+      ${kpi('Taxa Retenção',retPct!=null?retPct+'%':'—',prevMonth?`vs ${prevMonth}`:'sem dados prev.','green','','')}
+      ${kpi('Desistências',desist,prevMonth?`clientes sem pag. em ${curMonth}`:'','amber','','')}
+      ${kpi('Novas Adesões',novasAdes,prevMonth?`novos pagantes em ${curMonth}`:'','blue','','')}
+      ${kpi('Repetição Lab',labRepPct+'%',`${labRepet} de ${labTotalCli} clientes Lab repetiram`,'green','','')}
+      ${kpi('Pipeline Aberto',pipeAberto,'oportunidades','amber',"navigate('pipeline')",'📈')}
+      ${kpi('Alertas Ativos',alertasN,'','amber',"navigate('alertas')",'⚠️')}
+    </div>
+
     <div class="db-grid-2">
       ${_dbMiniTable('Atividade Recente',['Data','Utilizador','Ação','Secção'],histRows,'Sem histórico')}
       ${_dbMiniTable('Alertas Urgentes',['Tipo','Cliente','Atraso','Responsável'],alrtRows,'Sem alertas')}
-    </div>
-    <div class="db-section" style="display:flex;align-items:center;justify-content:space-between">
-      <div class="db-section-title" style="margin:0">💵 Totais de Pagamentos</div>
-      <button class="btn btn-ghost btn-sm" onclick="navigate('totais_pagamentos')">Ver detalhe →</button>
-    </div>
-    <div class="db-section"><div class="db-section-title">Todas as Secções</div>
-    <div class="table-wrap"><table class="tbl"><thead><tr><th>Secção</th><th>Registos</th><th></th></tr></thead><tbody>${secRows}</tbody></table></div></div>`;
+    </div>`;
 }
 
 async function _dbDireccao(el){
