@@ -3629,15 +3629,22 @@ function _calcGerarProposta(){
 function _renderCalcPrecario(){
   const el=document.getElementById('calc-precario');
   if(!el) return;
-  const sec=SECTIONS['precario_publico'];
-  const data=_calcPrecarioData;
-  if(!data.length){el.innerHTML=`<div class="tl-empty">Sem dados</div>`;return;}
-  const cols=sec.cols;
-  const thead=`<thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Ações</th></tr></thead>`;
-  const tbody=data.map((p,i)=>`<tr>${cols.map(c=>`<td>${_fmtCellVal(p[c])}</td>`).join('')}<td class="actions">
-    <button onclick="openEdit('precario_publico',${i})" title="Editar">&#x270F;</button>
-    <button class="del" onclick="deleteRec('precario_publico',${i})" title="Eliminar">&#x1f5d1;</button>
-  </td></tr>`).join('');
+  const fullData=sectionData['precario_publico']||[];
+  if(!_calcPrecarioData.length){el.innerHTML=`<div class="tl-empty">Sem dados</div>`;return;}
+  // colunas relevantes para edição de preços
+  const editCols=['Serviço','Código','PVP Base (c/IVA)','Desconto','PVP Promocional (c/IVA)'];
+  const thead=`<thead><tr>${editCols.map(c=>`<th style="white-space:nowrap">${c}</th>`).join('')}<th></th></tr></thead>`;
+  const tbody=_calcPrecarioData.map(p=>{
+    // índice correto no array completo para openEdit/deleteRec
+    const fullIdx=fullData.findIndex(f=>f['Código']===p['Código']&&f['Serviço']===p['Serviço']);
+    return`<tr>
+      ${editCols.map(c=>`<td>${_fmtCellVal(p[c])}</td>`).join('')}
+      <td class="actions" style="white-space:nowrap">
+        <button onclick="openEdit('precario_publico',${fullIdx})" title="Editar" style="font-size:15px">✏️</button>
+        <button class="del" onclick="deleteRec('precario_publico',${fullIdx})" title="Eliminar">&#x1f5d1;</button>
+      </td>
+    </tr>`;
+  }).join('');
   el.innerHTML=`
     <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
       <button class="btn btn-primary btn-sm" onclick="openAdd('precario_publico')">+ Adicionar serviço</button>
