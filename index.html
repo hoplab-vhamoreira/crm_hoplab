@@ -1079,6 +1079,80 @@ function _dbCloseDetail(){
   if(dr)dr.classList.remove('open');if(ov)ov.classList.remove('open');
 }
 
+function _dbOpenAtraso(){
+  const d=_dbCache.atraso; if(!d) return;
+  let kpisHtml='';
+  if(d.kpis) kpisHtml=`<div class="db-drawer-kpi">${d.kpis.map(k=>`<div class="db-drawer-kpi-item"><div class="dk-label">${k.label}</div><div class="dk-val" style="color:${k.color||'var(--text)'}">${k.val}</div></div>`).join('')}</div>`;
+  let rows='';
+  (d.rows||[]).forEach((r,i)=>{
+    rows+=`<div class="db-drawer-row" style="grid-template-columns:auto 1fr auto;gap:10px;cursor:default">
+      <input type="checkbox" id="_atr_cb_${i}" value="${r.name.replace(/"/g,'&quot;')}" style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer;flex-shrink:0" onchange="_dbAtrasoCount()">
+      <div onclick="document.getElementById('_atr_cb_${i}').click()" style="cursor:pointer">
+        <div class="dr-name">${r.name}</div><div class="dr-sub">${r.sub||''}</div>
+      </div>
+      <div class="dr-badge" style="background:${r.bc||'var(--surface3)'};color:${r.tc||'var(--text-muted)'}">${r.badge||''}</div>
+    </div>`;
+  });
+  const body=`${kpisHtml}
+    <div style="padding:6px 12px 0;font-size:11px;color:var(--text-muted)">Seleciona clientes para regularizar em bloco ou clica no nome para abrir a ficha.</div>
+    <div class="db-drawer-list" id="_db_atraso_list">${rows}</div>
+    <div id="_db_atraso_footer" style="padding:12px 16px;border-top:1px solid var(--border);display:none">
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="_dbRegularizarSelecionados()">✅ Regularizar <span id="_db_atraso_count">0</span> cliente(s)</button>
+    </div>`;
+  let dr=document.getElementById('_db_drawer');
+  if(!dr){
+    document.body.insertAdjacentHTML('beforeend',`<div class="db-drawer-overlay" id="_db_overlay" onclick="_dbCloseDetail()"></div><div class="db-drawer" id="_db_drawer"><div class="db-drawer-header"><h3 id="_db_drawer_title"></h3><button class="db-drawer-close" onclick="_dbCloseDetail()">✕</button></div><div class="db-drawer-body" id="_db_drawer_body"></div></div>`);
+    dr=document.getElementById('_db_drawer');
+  }
+  document.getElementById('_db_drawer_title').textContent=d.title;
+  document.getElementById('_db_drawer_body').innerHTML=body;
+  dr.classList.add('open');
+  document.getElementById('_db_overlay').classList.add('open');
+}
+
+function _dbAtrasoCount(){
+  const n=document.querySelectorAll('#_db_atraso_list input:checked').length;
+  const footer=document.getElementById('_db_atraso_footer');
+  const cnt=document.getElementById('_db_atraso_count');
+  if(footer) footer.style.display=n>0?'block':'none';
+  if(cnt) cnt.textContent=n;
+}
+
+async function _dbRegularizarSelecionados(){
+  const checked=[...document.querySelectorAll('#_db_atraso_list input:checked')].map(cb=>cb.value);
+  if(!checked.length) return;
+  const rawRows=(_dbCache.atraso||{})._rawRows||[];
+  const toUpdate=rawRows.filter(r=>checked.includes(r['Cliente']));
+  if(!toUpdate.length) return toast('Sem linhas para atualizar','error');
+  const formas=['Transferência Multibanco','Débito Direto','Pagamento Mbway','Numerário'];
+  const opt=arr=>arr.map(v=>`<option>${v}</option>`).join('');
+  document.getElementById('modalTitle').textContent=`✅ Regularizar ${checked.length} cliente(s)`;
+  document.getElementById('modalBody').innerHTML=`
+    <div style="margin-bottom:14px;padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--text-muted);line-height:1.6">${checked.join(' · ')}</div>
+    <div class="form-group"><label>Estado</label><select id="br_estado"><option>Pago</option><option>Ativo</option><option>Suspendeu</option><option>Cancelou</option></select></div>
+    <div class="form-group"><label>Valor Pago (€) <span style="color:var(--text-muted);font-weight:400">— deixar vazio para usar o valor de cada linha</span></label><input type="number" id="br_valor" step="0.01" placeholder="Opcional"></div>
+    <div class="form-group"><label>Forma de Pagamento</label><select id="br_forma"><option value=""></option>${opt(formas)}</select></div>
+    <div class="form-group"><label>Nº Doc</label><input type="text" id="br_doc" placeholder="Opcional"></div>`;
+  document.getElementById('modal').classList.add('show');
+  document.getElementById('modalSave').onclick=async()=>{
+    const estado=document.getElementById('br_estado').value;
+    const valorRaw=document.getElementById('br_valor').value;
+    const forma=document.getElementById('br_forma').value||null;
+    const doc=document.getElementById('br_doc').value||null;
+    let ok=0,erros=0;
+    for(const row of toUpdate){
+      const valor=valorRaw?parseFloat(valorRaw):(parseFloat(row['Valor a Pagar'])||null);
+      const{error}=await _SB.from('pag_clientes_2026').update({'Estado':estado,'Valor Pago':valor,'Forma Pagamento':forma,'Nº Doc':doc}).eq('id',row.id);
+      if(error) erros++; else ok++;
+    }
+    sectionData['pag_clientes_2026']=null;
+    closeModal(); _dbCloseDetail();
+    if(erros) toast(`${ok} atualizados · ${erros} erros`,'error');
+    else toast(`${ok} pagamentos regularizados ✓`);
+    renderDashboard(document.getElementById('mainContent'));
+  };
+}
+
 async function renderDashboard(el){
   el.innerHTML=`<div style="padding:40px;color:var(--text-muted);text-align:center">A carregar...</div>`;
   const role=currentUser.role||'';
@@ -1241,6 +1315,7 @@ async function _dbAdmin(el){
     receita:{title:`Receita ${curMonth}`,kpis:[{label:'Total confirmado',val:receitaMes>0?receitaMes.toFixed(0)+'€':'0€',color:'var(--primary-text)'},{label:'Pagamentos',val:pagCurMonth.filter(r=>r['Estado']==='Pago').length,color:'var(--success)'}],
       rows:pagCurMonth.filter(r=>r['Estado']==='Pago').map(r=>({name:r['Cliente']||'—',sub:r['Modalidade']||'—',badge:parseFloat(r['Valor Pago'])>0?parseFloat(r['Valor Pago']).toFixed(0)+'€':'—',bc:'rgba(22,163,74,.1)',tc:'var(--success)'}))},
     atraso:{title:'Pagamentos sem confirmação',kpis:[{label:'Clientes',val:emAtrasoN,color:'var(--danger)'},{label:'Meses em aberto',val:emAtrasoRows.length,color:'var(--warning)'}],
+      _rawRows:emAtrasoRows,
       rows:[...emAtrasoSet].map(c=>{const meses=emAtrasoRows.filter(r=>r['Cliente']===c).map(r=>r['Mês']).join(', ');const sc=c.replace(/'/g,"\\'");return{name:c,sub:meses,badge:'Sem confirm.',bc:'rgba(220,38,38,.1)',tc:'var(--danger)',link:`_dbCloseDetail();openClienteDetalhe('${sc}')`}})},
     clientes:{title:'Clientes Ativos',kpis:[{label:'Ativos',val:cliAtivos,color:'var(--info)'},{label:'Suspensos',val:cliSusp,color:'var(--warning)'},{label:'Studio',val:cliStudio,color:'var(--primary-text)'},{label:'Lab',val:cliLab,color:'var(--info)'}],
       rows:cli.filter(isCliAtivo).map(c=>({name:c['Nome']||'—',sub:c['Status']||'—',badge:'Ativo',bc:'rgba(37,99,235,.1)',tc:'var(--info)'}))},
@@ -1275,7 +1350,7 @@ async function _dbAdmin(el){
               <span class="db-hc-badge" style="background:rgba(170,255,0,.15);color:var(--primary-text)">${pagCurMonth.filter(r=>r['Estado']==='Pago').length} pag. confirmados</span>
             </div>
           </div>
-          <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('atraso')">
+          <div class="db-hero-card" style="cursor:pointer" onclick="_dbOpenAtraso()">
             <div class="db-hc-icon" style="background:rgba(220,38,38,.1)">⚠️</div>
             <div class="db-hc-body">
               <div class="db-hc-label">Pag. sem Confirmação</div>
