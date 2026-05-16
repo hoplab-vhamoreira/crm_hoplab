@@ -1045,8 +1045,13 @@ async function _dbAdmin(el){
 
   // Clientes
   const cliAtivos=cli.filter(c=>c['Status']==='Ativo').length;
-  const cliSusp=cli.filter(c=>c['Status']==='Suspenso').length;
-  const cliCanc=cli.filter(c=>c['Status']==='Cancelado').length;
+  // Status do cliente: valor pode ser "Ativo · ⚠️ Sem Avaliação", "Híbrido ativo ·...", etc.
+  const isCliAtivo=c=>/^Ativo|^Híbrido ativo/i.test(c['Status']||'');
+  const isCliSusp=c=>/suspenso/i.test(c['Status']||'');
+  const isCliCanc=c=>c['Status']==='Cancelado';
+  const cliAtivos=cli.filter(isCliAtivo).length;
+  const cliSusp=cli.filter(isCliSusp).length;
+  const cliCanc=cli.filter(isCliCanc).length;
 
   // Categorização de serviços (baseada nos nomes reais da tabela servicos)
   const emCurso=s=>s['Estado do serviço']==='Em curso';
@@ -1063,6 +1068,11 @@ async function _dbAdmin(el){
   const gl12At=servs.filter(s=>isGL12(s)&&emCurso(s)).length;
   const giAt=servs.filter(s=>isGI(s)&&emCurso(s)).length;
   const consultAt=servs.filter(s=>isConsulta(s)&&emCurso(s)).length;
+
+  // Clientes ativos por tipo (baseado em todos os serviços, não só Em curso)
+  const cliActivosSet=new Set(cli.filter(isCliAtivo).map(c=>c['Nome']));
+  const cliStudio=new Set(servs.filter(s=>isStudio(s)&&cliActivosSet.has(s['Cliente'])).map(s=>s['Cliente'])).size;
+  const cliLab=new Set(servs.filter(s=>isLab(s)&&cliActivosSet.has(s['Cliente'])).map(s=>s['Cliente'])).size;
 
   // Receita a partir de pag_clientes_2026 (estrutura: Mês, Estado, Valor Pago)
   const pagCurMonth=pag.filter(r=>r['Mês']===curMonth);
@@ -1177,7 +1187,8 @@ async function _dbAdmin(el){
             <div class="db-hc-body">
               <div class="db-hc-label">Clientes Ativos</div>
               <div class="db-hc-value" style="color:var(--info)">${cliAtivos}</div>
-              <span class="db-hc-badge" style="background:rgba(37,99,235,.1);color:var(--info)">${cliSusp} susp · ${cliCanc} canc</span>
+              <span class="db-hc-badge" style="background:rgba(37,99,235,.1);color:var(--info)">🏋️ ${cliStudio} Studio · 🔬 ${cliLab} Lab</span>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:4px">${cliSusp} susp · ${cliCanc} canc</div>
             </div>
           </div>
           <div class="db-hero-card" style="cursor:pointer" onclick="navigate('pipeline')">
