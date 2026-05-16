@@ -3105,7 +3105,7 @@ async function renderCalculadora(el){
   const pr=await api('/api/data/precario_publico');
   sectionData['precario_publico']=pr;
   // só serviços com preço numérico positivo — exclui linhas de cabeçalho e tabelas internas
-  _calcPrecarioData=Array.isArray(pr)?pr.filter(p=>p['Serviço']&&p['Código']&&parseFloat(p['PVP Base (c/IVA)'])>0):[];
+  _calcPrecarioData=Array.isArray(pr)?pr.filter(p=>p['Serviço']&&p['Código']&&parseFloat(p['PVP Base (c/IVA)'])!==0):[];
 
   el.innerHTML=`
     <div class="page-header"><div><h1>🖩 Calculadora de Serviços</h1><div class="subtitle">Constrói uma proposta a partir do preçário</div></div></div>
@@ -3146,19 +3146,26 @@ function _renderCalcLista(search=''){
     const base=parseFloat(p['PVP Base (c/IVA)'])||0;
     const promo=parseFloat(p['PVP Promocional (c/IVA)'])||base;
     const poupar=base-promo;
+    const isCredit=base<0;
     const jaAdic=_calcProposta.some(x=>x.codigo===p['Código']);
-    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;margin-bottom:6px;background:var(--surface);border:1px solid var(--border);border-radius:10px;gap:12px">
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;margin-bottom:6px;background:${isCredit?'rgba(var(--success-rgb,34,197,94),.07)':'var(--surface)'};border:1px solid ${isCredit?'rgba(var(--success-rgb,34,197,94),.3)':'var(--border)'};border-radius:10px;gap:12px">
       <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:14px">${p['Serviço']}</div>
+        <div style="font-weight:600;font-size:14px">${isCredit?'💳 ':''} ${p['Serviço']}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
           <span style="background:var(--surface2);padding:1px 6px;border-radius:4px;font-family:monospace">${p['Código']}</span>
-          ${promo<base?`<span style="color:var(--success);margin-left:8px">↓ ${promo.toFixed(0)}€</span><span style="color:var(--text-muted);text-decoration:line-through;margin-left:4px;font-size:10px">${base.toFixed(0)}€</span>`:` <span style="color:var(--text)">${base.toFixed(0)}€</span>`}
+          ${isCredit
+            ? `<span style="color:var(--success);font-weight:600;margin-left:8px">${base.toFixed(0)}€</span>`
+            : promo<base
+              ? `<span style="color:var(--success);margin-left:8px">↓ ${promo.toFixed(0)}€</span><span style="color:var(--text-muted);text-decoration:line-through;margin-left:4px;font-size:10px">${base.toFixed(0)}€</span>`
+              : ` <span style="color:var(--text)">${base.toFixed(0)}€</span>`}
           ${poupar>0?`<span style="color:var(--primary-text);font-weight:600;margin-left:6px">-${poupar.toFixed(0)}€</span>`:''}
         </div>
+        ${isCredit&&p['Descrição']?`<div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-style:italic">${p['Descrição']}</div>`:''}
       </div>
       <button onclick="_calcAddServico('${p['Código'].replace(/'/g,"\\'")}','${p['Serviço'].replace(/'/g,"\\'")}',${base},${promo},${parseFloat(p['Sinal'])||0})"
-        class="btn btn-sm ${jaAdic?'btn-ghost':'btn-primary'}" ${jaAdic?'disabled':''}>
-        ${jaAdic?'✓ Adicionado':'+ Adicionar'}
+        class="btn btn-sm ${jaAdic?'btn-ghost':isCredit?'btn-ghost':'btn-primary'}" ${jaAdic?'disabled':''}
+        style="${isCredit&&!jaAdic?'border-color:var(--success);color:var(--success)':''}">
+        ${jaAdic?'✓ Aplicado':isCredit?'+ Aplicar':'+ Adicionar'}
       </button>
     </div>`;
   }).join('');
@@ -3188,30 +3195,37 @@ function _renderCalcProposta(){
     </div>`;
     return;
   }
-  const totalBase=_calcProposta.reduce((s,x)=>s+x.pvpBase,0);
-  const totalPromo=_calcProposta.reduce((s,x)=>s+x.pvpPromo,0);
-  const totalSinal=_calcProposta.reduce((s,x)=>s+x.sinal,0);
-  const poupanca=totalBase-totalPromo;
-  const rows=_calcProposta.map(x=>`
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
+  const totalServicos=_calcProposta.filter(x=>x.pvpBase>=0).reduce((s,x)=>s+x.pvpPromo,0);
+  const totalCreditos=_calcProposta.filter(x=>x.pvpBase<0).reduce((s,x)=>s+x.pvpBase,0);
+  const totalBase=_calcProposta.filter(x=>x.pvpBase>=0).reduce((s,x)=>s+x.pvpBase,0);
+  const totalPromo=totalServicos+totalCreditos;
+  const totalSinal=_calcProposta.filter(x=>x.pvpBase>=0).reduce((s,x)=>s+x.sinal,0);
+  const poupanca=totalBase-totalServicos;
+  const rows=_calcProposta.map(x=>{
+    const isCredit=x.pvpBase<0;
+    return`<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)${isCredit?';background:rgba(34,197,94,.05);border-radius:6px;padding-left:6px;padding-right:6px':''}">
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600">${x.nome}</div>
+        <div style="font-size:13px;font-weight:600;color:${isCredit?'var(--success)':'inherit'}">${isCredit?'💳 ':''}${x.nome}</div>
         <div style="font-size:11px;color:var(--text-muted);font-family:monospace">${x.codigo}</div>
-        ${x.pvpPromo<x.pvpBase
-          ?`<div style="font-size:12px;margin-top:2px"><span style="color:var(--success);font-weight:600">${x.pvpPromo.toFixed(0)}€</span> <span style="text-decoration:line-through;color:var(--text-muted)">${x.pvpBase.toFixed(0)}€</span></div>`
-          :`<div style="font-size:12px;color:var(--text);margin-top:2px">${x.pvpBase.toFixed(0)}€</div>`}
+        ${isCredit
+          ?`<div style="font-size:12px;color:var(--success);font-weight:600;margin-top:2px">${x.pvpBase.toFixed(0)}€</div>`
+          :x.pvpPromo<x.pvpBase
+            ?`<div style="font-size:12px;margin-top:2px"><span style="color:var(--success);font-weight:600">${x.pvpPromo.toFixed(0)}€</span> <span style="text-decoration:line-through;color:var(--text-muted)">${x.pvpBase.toFixed(0)}€</span></div>`
+            :`<div style="font-size:12px;color:var(--text);margin-top:2px">${x.pvpBase.toFixed(0)}€</div>`}
         ${x.sinal>0?`<div style="font-size:11px;color:var(--text-muted)">Sinal: ${x.sinal.toFixed(0)}€</div>`:''}
       </div>
       <button onclick="_calcRemoveServico('${x.codigo.replace(/'/g,"\\'")}')}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:0 4px;flex-shrink:0" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   el.innerHTML=`
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
       <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:12px">Proposta (${_calcProposta.length} serviço${_calcProposta.length!==1?'s':''})</div>
       ${rows}
       <div style="margin-top:14px;padding-top:12px">
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);margin-bottom:4px"><span>Total base</span><span>${totalBase.toFixed(0)}€</span></div>
-        ${poupanca>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--primary-text);margin-bottom:4px"><span>Poupança</span><span>-${poupanca.toFixed(0)}€</span></div>`:''}
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);margin-bottom:4px"><span>Subtotal</span><span>${totalServicos.toFixed(0)}€</span></div>
+        ${poupanca>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--primary-text);margin-bottom:4px"><span>Poupança promo</span><span>-${poupanca.toFixed(0)}€</span></div>`:''}
+        ${totalCreditos<0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--success);margin-bottom:4px"><span>💳 Crédito troca</span><span>${totalCreditos.toFixed(0)}€</span></div>`:''}
         <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;margin-top:6px;padding-top:8px;border-top:2px solid var(--border)"><span>Total</span><span>${totalPromo.toFixed(0)}€</span></div>
         ${totalSinal>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-top:6px"><span>Sinal total</span><span>${totalSinal.toFixed(0)}€</span></div>`:''}
       </div>
