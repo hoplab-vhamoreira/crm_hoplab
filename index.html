@@ -1045,10 +1045,14 @@ function _dbDetail(key){
     body+=`<div class="db-drawer-kpi">${d.kpis.map(k=>`<div class="db-drawer-kpi-item"><div class="dk-label">${k.label}</div><div class="dk-val" style="color:${k.color||'var(--text)'}">${k.val}</div></div>`).join('')}</div>`;
   }
   if(d.rows&&d.rows.length){
-    body+=`<div class="db-drawer-list">${d.rows.map(r=>`<div class="db-drawer-row" style="grid-template-columns:1fr auto">
-      <div><div class="dr-name">${r.name}</div><div class="dr-sub">${r.sub||''}</div></div>
-      <div class="dr-badge" style="background:${r.bc||'var(--surface3)'};color:${r.tc||'var(--text-muted)'}">${r.badge||''}</div>
-    </div>`).join('')}</div>`;
+    body+=`<div class="db-drawer-list">${d.rows.map(r=>{
+      const oc=r.link?`onclick="${r.link}" style="grid-template-columns:1fr auto;cursor:pointer"`:'style="grid-template-columns:1fr auto"';
+      const arrow=r.link?`<span style="font-size:11px;color:var(--text-muted);margin-left:4px">›</span>`:'';
+      return`<div class="db-drawer-row" ${oc}>
+        <div><div class="dr-name">${r.name}${arrow}</div><div class="dr-sub">${r.sub||''}</div></div>
+        <div class="dr-badge" style="background:${r.bc||'var(--surface3)'};color:${r.tc||'var(--text-muted)'}">${r.badge||''}</div>
+      </div>`;
+    }).join('')}</div>`;
   }else{
     body+='<div style="text-align:center;color:var(--text-muted);padding:32px;font-size:13px">Sem dados</div>';
   }
@@ -1237,7 +1241,7 @@ async function _dbAdmin(el){
     receita:{title:`Receita ${curMonth}`,kpis:[{label:'Total confirmado',val:receitaMes>0?receitaMes.toFixed(0)+'€':'0€',color:'var(--primary-text)'},{label:'Pagamentos',val:pagCurMonth.filter(r=>r['Estado']==='Pago').length,color:'var(--success)'}],
       rows:pagCurMonth.filter(r=>r['Estado']==='Pago').map(r=>({name:r['Cliente']||'—',sub:r['Modalidade']||'—',badge:parseFloat(r['Valor Pago'])>0?parseFloat(r['Valor Pago']).toFixed(0)+'€':'—',bc:'rgba(22,163,74,.1)',tc:'var(--success)'}))},
     atraso:{title:'Pagamentos sem confirmação',kpis:[{label:'Clientes',val:emAtrasoN,color:'var(--danger)'},{label:'Meses em aberto',val:emAtrasoRows.length,color:'var(--warning)'}],
-      rows:[...emAtrasoSet].map(c=>{const meses=emAtrasoRows.filter(r=>r['Cliente']===c).map(r=>r['Mês']).join(', ');return{name:c,sub:meses,badge:'Sem confirm.',bc:'rgba(220,38,38,.1)',tc:'var(--danger)'}})},
+      rows:[...emAtrasoSet].map(c=>{const meses=emAtrasoRows.filter(r=>r['Cliente']===c).map(r=>r['Mês']).join(', ');const sc=c.replace(/'/g,"\\'");return{name:c,sub:meses,badge:'Sem confirm.',bc:'rgba(220,38,38,.1)',tc:'var(--danger)',link:`_dbCloseDetail();openClienteDetalhe('${sc}')`}})},
     clientes:{title:'Clientes Ativos',kpis:[{label:'Ativos',val:cliAtivos,color:'var(--info)'},{label:'Suspensos',val:cliSusp,color:'var(--warning)'},{label:'Studio',val:cliStudio,color:'var(--primary-text)'},{label:'Lab',val:cliLab,color:'var(--info)'}],
       rows:cli.filter(isCliAtivo).map(c=>({name:c['Nome']||'—',sub:c['Status']||'—',badge:'Ativo',bc:'rgba(37,99,235,.1)',tc:'var(--info)'}))},
     suspensoes:{title:'Suspensões e Cancelamentos',kpis:[{label:'Suspensões',val:suspClientes,color:'var(--warning)'},{label:'Cancelamentos',val:cancClientes,color:'var(--danger)'}],
