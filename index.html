@@ -3208,16 +3208,9 @@ function _calcPromptTrocaAMR(){
 function _calcEscolherAMR(opcao){
   const b=document.getElementById('calc-amr-prompt');if(b)b.remove();
   if(opcao==='manter'){
-    // Adicionar AMR à proposta automaticamente
-    const amrPrec=_calcPrecarioData.find(p=>p['Código']==='AMR');
-    if(amrPrec&&!_calcProposta.some(x=>x.codigo==='AMR')){
-      const base=parseFloat(amrPrec['PVP Base (c/IVA)'])||0;
-      const promo=parseFloat(amrPrec['PVP Promocional (c/IVA)'])||base;
-      _calcProposta.push({codigo:'AMR',nome:amrPrec['Serviço'],pvpBase:base,pvpPromo:promo,sinal:parseFloat(amrPrec['Sinal'])||0,desc:amrPrec['Descrição']||''});
-    }
-    _renderCalcLista((document.getElementById('calc-search')||{}).value||'');
+    // AMR já incluído na inscrição — não adicionar nada, só fechar o prompt
     _renderCalcProposta();
-    toast('AMR adicionado à proposta','success');
+    toast('AMR mantido — incluído na inscrição','success');
   } else {
     // Trocar: adicionar o crédito e scrollar para a secção de avaliações
     const credPrec=_calcPrecarioData.find(p=>p['Código']==='CRED-AMR');
