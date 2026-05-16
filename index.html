@@ -772,8 +772,8 @@ const SECTIONS = {
   historico_faturacao: {title:'Histórico de Faturação',icon:'&#x1f9fe;',group:'Financeiro',noAdd:false},
   totais_pagamentos: {title:'Totais Pagamentos',icon:'&#x1f4b5;',group:'Financeiro',hidden:true,
     cols:['Professor','Role','Jan Pagamento','Jan Cedência','Jan Saldo NET','Fev Pagamento','Fev Cedência','Fev Saldo NET']},
-  calculadora: {title:'Calculadora',icon:'&#x1f5a9;',group:'Financeiro'},
-  precario_publico: {title:'Preçário Público',icon:'&#x1f4c3;',group:'Financeiro',
+  calculadora: {title:'Calculadora',icon:'&#x1f5a9;',group:'Financeiro',noAdd:true},
+  precario_publico: {title:'Preçário Público',icon:'&#x1f4c3;',group:'Financeiro',hidden:true,
     cols:['Serviço','Código','PVP Base (c/IVA)','Desconto','PVP Promocional (c/IVA)','Poupança'],
     fields:[
       {k:'Serviço',t:'text'},
@@ -928,6 +928,7 @@ async function navigate(section){
   if(section==='ciclos')            return renderGestaoClientes(main);
   if(section==='avaliacoes')        return renderAgenda(main);
   if(section==='responsabilidades') return renderResponsabilidadesMatriz(main);
+  if(section==='calculadora')       return renderCalculadora(main);
   if(section==='falhas_sancoes') return renderFalhas(main);
   if(section==='vendas_bonus')        return renderVendasBonus(main);
   if(section==='historico_faturacao') return renderHistoricoFaturacao(main);
@@ -3082,6 +3083,199 @@ function switchGtab(btn,id){
   btn.closest('.gtab-wrap').querySelectorAll('.gtab').forEach(b=>b.classList.remove('gtab-active'));
   btn.classList.add('gtab-active');
   ['rm-resp','rm-matr'].forEach(k=>{const el=document.getElementById(k);if(el)el.style.display=k===id?'':'none';});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CALCULADORA DE SERVIÇOS
+// ─────────────────────────────────────────────────────────────────────────────
+let _calcProposta = []; // [{nome,codigo,pvpBase,pvpPromo,sinal}]
+let _calcPrecarioData = [];
+
+async function renderCalculadora(el){
+  el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted)">A carregar preçário...</div>`;
+  const pr=sectionData['precario_publico']||(await api('/api/data/precario_publico'));
+  if(!sectionData['precario_publico']) sectionData['precario_publico']=pr;
+  _calcPrecarioData=Array.isArray(pr)?pr.filter(p=>p['Serviço']&&p['Código']):[];
+
+  el.innerHTML=`
+    <div class="page-header"><div><h1>🖩 Calculadora de Serviços</h1><div class="subtitle">Constrói uma proposta a partir do preçário</div></div></div>
+    <div class="gtab-wrap" style="margin-bottom:20px">
+      <button class="gtab gtab-active" id="calc-tab-btn" onclick="switchGtab(this,'calc-main');_renderCalcLista()">🖩 Calculadora</button>
+      <button class="gtab" onclick="switchGtab(this,'calc-precario');_renderCalcPrecario()">📋 Preçário</button>
+    </div>
+    <div id="calc-main">
+      <div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start">
+        <div>
+          <input type="text" id="calc-search" placeholder="Filtrar serviços..." oninput="_filterCalcLista()"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:14px">
+          <div id="calc-lista"></div>
+        </div>
+        <div style="position:sticky;top:20px">
+          <div id="calc-proposta"></div>
+        </div>
+      </div>
+    </div>
+    <div id="calc-precario" style="display:none"></div>`;
+
+  _renderCalcLista();
+  _renderCalcProposta();
+}
+
+function _filterCalcLista(){
+  const q=(document.getElementById('calc-search')||{}).value||'';
+  _renderCalcLista(q);
+}
+
+function _renderCalcLista(search=''){
+  const el=document.getElementById('calc-lista');
+  if(!el) return;
+  const q=search.toLowerCase();
+  const items=_calcPrecarioData.filter(p=>!q||p['Serviço'].toLowerCase().includes(q)||p['Código'].toLowerCase().includes(q));
+  if(!items.length){el.innerHTML=`<div class="tl-empty">Sem serviços encontrados.</div>`;return;}
+  el.innerHTML=items.map(p=>{
+    const base=parseFloat(p['PVP Base (c/IVA)'])||0;
+    const promo=parseFloat(p['PVP Promocional (c/IVA)'])||base;
+    const poupar=base-promo;
+    const jaAdic=_calcProposta.some(x=>x.codigo===p['Código']);
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;margin-bottom:6px;background:var(--surface);border:1px solid var(--border);border-radius:10px;gap:12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px">${p['Serviço']}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+          <span style="background:var(--surface2);padding:1px 6px;border-radius:4px;font-family:monospace">${p['Código']}</span>
+          ${promo<base?`<span style="color:var(--success);margin-left:8px">↓ ${promo.toFixed(0)}€</span><span style="color:var(--text-muted);text-decoration:line-through;margin-left:4px;font-size:10px">${base.toFixed(0)}€</span>`:` <span style="color:var(--text)">${base.toFixed(0)}€</span>`}
+          ${poupar>0?`<span style="color:var(--primary-text);font-weight:600;margin-left:6px">-${poupar.toFixed(0)}€</span>`:''}
+        </div>
+      </div>
+      <button onclick="_calcAddServico('${p['Código'].replace(/'/g,"\\'")}','${p['Serviço'].replace(/'/g,"\\'")}',${base},${promo},${parseFloat(p['Sinal'])||0})"
+        class="btn btn-sm ${jaAdic?'btn-ghost':'btn-primary'}" ${jaAdic?'disabled':''}>
+        ${jaAdic?'✓ Adicionado':'+ Adicionar'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function _calcAddServico(codigo,nome,pvpBase,pvpPromo,sinal){
+  if(_calcProposta.some(x=>x.codigo===codigo)) return;
+  _calcProposta.push({codigo,nome,pvpBase,pvpPromo,sinal});
+  _renderCalcLista((document.getElementById('calc-search')||{}).value||'');
+  _renderCalcProposta();
+}
+
+function _calcRemoveServico(codigo){
+  _calcProposta=_calcProposta.filter(x=>x.codigo!==codigo);
+  _renderCalcLista((document.getElementById('calc-search')||{}).value||'');
+  _renderCalcProposta();
+}
+
+function _renderCalcProposta(){
+  const el=document.getElementById('calc-proposta');
+  if(!el) return;
+  if(!_calcProposta.length){
+    el.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;text-align:center;color:var(--text-muted);font-size:13px">
+      Adiciona serviços para construir a proposta
+    </div>`;
+    return;
+  }
+  const totalBase=_calcProposta.reduce((s,x)=>s+x.pvpBase,0);
+  const totalPromo=_calcProposta.reduce((s,x)=>s+x.pvpPromo,0);
+  const totalSinal=_calcProposta.reduce((s,x)=>s+x.sinal,0);
+  const poupanca=totalBase-totalPromo;
+  const rows=_calcProposta.map(x=>`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">${x.nome}</div>
+        <div style="font-size:11px;color:var(--text-muted);font-family:monospace">${x.codigo}</div>
+        ${x.pvpPromo<x.pvpBase
+          ?`<div style="font-size:12px;margin-top:2px"><span style="color:var(--success);font-weight:600">${x.pvpPromo.toFixed(0)}€</span> <span style="text-decoration:line-through;color:var(--text-muted)">${x.pvpBase.toFixed(0)}€</span></div>`
+          :`<div style="font-size:12px;color:var(--text);margin-top:2px">${x.pvpBase.toFixed(0)}€</div>`}
+        ${x.sinal>0?`<div style="font-size:11px;color:var(--text-muted)">Sinal: ${x.sinal.toFixed(0)}€</div>`:''}
+      </div>
+      <button onclick="_calcRemoveServico('${x.codigo.replace(/'/g,"\\'")}')}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:0 4px;flex-shrink:0" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
+    </div>`).join('');
+
+  el.innerHTML=`
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:12px">Proposta (${_calcProposta.length} serviço${_calcProposta.length!==1?'s':''})</div>
+      ${rows}
+      <div style="margin-top:14px;padding-top:12px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);margin-bottom:4px"><span>Total base</span><span>${totalBase.toFixed(0)}€</span></div>
+        ${poupanca>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--primary-text);margin-bottom:4px"><span>Poupança</span><span>-${poupanca.toFixed(0)}€</span></div>`:''}
+        <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;margin-top:6px;padding-top:8px;border-top:2px solid var(--border)"><span>Total</span><span>${totalPromo.toFixed(0)}€</span></div>
+        ${totalSinal>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-top:6px"><span>Sinal total</span><span>${totalSinal.toFixed(0)}€</span></div>`:''}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-ghost btn-sm" onclick="_calcLimpar()">🗑️ Limpar</button>
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="_calcGerarProposta()">📋 Gerar Proposta</button>
+      </div>
+    </div>`;
+}
+
+function _calcLimpar(){
+  _calcProposta=[];
+  _renderCalcLista((document.getElementById('calc-search')||{}).value||'');
+  _renderCalcProposta();
+}
+
+function _calcGerarProposta(){
+  if(!_calcProposta.length) return toast('Adiciona pelo menos um serviço','error');
+  const totalBase=_calcProposta.reduce((s,x)=>s+x.pvpBase,0);
+  const totalPromo=_calcProposta.reduce((s,x)=>s+x.pvpPromo,0);
+  const totalSinal=_calcProposta.reduce((s,x)=>s+x.sinal,0);
+  const poupanca=totalBase-totalPromo;
+  const linhas=_calcProposta.map((x,i)=>`
+    <tr>
+      <td style="padding:10px 12px;font-size:13px;font-family:monospace;color:var(--text-muted);white-space:nowrap">${x.codigo}</td>
+      <td style="padding:10px 12px;font-weight:500">${x.nome}</td>
+      <td style="padding:10px 12px;text-align:right;${x.pvpPromo<x.pvpBase?'text-decoration:line-through;color:var(--text-muted)':''}">${x.pvpBase.toFixed(0)}€</td>
+      <td style="padding:10px 12px;text-align:right;font-weight:600;color:var(--success)">${x.pvpPromo<x.pvpBase?x.pvpPromo.toFixed(0)+'€':'—'}</td>
+      <td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--text-muted)">${x.sinal>0?x.sinal.toFixed(0)+'€':'—'}</td>
+    </tr>`).join('');
+
+  document.getElementById('modalTitle').textContent='📋 Proposta de Serviços';
+  document.getElementById('modalBody').innerHTML=`
+    <div style="margin-bottom:16px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--surface2)">
+          <th style="padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">Cód.</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">Serviço</th>
+          <th style="padding:8px 12px;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">PVP Base</th>
+          <th style="padding:8px 12px;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">Promoção</th>
+          <th style="padding:8px 12px;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">Sinal</th>
+        </tr></thead>
+        <tbody>${linhas}</tbody>
+        <tfoot>
+          <tr style="border-top:2px solid var(--border)">
+            <td colspan="2" style="padding:10px 12px;font-weight:700">TOTAL</td>
+            <td style="padding:10px 12px;text-align:right;${poupanca>0?'text-decoration:line-through;color:var(--text-muted)':''}">${totalBase.toFixed(0)}€</td>
+            <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:15px;color:var(--success)">${totalPromo.toFixed(0)}€</td>
+            <td style="padding:10px 12px;text-align:right;color:var(--text-muted)">${totalSinal>0?totalSinal.toFixed(0)+'€':'—'}</td>
+          </tr>
+          ${poupanca>0?`<tr><td colspan="5" style="padding:6px 12px;font-size:12px;color:var(--primary-text);font-weight:600">💚 Poupança total: ${poupanca.toFixed(0)}€</td></tr>`:''}
+        </tfoot>
+      </table>
+    </div>`;
+  document.getElementById('modalSave').textContent='🖨️ Imprimir';
+  document.getElementById('modalSave').onclick=()=>window.print();
+  document.getElementById('modal').classList.add('show');
+}
+
+function _renderCalcPrecario(){
+  const el=document.getElementById('calc-precario');
+  if(!el) return;
+  const sec=SECTIONS['precario_publico'];
+  const data=_calcPrecarioData;
+  if(!data.length){el.innerHTML=`<div class="tl-empty">Sem dados</div>`;return;}
+  const cols=sec.cols;
+  const thead=`<thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Ações</th></tr></thead>`;
+  const tbody=data.map((p,i)=>`<tr>${cols.map(c=>`<td>${_fmtCellVal(p[c])}</td>`).join('')}<td class="actions">
+    <button onclick="openEdit('precario_publico',${i})" title="Editar">&#x270F;</button>
+    <button class="del" onclick="deleteRec('precario_publico',${i})" title="Eliminar">&#x1f5d1;</button>
+  </td></tr>`).join('');
+  el.innerHTML=`
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <button class="btn btn-primary btn-sm" onclick="openAdd('precario_publico')">+ Adicionar serviço</button>
+    </div>
+    <div class="table-wrap"><table class="tbl">${thead}<tbody>${tbody}</tbody></table></div>`;
 }
 
 async function renderAlertas(el){
