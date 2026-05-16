@@ -228,7 +228,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 .cd-main{flex:1;min-width:0}
 /* TABS */
 .tabs{display:inline-flex;gap:4px;background:var(--surface3);border-radius:50px;padding:4px;margin-bottom:20px;border-bottom:none}
-.tab{padding:8px 20px;cursor:pointer;font-size:13px;font-weight:600;color:#6b7280;border-bottom:none;margin-bottom:0;border-radius:50px;transition:.15s}
+.tab{padding:8px 20px;cursor:pointer;font-size:13px;font-weight:600;color:#6b7280;border-bottom:none;margin-bottom:0;border-radius:50px;transition:.15s;white-space:nowrap}
 .tab:hover{color:#374151;background:rgba(0,0,0,.05)}
 .tab.active{color:var(--green);background:var(--navy);border-bottom-color:transparent;font-weight:700}
 .tab-panel{display:none}.tab-panel.active{display:block}
@@ -5563,11 +5563,11 @@ function renderClienteDetalhe(el, nome, d){
       </div>
       <div class="cd-main">
         <div class="tabs">
-          <div class="tab active" onclick="switchTab(this,'tab-servicos')">Serviços</div>
-          <div class="tab" onclick="switchTab(this,'tab-avaliacoes')">Avaliações</div>
-          <div class="tab" onclick="switchTab(this,'tab-faturacao')">Faturação</div>
-          <div class="tab" onclick="switchTab(this,'tab-contratos')">Contratos</div>
-          <div class="tab" onclick="switchTab(this,'tab-historico')">Histórico</div>
+          <div class="tab active" onclick="switchTab(this,'tab-servicos')">Serviços (${nServicos})</div>
+          <div class="tab" onclick="switchTab(this,'tab-avaliacoes')">Avaliações (${nAvals})</div>
+          <div class="tab" onclick="switchTab(this,'tab-faturacao')">Faturação (${nFaturacao})</div>
+          <div class="tab" onclick="switchTab(this,'tab-contratos')">Contratos (${nContratos})</div>
+          <div class="tab" onclick="switchTab(this,'tab-historico')">Histórico (${nHistorico})</div>
         </div>
         <div id="tab-servicos"   class="tab-panel active">${servsHtml}</div>
         <div id="tab-avaliacoes" class="tab-panel">${avalsHtml}</div>
