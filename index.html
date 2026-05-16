@@ -778,6 +778,7 @@ const SECTIONS = {
     fields:[
       {k:'Serviço',t:'text'},
       {k:'Código',t:'text'},
+      {k:'Descrição',t:'textarea'},
       {k:'PVP Base (c/IVA)',t:'number'},
       {k:'Desconto',t:'number'},
       {k:'Sinal',t:'number'}
@@ -1397,7 +1398,11 @@ function changePage(section,p){
 }
 
 // MODAL CRUD
-function closeModal(){document.getElementById('modal').classList.remove('show');}
+function closeModal(){
+  document.getElementById('modal').classList.remove('show');
+  const ms=document.getElementById('modalSave');
+  if(ms){ms.style.display='';ms.textContent='Guardar';}
+}
 
 // Cache de lookups para não pedir ao servidor repetidamente
 const _lookupCache={};
@@ -3088,8 +3093,9 @@ function switchGtab(btn,id,panels){
 // ─────────────────────────────────────────────────────────────────────────────
 // CALCULADORA DE SERVIÇOS
 // ─────────────────────────────────────────────────────────────────────────────
-let _calcProposta = []; // [{nome,codigo,pvpBase,pvpPromo,sinal}]
+let _calcProposta = []; // [{nome,codigo,pvpBase,pvpPromo,sinal,desc}]
 let _calcPrecarioData = [];
+let _calcDestinatarios = null; // cache [{nome,email,tel,origem}]
 
 async function renderCalculadora(el){
   el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted)">A carregar preçário...</div>`;
@@ -3156,7 +3162,9 @@ function _renderCalcLista(search=''){
 
 function _calcAddServico(codigo,nome,pvpBase,pvpPromo,sinal){
   if(_calcProposta.some(x=>x.codigo===codigo)) return;
-  _calcProposta.push({codigo,nome,pvpBase,pvpPromo,sinal});
+  const prec=_calcPrecarioData.find(p=>p['Código']===codigo);
+  const desc=(prec&&prec['Descrição'])||'';
+  _calcProposta.push({codigo,nome,pvpBase,pvpPromo,sinal,desc});
   _renderCalcLista((document.getElementById('calc-search')||{}).value||'');
   _renderCalcProposta();
 }
@@ -3203,17 +3211,144 @@ function _renderCalcProposta(){
         <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;margin-top:6px;padding-top:8px;border-top:2px solid var(--border)"><span>Total</span><span>${totalPromo.toFixed(0)}€</span></div>
         ${totalSinal>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-top:6px"><span>Sinal total</span><span>${totalSinal.toFixed(0)}€</span></div>`:''}
       </div>
-      <div style="display:flex;gap:8px;margin-top:16px">
+      <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="_calcLimpar()">🗑️ Limpar</button>
-        <button class="btn btn-primary btn-sm" style="flex:1" onclick="_calcGerarProposta()">📋 Gerar Proposta</button>
+        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="_calcGerarProposta()">📋 Imprimir</button>
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="_calcEnviarProposta()">📤 Enviar</button>
       </div>
     </div>`;
 }
 
 function _calcLimpar(){
   _calcProposta=[];
+  _calcDestinatarios=null;
   _renderCalcLista((document.getElementById('calc-search')||{}).value||'');
   _renderCalcProposta();
+}
+
+async function _calcEnviarProposta(){
+  if(!_calcProposta.length) return toast('Adiciona pelo menos um serviço','error');
+  if(!_calcDestinatarios){
+    const [cliRes,pipRes]=await Promise.all([
+      api('/api/data/clientes'),
+      api('/api/data/pipeline')
+    ]);
+    const cli=(Array.isArray(cliRes)?cliRes:[]).map(c=>({
+      nome:c['Nome']||'',email:c['Email']||'',tel:c['Telemóvel']||'',origem:'Cliente'
+    })).filter(c=>c.nome);
+    const nomesCli=new Set(cli.map(c=>c.nome));
+    const pip=(Array.isArray(pipRes)?pipRes:[])
+      .filter(p=>p['Aberta/Fechada']==='Aberta'&&p['Contacto']&&!nomesCli.has(p['Contacto']))
+      .map(p=>({nome:p['Contacto'],email:'',tel:'',origem:'Lead'}));
+    _calcDestinatarios=[...cli,...pip];
+  }
+  document.getElementById('modalTitle').textContent='📤 Enviar Proposta';
+  document.getElementById('modalBody').innerHTML=`
+    <div id="env-step1">
+      <p style="color:var(--text-muted);font-size:13px;margin:0 0 12px">Seleciona o destinatário da proposta</p>
+      <input type="text" id="env-search" placeholder="Pesquisar cliente ou lead..."
+        oninput="_calcFiltrarDestinatarios()"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box">
+      <div id="env-lista" style="max-height:300px;overflow-y:auto"></div>
+    </div>
+    <div id="env-step2" style="display:none"></div>`;
+  document.getElementById('modalSave').style.display='none';
+  document.getElementById('modal').classList.add('show');
+  _calcFiltrarDestinatarios();
+}
+
+function _calcFiltrarDestinatarios(){
+  const q=((document.getElementById('env-search')||{}).value||'').toLowerCase();
+  const el=document.getElementById('env-lista');
+  if(!el) return;
+  const items=(_calcDestinatarios||[]).filter(d=>!q||d.nome.toLowerCase().includes(q)).slice(0,25);
+  if(!items.length){el.innerHTML=`<div style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px">Sem resultados</div>`;return;}
+  el.innerHTML=items.map(d=>`
+    <div onclick="_calcSelecionarDestinatario(${JSON.stringify(d.nome)},${JSON.stringify(d.email)},${JSON.stringify(d.tel)},${JSON.stringify(d.origem)})"
+      style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;margin-bottom:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .15s"
+      onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div>
+        <div style="font-weight:600;font-size:13px">${d.nome}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${d.email||'<em>sem email</em>'} ${d.tel?'&nbsp;·&nbsp;'+d.tel:''}</div>
+      </div>
+      <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--surface2);color:var(--text-muted);flex-shrink:0;margin-left:8px">${d.origem}</span>
+    </div>`).join('');
+}
+
+function _calcSelecionarDestinatario(nome,email,tel,origem){
+  document.getElementById('env-step1').style.display='none';
+  const step2=document.getElementById('env-step2');
+  step2.style.display='';
+
+  const totalBase=_calcProposta.reduce((s,x)=>s+x.pvpBase,0);
+  const totalPromo=_calcProposta.reduce((s,x)=>s+x.pvpPromo,0);
+  const poupanca=totalBase-totalPromo;
+
+  const linhasTexto=_calcProposta.map(x=>{
+    const preco=x.pvpPromo<x.pvpBase?`${x.pvpPromo.toFixed(0)}€ (antes ${x.pvpBase.toFixed(0)}€)`:`${x.pvpBase.toFixed(0)}€`;
+    return `• ${x.nome} [${x.codigo}] — ${preco}`+(x.desc?`\n  ${x.desc}`:'');
+  }).join('\n');
+  const totalLinha=poupanca>0?`Total: ${totalPromo.toFixed(0)}€ (poupança de ${poupanca.toFixed(0)}€)`:`Total: ${totalPromo.toFixed(0)}€`;
+
+  const msgTemplate=`Olá ${nome.split(' ')[0]},\n\nSegue a proposta de serviços HOP Lab preparada para si:\n\n${linhasTexto}\n\n${totalLinha}\n\nEstamos ao dispor para qualquer esclarecimento.`;
+
+  const telLimpo=tel.replace(/[\s\-()]/g,'').replace(/^\+/,'').replace(/^00/,'');
+  const telWA=telLimpo.startsWith('351')?telLimpo:(telLimpo?'351'+telLimpo:'');
+  const semContacto=!email&&!telWA;
+
+  const linhasHtml=_calcProposta.map(x=>`
+    <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-weight:600;font-size:13px">${x.nome}</span>
+        <span style="font-size:13px;font-weight:600;color:${x.pvpPromo<x.pvpBase?'var(--success)':'var(--text)'}">
+          ${x.pvpPromo<x.pvpBase?x.pvpPromo.toFixed(0)+'€':x.pvpBase.toFixed(0)+'€'}
+          ${x.pvpPromo<x.pvpBase?`<span style="text-decoration:line-through;color:var(--text-muted);font-weight:400;font-size:11px;margin-left:4px">${x.pvpBase.toFixed(0)}€</span>`:''}
+        </span>
+      </div>
+      ${x.desc?`<div style="font-size:12px;color:var(--text-muted);margin-top:2px">${x.desc}</div>`:''}
+      <div style="font-size:11px;font-family:monospace;color:var(--text-muted);margin-top:1px">${x.codigo}</div>
+    </div>`).join('');
+
+  step2.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button onclick="document.getElementById('env-step1').style.display='';document.getElementById('env-step2').style.display='none'"
+        style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:20px;line-height:1;padding:0" title="Voltar">←</button>
+      <div>
+        <div style="font-weight:700;font-size:14px">${nome}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${email||'sem email'}${tel?' &nbsp;·&nbsp; '+tel:''} &nbsp;·&nbsp; <span>${origem}</span></div>
+      </div>
+    </div>
+    ${semContacto?`<div style="background:rgba(255,180,0,.1);border:1px solid rgba(255,180,0,.4);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text);margin-bottom:14px">⚠️ Este registo não tem email nem telemóvel. Adiciona os dados na ficha para poder enviar.</div>`:''}
+    <div style="margin-bottom:14px">
+      ${linhasHtml}
+      <div style="display:flex;justify-content:space-between;font-weight:700;font-size:14px;padding:10px 0 0">
+        <span>Total</span>
+        <span style="color:var(--success)">${totalPromo.toFixed(0)}€</span>
+      </div>
+      ${poupanca>0?`<div style="font-size:12px;color:var(--primary-text)">💚 Poupança: ${poupanca.toFixed(0)}€</div>`:''}
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Nota pessoal (opcional)</label>
+      <textarea id="env-nota" rows="2" placeholder="Ex: Foi um prazer falar consigo, fico ao dispor para agendar..."
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" style="flex:1;min-width:130px;${email?'background:var(--primary);color:#fff;border-color:var(--primary)':''}" ${!email?'disabled title="Sem email registado"':''} onclick="_calcEnviarEmail(${JSON.stringify(nome)},${JSON.stringify(email)},${JSON.stringify(msgTemplate)})">📧 Email</button>
+      <button class="btn btn-sm" style="flex:1;min-width:130px;${telWA?'background:#25d366;color:#fff;border:none':''}" ${!telWA?'disabled title="Sem telemóvel registado"':''} onclick="_calcEnviarWA(${JSON.stringify(telWA)},${JSON.stringify(msgTemplate)})">💬 WhatsApp</button>
+      <button class="btn btn-ghost btn-sm" onclick="_calcGerarProposta()">📋 Imprimir</button>
+    </div>`;
+}
+
+function _calcEnviarEmail(nome,email,msgTemplate){
+  const nota=(document.getElementById('env-nota')||{}).value||'';
+  const corpo=nota?nota+'\n\n---\n\n'+msgTemplate:msgTemplate;
+  window.open('mailto:'+email+'?subject='+encodeURIComponent('Proposta de Serviços HOP Lab')+'&body='+encodeURIComponent(corpo));
+}
+
+function _calcEnviarWA(tel,msgTemplate){
+  const nota=(document.getElementById('env-nota')||{}).value||'';
+  const msg=nota?nota+'\n\n'+msgTemplate:msgTemplate;
+  window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
 }
 
 function _calcGerarProposta(){
@@ -3225,7 +3360,7 @@ function _calcGerarProposta(){
   const linhas=_calcProposta.map((x,i)=>`
     <tr>
       <td style="padding:10px 12px;font-size:13px;font-family:monospace;color:var(--text-muted);white-space:nowrap">${x.codigo}</td>
-      <td style="padding:10px 12px;font-weight:500">${x.nome}</td>
+      <td style="padding:10px 12px;font-weight:500">${x.nome}${x.desc?`<div style="font-size:11px;color:var(--text-muted);font-weight:400;margin-top:2px">${x.desc}</div>`:''}</td>
       <td style="padding:10px 12px;text-align:right;${x.pvpPromo<x.pvpBase?'text-decoration:line-through;color:var(--text-muted)':''}">${x.pvpBase.toFixed(0)}€</td>
       <td style="padding:10px 12px;text-align:right;font-weight:600;color:var(--success)">${x.pvpPromo<x.pvpBase?x.pvpPromo.toFixed(0)+'€':'—'}</td>
       <td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--text-muted)">${x.sinal>0?x.sinal.toFixed(0)+'€':'—'}</td>
