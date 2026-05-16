@@ -110,6 +110,67 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .db-section-title{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
 .db-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px}
 @media(max-width:900px){.db-grid-2{grid-template-columns:1fr}}
+/* Dashboard redesign */
+.db-top{display:grid;grid-template-columns:1fr 340px;gap:20px;margin-bottom:20px;align-items:start}
+.db-welcome h1{font-size:26px;font-weight:800;margin-bottom:4px}
+.db-welcome p{font-size:13px;color:var(--text-muted);margin-bottom:18px}
+.db-hero-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.db-hero-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;gap:14px;align-items:flex-start}
+.db-hc-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.db-hc-body{flex:1;min-width:0}
+.db-hc-label{font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.db-hc-value{font-size:26px;font-weight:800;line-height:1;margin-bottom:6px}
+.db-hc-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:50px}
+.db-overview{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.db-overview-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.db-overview-title span{font-size:13px;font-weight:700}
+.db-gauge-wrap{text-align:center;margin-bottom:8px}
+.db-gauge-svg{width:160px;height:90px}
+.db-overview-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.db-ov-stat{background:var(--surface2);border-radius:10px;padding:10px 12px}
+.db-ov-stat .ovs-label{font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px}
+.db-ov-stat .ovs-val{font-size:18px;font-weight:800}
+.db-analytics{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:20px}
+.db-analytics-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.db-analytics-title{font-size:13px;font-weight:700}
+.db-cat-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.db-cat-tab{padding:5px 14px;border-radius:50px;border:1px solid var(--border);background:none;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-muted);transition:.15s}
+.db-cat-tab.active,.db-cat-tab:hover{background:#141720;color:#fff;border-color:#141720}
+.db-analytics-body{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.db-service-list{display:flex;flex-direction:column;gap:10px}
+.db-srv-row{display:flex;flex-direction:column;gap:4px}
+.db-srv-info{display:flex;justify-content:space-between;font-size:12px}
+.db-srv-name{font-weight:600}
+.db-srv-count{font-weight:700}
+.db-bar-bg{height:8px;border-radius:4px;background:var(--surface3);overflow:hidden}
+.db-bar-fill{height:100%;border-radius:4px;transition:width .4s}
+.db-month-chart{display:flex;flex-direction:column;gap:8px}
+.db-chart-bars{display:flex;align-items:flex-end;gap:6px;height:90px}
+.db-chart-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.db-chart-bar-wrap{flex:1;width:100%;display:flex;align-items:flex-end}
+.db-chart-bar{width:100%;border-radius:4px 4px 0 0;min-height:2px;transition:height .4s}
+.db-chart-label{font-size:9px;color:var(--text-muted);font-weight:600}
+.db-chart-val{font-size:9px;color:var(--text-muted)}
+.db-chart-legend{display:flex;gap:12px;font-size:11px;margin-top:4px}
+.db-chart-legend span{display:flex;align-items:center;gap:4px}
+.db-chart-legend i{display:inline-block;width:8px;height:8px;border-radius:2px}
+.db-recent{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.db-recent-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border)}
+.db-recent-header span{font-size:13px;font-weight:700}
+.db-recent-item{display:grid;grid-template-columns:32px 1fr auto;gap:10px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--border)}
+.db-recent-item:last-child{border-bottom:none}
+.db-ri-avatar{width:32px;height:32px;border-radius:50%;background:#141720;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#aaff00;flex-shrink:0}
+.db-ri-body .ri-name{font-size:13px;font-weight:600}
+.db-ri-body .ri-sub{font-size:11px;color:var(--text-muted)}
+.db-ri-val{font-size:12px;font-weight:700;color:var(--success);white-space:nowrap}
+.db-alert-item{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--border)}
+.db-alert-item:last-child{border-bottom:none}
+.db-alert-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);flex-shrink:0}
+.db-alert-body{flex:1;min-width:0}
+.db-alert-body .ab-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.db-alert-body .ab-sub{font-size:11px;color:var(--text-muted)}
+.db-alert-days{font-size:12px;font-weight:700;color:var(--danger)}
+@media(max-width:1100px){.db-top{grid-template-columns:1fr}.db-analytics-body{grid-template-columns:1fr}}
 /* BACKOFFICE */
 .perm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-top:8px}
 .perm-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:12px}
@@ -1035,57 +1096,178 @@ async function _dbAdmin(el){
   const pipeAberto=pip.filter(p=>p['Aberta/Fechada']==='Aberta').length;
   const alertasN=stats.alertas||0;
 
-  // Render
-  const kpi=(label,val,sub,color,onclick,icon='')=>{
-    const cl=onclick?'stat-card clickable':'stat-card';
-    const oc=onclick?`onclick="${onclick}"`:'';
-    return`<div class="${cl}" ${oc}>
-      <div class="label">${icon?icon+' ':''}${label}</div>
-      <div class="value ${color||''}">${val??'—'}</div>
-      ${sub?`<div class="sub">${sub}</div>`:''}
-    </div>`;
-  };
+  // Monthly chart data (last 5 months)
+  const chartMonths=MONTHS.slice(Math.max(0,mi-4),mi+1);
+  const monthData=chartMonths.map(m=>{
+    const rows=pag.filter(r=>r['Mês']===m);
+    const pago=rows.filter(r=>r['Estado']==='Pago').reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
+    const ativos=rows.filter(r=>r['Estado']==='Ativo').length;
+    return{m:m.slice(0,3),pago,ativos};
+  });
+  const maxPago=Math.max(...monthData.map(x=>x.pago),1);
+  const maxAtivos=Math.max(...monthData.map(x=>x.ativos),1);
 
-  const histRows=(hist.data||[]).map(h=>[
-    `<span style="font-size:11px">${fmtDate(h.timestamp)}</span>`,
-    h.utilizador||'—',h.acao||'—',SECTIONS[h.colecao]?.title||h.colecao||'—'
-  ]);
-  const alrtRows=(alrtTop.data||[]).map(a=>[
-    a['Tipo']||'—',a['Cliente']||'—',
-    a['DiasAtraso']!=null?`<span style="color:var(--danger);font-weight:600">${a['DiasAtraso']}d</span>`:'—',
-    a['Responsável']||'—'
-  ]);
+  // Service distribution
+  const gestaoAt=gl4At+gl12At+giAt;
+  const totalAt=studioAt+labAt+gestaoAt+consultAt||1;
+  const srvs=[
+    {nome:'Studio / PT',n:studioAt,color:'#aaff00',bg:'rgba(170,255,0,.15)'},
+    {nome:'Lab & Avaliações',n:labAt,color:'#2563eb',bg:'rgba(37,99,235,.12)'},
+    {nome:'Gestão',n:gestaoAt,color:'#7c3aed',bg:'rgba(124,58,237,.12)'},
+    {nome:'Consultas',n:consultAt,color:'#16a34a',bg:'rgba(22,163,74,.12)'},
+  ];
+
+  // Gauge: retention or client health
+  const gaugeVal=retPct!=null?retPct:cliAtivos+cliSusp+cliCanc>0?Math.round((cliAtivos/(cliAtivos+cliSusp+cliCanc))*100):0;
+  const gaugeLabel=retPct!=null?'Retenção vs '+prevMonth:'% Clientes Ativos';
+  const R=40,CX=60,CY=52,semi=Math.PI*R;
+  const dash=(gaugeVal/100)*semi;
+  const gaugeSVG=`<svg viewBox="0 0 120 62" class="db-gauge-svg">
+    <path d="M${CX-R},${CY} A${R},${R} 0 0,1 ${CX+R},${CY}" fill="none" stroke="var(--surface3)" stroke-width="9" stroke-linecap="round"/>
+    <path d="M${CX-R},${CY} A${R},${R} 0 0,1 ${CX+R},${CY}" fill="none" stroke="#aaff00" stroke-width="9" stroke-linecap="round"
+      stroke-dasharray="${dash.toFixed(1)} ${semi.toFixed(1)}"/>
+    <text x="${CX}" y="${CY-4}" text-anchor="middle" font-size="16" font-weight="800" fill="var(--text)">${gaugeVal}%</text>
+    <text x="${CX}" y="${CY+9}" text-anchor="middle" font-size="6.5" fill="var(--text-muted)">${gaugeLabel}</text>
+  </svg>`;
+
+  // Recent history items
+  const histItems=(hist.data||[]).slice(0,5).map(h=>{
+    const init=(h.utilizador||'?').charAt(0).toUpperCase();
+    return`<div class="db-recent-item">
+      <div class="db-ri-avatar">${init}</div>
+      <div class="db-ri-body"><div class="ri-name">${h.utilizador||'—'}</div><div class="ri-sub">${h.acao||'—'} · ${SECTIONS[h.colecao]?.title||h.colecao||'—'}</div></div>
+      <div class="db-ri-val" style="color:var(--text-muted);font-weight:400;font-size:11px">${fmtDate(h.timestamp)}</div>
+    </div>`;
+  }).join('');
+
+  // Alert items
+  const alrtItems=(alrtTop.data||[]).slice(0,5).map(a=>`<div class="db-alert-item">
+    <div class="db-alert-dot"></div>
+    <div class="db-alert-body"><div class="ab-name">${a['Cliente']||'—'}</div><div class="ab-sub">${a['Tipo']||'—'} · ${a['Responsável']||'—'}</div></div>
+    <div class="db-alert-days">${a['DiasAtraso']!=null?a['DiasAtraso']+'d':'—'}</div>
+  </div>`).join('');
 
   el.innerHTML=`
-    <div class="page-header">
-      <div><h1>Dashboard</h1><div class="subtitle">Bem-vindo, ${currentUser.name} · ${curMonth} ${now.getFullYear()}</div></div>
-      <button class="btn btn-ghost btn-sm" onclick="navigate('totais_pagamentos')">💵 Pagamentos</button>
+    <!-- TOP ROW -->
+    <div class="db-top">
+      <div>
+        <div class="db-welcome">
+          <h1>Olá, ${currentUser.name.split(' ')[0]} 👋</h1>
+          <p>Aqui está o resumo de ${curMonth} ${now.getFullYear()}. Como está o negócio?</p>
+        </div>
+        <div class="db-hero-cards">
+          <div class="db-hero-card" style="cursor:pointer" onclick="navigate('totais_pagamentos')">
+            <div class="db-hc-icon" style="background:rgba(170,255,0,.15)">💶</div>
+            <div class="db-hc-body">
+              <div class="db-hc-label">Receita ${curMonth}</div>
+              <div class="db-hc-value" style="color:var(--primary-text)">${receitaMes>0?receitaMes.toFixed(0)+'€':'—'}</div>
+              <span class="db-hc-badge" style="background:rgba(170,255,0,.15);color:var(--primary-text)">${pagCurMonth.filter(r=>r['Estado']==='Pago').length} pag. confirmados</span>
+            </div>
+          </div>
+          <div class="db-hero-card" style="cursor:pointer" onclick="navigate('totais_pagamentos')">
+            <div class="db-hc-icon" style="background:rgba(220,38,38,.1)">⚠️</div>
+            <div class="db-hc-body">
+              <div class="db-hc-label">Pag. em Atraso</div>
+              <div class="db-hc-value" style="color:var(--danger)">${emAtrasoClientes}</div>
+              <span class="db-hc-badge" style="background:rgba(220,38,38,.1);color:var(--danger)">${emAtrasoRows.length} meses por regularizar</span>
+            </div>
+          </div>
+          <div class="db-hero-card" style="cursor:pointer" onclick="navigate('clientes')">
+            <div class="db-hc-icon" style="background:rgba(37,99,235,.1)">👤</div>
+            <div class="db-hc-body">
+              <div class="db-hc-label">Clientes Ativos</div>
+              <div class="db-hc-value" style="color:var(--info)">${cliAtivos}</div>
+              <span class="db-hc-badge" style="background:rgba(37,99,235,.1);color:var(--info)">${cliSusp} susp · ${cliCanc} canc</span>
+            </div>
+          </div>
+          <div class="db-hero-card" style="cursor:pointer" onclick="navigate('pipeline')">
+            <div class="db-hc-icon" style="background:rgba(217,119,6,.1)">📈</div>
+            <div class="db-hc-body">
+              <div class="db-hc-label">Pipeline Aberto</div>
+              <div class="db-hc-value" style="color:var(--warning)">${pipeAberto}</div>
+              <span class="db-hc-badge" style="background:rgba(217,119,6,.1);color:var(--warning)">${alertasN} alertas ativos</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OVERVIEW PANEL -->
+      <div class="db-overview">
+        <div class="db-overview-title"><span>Saúde do Negócio</span></div>
+        <div class="db-gauge-wrap">${gaugeSVG}</div>
+        <div class="db-overview-stats">
+          <div class="db-ov-stat">
+            <div class="ovs-label">Desistências</div>
+            <div class="ovs-val" style="color:var(--danger)">${desist}</div>
+          </div>
+          <div class="db-ov-stat">
+            <div class="ovs-label">Novas Adesões</div>
+            <div class="ovs-val" style="color:var(--success)">${novasAdes}</div>
+          </div>
+          <div class="db-ov-stat">
+            <div class="ovs-label">Rep. Lab</div>
+            <div class="ovs-val" style="color:#7c3aed">${labRepPct}%</div>
+          </div>
+          <div class="db-ov-stat">
+            <div class="ovs-label">Total Serviços</div>
+            <div class="ovs-val">${studioAt+labAt+gestaoAt+consultAt}</div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="db-section-title">Visão Geral</div>
-    <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:24px">
-      ${kpi('Clientes Ativos',cliAtivos,`${cliSusp} susp · ${cliCanc} canc`,'purple',"navigate('clientes')",'👤')}
-      ${kpi('Studio (PT)',studioAt,'serviços em curso','blue','','🏋️')}
-      ${kpi('Lab Avaliações',labAt,'serviços em curso','green','','🔬')}
-      ${kpi('Gestão',gl4At+gl12At+giAt,`GL4: ${gl4At} · GL12: ${gl12At} · GI: ${giAt}`,'purple','','')}
-      ${kpi('Consultas',consultAt,'em curso','blue','','')}
-      ${kpi('Receita '+curMonth,receitaMes>0?receitaMes.toFixed(0)+'€':'—',`${pagCurMonth.filter(r=>r['Estado']==='Pago').length} pagamentos confirmados`,'green',"navigate('totais_pagamentos')",'💶')}
+    <!-- ANALYTICS -->
+    <div class="db-analytics">
+      <div class="db-analytics-header">
+        <span class="db-analytics-title">Serviços Ativos</span>
+        <div class="db-cat-tabs">
+          ${srvs.map(s=>`<span class="db-cat-tab" style="border-color:${s.color};color:${s.color};background:${s.bg}">${s.nome} <b>${s.n}</b></span>`).join('')}
+        </div>
+      </div>
+      <div class="db-analytics-body">
+        <div class="db-service-list">
+          ${srvs.map(s=>`<div class="db-srv-row">
+            <div class="db-srv-info"><span class="db-srv-name">${s.nome}</span><span class="db-srv-count" style="color:${s.color}">${s.n}</span></div>
+            <div class="db-bar-bg"><div class="db-bar-fill" style="width:${Math.round((s.n/totalAt)*100)}%;background:${s.color}"></div></div>
+          </div>`).join('')}
+          <div style="margin-top:8px;font-size:11px;color:var(--text-muted)">GL4: ${gl4At} · GL12: ${gl12At} · GI: ${giAt} · Repetição Lab: ${labRepet}/${labTotalCli}</div>
+        </div>
+        <div class="db-month-chart">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text-muted)">Pagamentos por Mês</div>
+          <div class="db-chart-bars">
+            ${monthData.map(d=>{
+              const hPago=maxPago>0?Math.round((d.pago/maxPago)*80):2;
+              const hAtivos=maxAtivos>0?Math.round((d.ativos/maxAtivos)*80):2;
+              return`<div class="db-chart-col">
+                <div class="db-chart-val">${d.pago>0?d.pago.toFixed(0)+'€':d.ativos>0?d.ativos+'':''}</div>
+                <div class="db-chart-bar-wrap" style="height:80px">
+                  ${d.pago>0
+                    ?`<div class="db-chart-bar" style="height:${hPago}px;background:#aaff00;opacity:.85"></div>`
+                    :`<div class="db-chart-bar" style="height:${hAtivos}px;background:var(--surface3)"></div>`
+                  }
+                </div>
+                <div class="db-chart-label">${d.m}</div>
+              </div>`;
+            }).join('')}
+          </div>
+          <div class="db-chart-legend">
+            <span><i style="background:#aaff00"></i> Pago (€)</span>
+            <span><i style="background:var(--surface3)"></i> Ativo (subscrito)</span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="db-section-title">Saúde do Negócio — ${curMonth}</div>
-    <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:24px">
-      ${kpi('Taxa Retenção',retPct!=null?retPct+'%':'—',prevMonth?`vs ${prevMonth}`:'sem dados prev.','green','','')}
-      ${kpi('Desistências',desist,prevMonth?`sem registo em ${curMonth}`:'','amber',"navigate('totais_pagamentos')",'')}
-      ${kpi('Novas Adesões',novasAdes,prevMonth?`novos em ${curMonth}`:'','blue','','')}
-      ${kpi('Pag. em Atraso',emAtrasoClientes,`clientes c/ meses por pagar`,'danger',"navigate('totais_pagamentos')",'⚠️')}
-      ${kpi('Repetição Lab',labRepPct+'%',`${labRepet}/${labTotalCli} repetiram`,'green','','')}
-      ${kpi('Pipeline Aberto',pipeAberto,'oportunidades','amber',"navigate('pipeline')",'📈')}
-      ${kpi('Alertas Ativos',alertasN,'','amber',"navigate('alertas')",'⚠️')}
-    </div>
-
+    <!-- BOTTOM ROW -->
     <div class="db-grid-2">
-      ${_dbMiniTable('Atividade Recente',['Data','Utilizador','Ação','Secção'],histRows,'Sem histórico')}
-      ${_dbMiniTable('Alertas Urgentes',['Tipo','Cliente','Atraso','Responsável'],alrtRows,'Sem alertas')}
+      <div class="db-recent">
+        <div class="db-recent-header"><span>Atividade Recente</span><button class="btn btn-ghost btn-sm" onclick="navigate('historico')">Ver tudo</button></div>
+        ${histItems||'<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">Sem atividade registada</div>'}
+      </div>
+      <div class="db-recent">
+        <div class="db-recent-header"><span>⚠️ Alertas Urgentes</span><button class="btn btn-ghost btn-sm" onclick="navigate('alertas')">Ver tudo</button></div>
+        ${alrtItems||'<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">Sem alertas ativos</div>'}
+      </div>
     </div>`;
 }
 
