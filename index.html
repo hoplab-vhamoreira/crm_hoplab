@@ -244,6 +244,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 .tl-desc{font-size:12px;color:var(--text-muted);line-height:1.5}
 .tl-empty{text-align:center;color:var(--text-muted);padding:40px;font-size:13px}
 /* mini-table inside tabs */
+.mini-table-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:4px}
 .mini-table{width:100%;border-collapse:collapse;font-size:12px}
 .mini-table th{padding:7px 10px;text-align:left;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px;background:var(--surface2);border-bottom:1px solid var(--border)}
 .mini-table td{padding:7px 10px;border-bottom:1px solid var(--border)}
@@ -5357,9 +5358,9 @@ function renderClienteDetalhe(el, nome, d){
     </tr>`;
   }).join('');
   const servsTable = (motorRow||servsRows)
-    ? `<table class="mini-table"><thead><tr><th>Estado</th><th>Serviço / Plano</th><th>Código</th><th>Técnico</th><th>Início</th><th>Ciclo / Total</th><th></th></tr></thead><tbody>
+    ? `<div class="mini-table-wrap"><table class="mini-table"><thead><tr><th>Estado</th><th>Serviço / Plano</th><th>Código</th><th>Técnico</th><th>Início</th><th>Ciclo / Total</th><th></th></tr></thead><tbody>
        ${motorRow}${servsRows}
-       </tbody></table>`
+       </tbody></table></div>`
     : `<div class="tl-empty">Sem serviços activos</div>`;
   const servsHtml=tabHeader('Serviços activos','servicos')+servsTable;
 
@@ -5380,7 +5381,7 @@ function renderClienteDetalhe(el, nome, d){
     return db.localeCompare(da);
   });
   const avalsTable = avalsOrdenadas.length
-    ? `<table class="mini-table"><thead><tr><th>Estado</th><th>Serviço</th><th>Data</th><th>Dias desde</th><th>Técnico</th><th>Nível</th><th></th></tr></thead><tbody>
+    ? `<div class="mini-table-wrap"><table class="mini-table"><thead><tr><th>Estado</th><th>Serviço</th><th>Data</th><th>Dias desde</th><th>Técnico</th><th>Nível</th><th></th></tr></thead><tbody>
        ${avalsOrdenadas.map(a=>{
          const status = a['_Status_Aval']||'';
          const expirada = status.includes('Expirada');
@@ -5401,7 +5402,7 @@ function renderClienteDetalhe(el, nome, d){
            <td>${btnDel}</td>
          </tr>`;
        }).join('')}
-       </tbody></table>`
+       </tbody></table></div>`
     : `<div class="tl-empty">Sem avaliações registadas</div>`;
   const avalsHtml=tabHeader('Avaliações','avaliacoes')+avalsTable;
 
@@ -5466,7 +5467,7 @@ function renderClienteDetalhe(el, nome, d){
   const fatHtml = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px">${fatAddBtn}</div>
     ${fatRows
-      ? `<table class="mini-table"><thead><tr><th>Mês</th><th>Modalidade</th><th style="text-align:right">A Pagar</th><th style="text-align:right">Pago</th><th>Estado</th><th>Forma</th><th>Doc</th><th></th></tr></thead><tbody>${fatRows}</tbody></table>`
+      ? `<div class="mini-table-wrap"><table class="mini-table"><thead><tr><th>Mês</th><th>Modalidade</th><th style="text-align:right">A Pagar</th><th style="text-align:right">Pago</th><th>Estado</th><th>Forma</th><th>Doc</th><th></th></tr></thead><tbody>${fatRows}</tbody></table></div>`
       : `<div class="tl-empty">Sem histórico de faturação</div>`
     }`;
 
@@ -5481,7 +5482,7 @@ function renderClienteDetalhe(el, nome, d){
     return `<span class="badge badge-info">${e}</span>`;
   }
   const contratoTable = d.log_contratos&&d.log_contratos.length
-    ? `<table class="mini-table"><thead><tr><th>Data início</th><th>Estado</th><th>Motivo</th><th>Data fim</th><th>Desconto</th><th>Por</th><th>Notas</th><th></th></tr></thead><tbody>
+    ? `<div class="mini-table-wrap"><table class="mini-table"><thead><tr><th>Data início</th><th>Estado</th><th>Motivo</th><th>Data fim</th><th>Desconto</th><th>Por</th><th>Notas</th><th></th></tr></thead><tbody>
        ${d.log_contratos.map(c=>{
          const btnDel = c['_idx']!=null
            ? `<button onclick="deleteDetalhe('log_contratos',${c['_idx']},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Eliminar" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'"></button>` : '';
@@ -5497,7 +5498,7 @@ function renderClienteDetalhe(el, nome, d){
            <td>${btnDel}</td>
          </tr>`;
        }).join('')}
-       </tbody></table>`
+       </tbody></table></div>`
     : `<div class="tl-empty">Sem alterações de contrato registadas</div>`;
   const contratoHtml=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
     <span style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Alterações de Contrato</span>
@@ -5520,7 +5521,7 @@ function renderClienteDetalhe(el, nome, d){
     <td style="color:var(--text-muted);font-size:12px">${l['Comercial']||'—'}</td>
   </tr>`).join('');
   const _lcTable=_lcRows
-    ? `<table class="mini-table"><thead><tr><th>Data</th><th>Canal</th><th>Tipo</th><th>Resumo</th><th>Resultado</th><th>Comercial</th></tr></thead><tbody>${_lcRows}</tbody></table>`
+    ? `<div class="mini-table-wrap"><table class="mini-table"><thead><tr><th>Data</th><th>Canal</th><th>Tipo</th><th>Resumo</th><th>Resultado</th><th>Comercial</th></tr></thead><tbody>${_lcRows}</tbody></table></div>`
     : `<div class="tl-empty">Sem contactos registados. Clica em " Registar contacto" para começar.</div>`;
   const _auditHtml=d.historico&&d.historico.length
     ? `<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Histórico de sistema</div><div class="timeline">${d.historico.map(h=>buildHistItem(h)).join('')}</div></div>`
@@ -5884,7 +5885,7 @@ function renderONDetalhe(el, nON, d){
   }).join('');
 
   const logTable = log.length
-    ? `<table class="mini-table"><thead><tr><th>Data</th><th>Canal</th><th>Tipo</th><th>Resumo</th><th>Resultado</th><th>Há</th><th></th></tr></thead><tbody>${logRows}</tbody></table>`
+    ? `<div class="mini-table-wrap"><table class="mini-table"><thead><tr><th>Data</th><th>Canal</th><th>Tipo</th><th>Resumo</th><th>Resultado</th><th>Há</th><th></th></tr></thead><tbody>${logRows}</tbody></table></div>`
     : `<div class="tl-empty">Sem contactos registados. Clica em " Registar contacto" para começar.</div>`;
 
   const logHtml=`<div style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Histórico de contactos</div>${logTable}`;
