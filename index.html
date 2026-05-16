@@ -554,7 +554,7 @@ const SECTIONS = {
       {k:'Contacto',t:'text'},
       {k:'Tipo',t:'select',opts:['Studio','Lab','Lab + Studio']},
       {k:'Comercial',t:'text'},
-      {k:'Status',t:'select',opts:['Em Análise','Ganho','Perdido','Não Avançou']},
+      {k:'Status',t:'select',opts:['Ativo','Inativo','Ganho','Outras']},
       {k:'Aberta/Fechada',t:'select',opts:['Aberta','Fechada']},
       {k:'Fonte Aquisição',t:'select',opts:['Prospeção','Recomendação PT','Inscrição','Website','Voucher','HOP Studio','Cadastro retroactivo']},
       {k:'Canal Contacto',t:'select',opts:['Chamada Telefónica','WhatsApp','Email','Presencial','Instagram','Website']},
@@ -4457,9 +4457,9 @@ function onStatusBadge(s){
   if(!s||s==='—') return `<span class="badge" style="background:rgba(148,163,184,.1);color:var(--text-muted)">—</span>`;
   const l=s.toLowerCase();
   if(l.includes('ganho')||l.includes('convertido')) return `<span class="badge badge-ok">${s}</span>`;
-  if(l.includes('perdido')||l.includes('não avançou')) return `<span class="badge badge-err">${s}</span>`;
+  if(l.includes('outras')||l.includes('perdido')||l.includes('não avançou')||l==='inativo') return `<span class="badge badge-err">${s}</span>`;
   if(l.includes('agendado')) return `<span class="badge badge-info">${s}</span>`;
-  if(l.includes('em análise')||l.includes('pendente')) return `<span class="badge badge-warn">${s}</span>`;
+  if(l==='ativo'||l.includes('em análise')||l.includes('pendente')) return `<span class="badge badge-warn">${s}</span>`;
   return `<span class="badge badge-info">${s}</span>`;
 }
 
