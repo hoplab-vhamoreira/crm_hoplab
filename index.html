@@ -3239,7 +3239,7 @@ async function _calcEnviarProposta(){
     })).filter(c=>c.nome);
     const nomesCli=new Set(cli.map(c=>c.nome));
     const pip=(Array.isArray(pipRes)?pipRes:[])
-      .filter(p=>p['Contacto']&&!nomesCli.has(p['Contacto']))
+      .filter(p=>p['Contacto']&&p['Aberta/Fechada']==='Aberta'&&!nomesCli.has(p['Contacto']))
       .map(p=>({nome:p['Contacto'],email:'',tel:'',origem:'Lead',status:p['Status']||'',aberta:p['Aberta/Fechada']||''}))
       .filter((p,i,a)=>a.findIndex(x=>x.nome===p.nome)===i);
     _calcDestinatarios={cli,pip};
