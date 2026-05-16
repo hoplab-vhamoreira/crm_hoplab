@@ -516,7 +516,7 @@ async function api(url,opts={}){
   const colabM=url.match(/^\/api\/colaborador\/(.+)$/);
   if(colabM){
     const nome=decodeURIComponent(colabM[1]);
-    const[dc,lc,hist,subOrig,subSubst,fs,cat,niv]=await Promise.all([
+    const[dc,lc,hist,subOrig,subSubst,fs,cat,niv,vl,vb]=await Promise.all([
       _SB.from('dados_colaboradores').select('*').eq('Nome Oficial',nome).single(),
       _SB.from('log_colaboradores').select('*').eq('Colaborador',nome).order('Data',{ascending:false}),
       _SB.from('historico').select('*').eq('colaborador',nome).order('timestamp',{ascending:false}),
@@ -524,7 +524,9 @@ async function api(url,opts={}){
       _SB.from('substituicoes_treino').select('*').eq('Técnico Substituto',nome).order('Data Início',{ascending:false}),
       _SB.from('falhas_sancoes').select('*').eq('Professor',nome).order('Data',{ascending:false}),
       _SB.from('catalogo_faltas').select('*'),
-      _SB.from('niveis_sancao').select('*')
+      _SB.from('niveis_sancao').select('*'),
+      _SB.from('vendas_log').select('*').eq('Professor',nome).order('Data',{ascending:false}),
+      _SB.from('vendas_bonus').select('*').eq('Professor',nome).single()
     ]);
     const catalogo=cat.data||[]; const niveis=niv.data||[];
     const falhas=(fs.data||[]).map(f=>{const ci=catalogo.find(c=>c['Falta']===f['Falta']);return{...f,Categoria:ci?.['Categoria']||'—',Pontos:ci?.['Pontos']||0};});
@@ -537,7 +539,8 @@ async function api(url,opts={}){
     const nivelAtual=niveis.find(n=>totalPontos>=n[_kMin]&&totalPontos<=n[_kMax]);
     return{info:dc.data||{},log_colaboradores:lc.data||[],historico:hist.data||[],
       sub_como_original:subOrig.data||[],sub_como_substituto:subSubst.data||[],
-      falhas,totalPontos,nivelAtual:{nivel:nivelAtual?.[_kNiv]??0,designacao:nivelAtual?.[_kDes]||'—',medida:nivelAtual?.['Medida']||'—'},catalogo};
+      falhas,totalPontos,nivelAtual:{nivel:nivelAtual?.[_kNiv]??0,designacao:nivelAtual?.[_kDes]||'—',medida:nivelAtual?.['Medida']||'—'},catalogo,
+      vendas_log:vl.data||[],vendas_bonus:vb.data||null};
   }
   // /api/historico/revert/<id>
   const revertM=url.match(/^\/api\/historico\/revert\/(.+)$/);
@@ -737,7 +740,7 @@ const SECTIONS = {
       {k:'Tipo Entrada',t:'select',opts:['Manual','Automático']},
       {k:'Notas',t:'textarea'}
     ]},
-  vendas_bonus: {title:'Vendas e Bónus',icon:'&#x1f4b0;',group:'Financeiro',noAdd:true,
+  vendas_bonus: {title:'Vendas e Bónus',icon:'&#x1f4b0;',group:'Financeiro',hidden:true,noAdd:true,
     cols:['Professor','Cargo','Clean','Vendas','Train','Elegível','Bónus']},
   pag_clientes_2026: {title:'Pagamentos 2026',icon:'&#x1f4b3;',group:'Financeiro',hidden:true,
     cols:['Nº','Cliente','Mês','Modalidade','Valor a Pagar','Valor Pago','_Estado_Pag','Forma Pagamento','Faturar a','Nº Doc'],
@@ -767,7 +770,7 @@ const SECTIONS = {
   pag_clientes_2025: {title:'Pagamentos 2025',icon:'&#x1f4b3;',group:'Financeiro',hidden:true,
     cols:['Nº','Cliente','Mês','Modalidade','Valor a Pagar','Valor Pago','_Estado_Pag','Forma Pagamento']},
   historico_faturacao: {title:'Histórico de Faturação',icon:'&#x1f9fe;',group:'Financeiro',noAdd:false},
-  totais_pagamentos: {title:'Totais Pagamentos',icon:'&#x1f4b5;',group:'Financeiro',
+  totais_pagamentos: {title:'Totais Pagamentos',icon:'&#x1f4b5;',group:'Financeiro',hidden:true,
     cols:['Professor','Role','Jan Pagamento','Jan Cedência','Jan Saldo NET','Fev Pagamento','Fev Cedência','Fev Saldo NET']},
   calculadora: {title:'Calculadora',icon:'&#x1f5a9;',group:'Financeiro'},
   precario_publico: {title:'Preçário Público',icon:'&#x1f4c3;',group:'Financeiro',
@@ -987,6 +990,10 @@ async function _dbAdmin(el){
       ${_dbMiniTable('Atividade Recente',['Data','Utilizador','Ação','Secção'],histRows,'Sem histórico')}
       ${_dbMiniTable('Alertas Urgentes',['Tipo','Cliente','Atraso','Responsável'],alrtRows,'Sem alertas')}
     </div>
+    <div class="db-section" style="display:flex;align-items:center;justify-content:space-between">
+      <div class="db-section-title" style="margin:0">💵 Totais de Pagamentos</div>
+      <button class="btn btn-ghost btn-sm" onclick="navigate('totais_pagamentos')">Ver detalhe →</button>
+    </div>
     <div class="db-section"><div class="db-section-title">Todas as Secções</div>
     <div class="table-wrap"><table class="tbl"><thead><tr><th>Secção</th><th>Registos</th><th></th></tr></thead><tbody>${secRows}</tbody></table></div></div>`;
 }
@@ -1032,7 +1039,11 @@ async function _dbDireccao(el){
   el.innerHTML=`
     <div class="page-header"><div><h1>Dashboard — Direcção</h1><div class="subtitle">Bem-vindo, ${currentUser.name}</div></div></div>
     <div class="stats-grid">${cards}</div>
-    ${_dbMiniTable(`Performance Equipa — ${curQ}`,['Colaborador','Nº Vendas','Bónus'],perfRows,'Sem dados para este trimestre')}`;
+    ${_dbMiniTable(`Performance Equipa — ${curQ}`,['Colaborador','Nº Vendas','Bónus'],perfRows,'Sem dados para este trimestre')}
+    <div class="db-section" style="display:flex;align-items:center;justify-content:space-between">
+      <div class="db-section-title" style="margin:0">💵 Totais de Pagamentos</div>
+      <button class="btn btn-ghost btn-sm" onclick="navigate('totais_pagamentos')">Ver detalhe →</button>
+    </div>`;
 }
 
 async function _dbComercial(el){
@@ -4937,6 +4948,8 @@ function renderColaboradorDetalhe(el, nome, d){
   const totalPontos = d.totalPontos || 0;
   const nivelAtual = d.nivelAtual || {nivel:0,designacao:'—',medida:'—'};
   const catalogo = d.catalogo || [];
+  const vendasLog = d.vendas_log || [];
+  const vendasBonus = d.vendas_bonus || null;
 
   // ── Ficha de dados ──────────────────────────────────────────────────────────
   const CAMPOS_FICHA = [
@@ -5061,6 +5074,42 @@ function renderColaboradorDetalhe(el, nome, d){
       ? `<div class="table-wrap"><table class="mini-table"><thead><tr><th>Data</th><th>Falta</th><th>Categoria</th><th style="text-align:center">Pts</th><th>Âmbito</th><th>Notas</th><th></th></tr></thead><tbody>${falhasRows}</tbody></table></div>`
       : `<div class="tl-empty">Sem infrações registadas.</div>`}`;
 
+  // ── Vendas & Bónus ───────────────────────────────────────────────────────────
+  const _toTrimV=d=>{if(!d)return null;const dt=new Date(String(d).slice(0,10)+'T00:00:00');return`Q${Math.ceil((dt.getMonth()+1)/3)} ${dt.getFullYear()}`;};
+  const bonusCols=vendasBonus?Object.keys(vendasBonus).filter(k=>/^Q\d/.test(k)):[];
+  const trimestresV=[...new Set(vendasLog.map(v=>_toTrimV(v['Data'])).filter(Boolean))].sort().reverse();
+  const vendasPorTrim=trimestresV.map(q=>{
+    const items=vendasLog.filter(v=>_toTrimV(v['Data'])===q);
+    const bonus=vendasBonus&&bonusCols.find(c=>c.startsWith(q))?parseFloat(vendasBonus[bonusCols.find(c=>c.startsWith(q))])||0:0;
+    const total=items.reduce((s,v)=>s+(parseFloat(v['Valor s/IVA'])||0),0);
+    return{q,n:items.length,total,bonus,items};
+  });
+  const _codBadge=c=>{if(!c)return'';const m=c.match(/^[A-Z]+/);const t=m?m[0]:'';const col=t==='AMR'?'var(--info)':t==='AMP'?'var(--warning)':t==='AM'?'var(--success)':'var(--text-muted)';return`<span style="font-size:10px;font-weight:700;background:${col}22;color:${col};border-radius:4px;padding:1px 5px">${c}</span>`;};
+  const vendasRows=vendasLog.map(v=>`<tr>
+    <td style="font-size:12px;white-space:nowrap">${v['Data']?_fmtCellVal(v['Data']):'—'}</td>
+    <td>${_codBadge(v['Código Aval']||v['Código']||'')} ${v['Cliente']||'—'}</td>
+    <td style="font-size:12px">${v['Serviço']||'—'}</td>
+    <td style="text-align:right;font-weight:600">${v['Valor s/IVA']?parseFloat(v['Valor s/IVA']).toFixed(0)+'€':'—'}</td>
+    <td style="font-size:11px;color:var(--text-muted)">${_toTrimV(v['Data'])||'—'}</td>
+  </tr>`).join('');
+  const resumoTrimRows=vendasPorTrim.map(t=>`<tr>
+    <td style="font-weight:600">${t.q}</td>
+    <td style="text-align:center">${t.n}</td>
+    <td style="text-align:right">${t.total.toFixed(0)}€</td>
+    <td style="text-align:right;color:var(--success);font-weight:600">${t.bonus>0?t.bonus.toFixed(0)+'€':'—'}</td>
+  </tr>`).join('');
+  const vendasHtml=`
+    <div class="db-grid-2" style="margin-bottom:20px">
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Resumo por Trimestre</div>
+        ${resumoTrimRows?`<div class="table-wrap"><table class="mini-table"><thead><tr><th>Trimestre</th><th style="text-align:center">Nº</th><th style="text-align:right">Total</th><th style="text-align:right">Bónus</th></tr></thead><tbody>${resumoTrimRows}</tbody></table></div>`:`<div class="tl-empty">Sem vendas registadas.</div>`}
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Detalhe de Vendas</div>
+        ${vendasRows?`<div class="table-wrap"><table class="mini-table"><thead><tr><th>Data</th><th>Cliente</th><th>Serviço</th><th style="text-align:right">Valor</th><th>Trim.</th></tr></thead><tbody>${vendasRows}</tbody></table></div>`:`<div class="tl-empty">Sem vendas registadas.</div>`}
+      </div>
+    </div>`;
+
   // ── Layout ───────────────────────────────────────────────────────────────────
   const cargoBadge = cargo => {
     const map = {Treinador:'badge-ok',Coordenador:'badge-info',Técnico:'badge-warn',Comercial:'badge',Direcção:'badge-danger'};
@@ -5091,12 +5140,14 @@ function renderColaboradorDetalhe(el, nome, d){
         <div class="tab active" onclick="switchTab(this,'col-tab-ficha')">👤 Ficha</div>
         <div class="tab" onclick="switchTab(this,'col-tab-sub')">🔄 Substituições (${allSubs.length})</div>
         <div class="tab" onclick="switchTab(this,'col-tab-log')">📋 Log Eventos (${logEv.length})</div>
+        <div class="tab" onclick="switchTab(this,'col-tab-vendas')">💰 Vendas (${vendasLog.length})</div>
         <div class="tab" onclick="switchTab(this,'col-tab-falhas')">⚠️ Falhas (${falhas.length})</div>
         <div class="tab" onclick="switchTab(this,'col-tab-hist')">🕐 Histórico (${hist.length})</div>
       </div>
       <div id="col-tab-ficha"   class="tab-panel active">${fichaHtml}</div>
       <div id="col-tab-sub"     class="tab-panel">${subHtml}</div>
       <div id="col-tab-log"     class="tab-panel">${logEvHtml}</div>
+      <div id="col-tab-vendas"  class="tab-panel">${vendasHtml}</div>
       <div id="col-tab-falhas"  class="tab-panel">${falhasHtml}</div>
       <div id="col-tab-hist"    class="tab-panel">${histHtml}</div>
     </div>`;
