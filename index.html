@@ -3097,6 +3097,8 @@ let _calcProposta = []; // [{nome,codigo,pvpBase,pvpPromo,sinal,desc}]
 let _calcPrecarioData = [];
 let _calcDestinatarios = null; // cache {cli:[],pip:[]}
 let _calcEnvTab = 'cli'; // 'cli' | 'pip'
+let _calcPickerAction = 'enviar'; // 'enviar' | 'aplicar'
+const _EVAL_CODES = new Set(['AM','AMP','AMR','PE','PEP','PP','PV']);
 
 async function renderCalculadora(el){
   el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted)">A carregar preçário...</div>`;
@@ -3201,6 +3203,12 @@ function _renderCalcProposta(){
   const totalPromo=totalServicos+totalCreditos;
   const totalSinal=_calcProposta.filter(x=>x.pvpBase>=0).reduce((s,x)=>s+x.sinal,0);
   const poupanca=totalBase-totalServicos;
+
+  // CRED-AMR só pode ser aplicado com avaliação ou pack de avaliação
+  const hasCredit=_calcProposta.some(x=>x.codigo==='CRED-AMR');
+  const hasEval=_calcProposta.some(x=>_EVAL_CODES.has(x.codigo));
+  const creditBlocked=hasCredit&&!hasEval;
+
   const rows=_calcProposta.map(x=>{
     const isCredit=x.pvpBase<0;
     return`<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)${isCredit?';background:rgba(34,197,94,.05);border-radius:6px;padding-left:6px;padding-right:6px':''}">
@@ -3222,6 +3230,9 @@ function _renderCalcProposta(){
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
       <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:12px">Proposta (${_calcProposta.length} serviço${_calcProposta.length!==1?'s':''})</div>
       ${rows}
+      ${creditBlocked?`<div style="margin-top:10px;padding:10px 12px;background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.4);border-radius:8px;font-size:12px;color:var(--text)">
+        ⚠️ O <strong>Crédito Troca AMR</strong> só pode ser aplicado com uma avaliação ou pack de avaliação (AM, AMP, AMR, PE, PEP, PP, PV). Adiciona a avaliação escolhida para continuar.
+      </div>`:''}
       <div style="margin-top:14px;padding-top:12px">
         <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);margin-bottom:4px"><span>Subtotal</span><span>${totalServicos.toFixed(0)}€</span></div>
         ${poupanca>0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--primary-text);margin-bottom:4px"><span>Poupança promo</span><span>-${poupanca.toFixed(0)}€</span></div>`:''}
@@ -3231,8 +3242,9 @@ function _renderCalcProposta(){
       </div>
       <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="_calcLimpar()">🗑️ Limpar</button>
-        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="_calcGerarProposta()">📋 Imprimir</button>
-        <button class="btn btn-primary btn-sm" style="flex:1" onclick="_calcEnviarProposta()">📤 Enviar</button>
+        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="_calcGerarProposta()" ${creditBlocked?'disabled':''}>📋 Imprimir</button>
+        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="_calcEnviarProposta()" ${creditBlocked?'disabled':''}>📤 Enviar</button>
+        <button class="btn btn-sm" style="width:100%;margin-top:4px;background:var(--success);color:#fff;border:none;font-weight:600" onclick="_calcAplicarFicha()" ${creditBlocked?'disabled':''}>✅ Aplicar à Ficha</button>
       </div>
     </div>`;
 }
@@ -3261,7 +3273,7 @@ async function _calcEnviarProposta(){
       .filter((p,i,a)=>a.findIndex(x=>x.nome===p.nome)===i);
     _calcDestinatarios={cli,pip};
   }
-  _calcEnvTab='cli';
+  _calcEnvTab='cli';_calcPickerAction='enviar';
   document.getElementById('modalTitle').textContent='📤 Enviar Proposta';
   document.getElementById('modalBody').innerHTML=`
     <div id="env-step1">
@@ -3310,8 +3322,9 @@ function _calcFiltrarDestinatarios(){
   const pool=_calcEnvTab==='cli'?_calcDestinatarios.cli:_calcDestinatarios.pip;
   const items=pool.filter(d=>!q||d.nome.toLowerCase().includes(q)).slice(0,30);
   if(!items.length){el.innerHTML=`<div style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px">Sem resultados</div>`;return;}
+  const _pickFn=_calcPickerAction==='aplicar'?'_calcSelecionarParaAplicar':'_calcSelecionarDestinatario';
   el.innerHTML=items.map(d=>`
-    <div onclick="_calcSelecionarDestinatario(${JSON.stringify(d.nome)},${JSON.stringify(d.email)},${JSON.stringify(d.tel)},${JSON.stringify(d.origem)})"
+    <div onclick="${_pickFn}(${JSON.stringify(d.nome)},${JSON.stringify(d.email)},${JSON.stringify(d.tel)},${JSON.stringify(d.origem)})"
       style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;margin-bottom:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .15s"
       onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
       <div style="flex:1;min-width:0">
@@ -3398,6 +3411,131 @@ function _calcEnviarWA(tel,msgTemplate){
   const nota=(document.getElementById('env-nota')||{}).value||'';
   const msg=nota?nota+'\n\n'+msgTemplate:msgTemplate;
   window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
+}
+
+async function _calcAplicarFicha(){
+  if(!_calcProposta.length) return toast('Adiciona pelo menos um serviço','error');
+  if(!_calcDestinatarios){
+    const [cliRes,pipRes]=await Promise.all([api('/api/data/clientes'),api('/api/data/pipeline')]);
+    const cli=(Array.isArray(cliRes)?cliRes:[]).map(c=>({nome:c['Nome']||'',email:c['Email']||'',tel:c['Telemóvel']||'',origem:'Cliente'})).filter(c=>c.nome);
+    const nomesCli=new Set(cli.map(c=>c.nome));
+    const pip=(Array.isArray(pipRes)?pipRes:[]).filter(p=>p['Contacto']&&p['Aberta/Fechada']==='Aberta'&&!nomesCli.has(p['Contacto'])).map(p=>({nome:p['Contacto'],email:'',tel:'',origem:'Lead',status:p['Status']||'',aberta:p['Aberta/Fechada']||''})).filter((p,i,a)=>a.findIndex(x=>x.nome===p.nome)===i);
+    _calcDestinatarios={cli,pip};
+  }
+  _calcEnvTab='cli';_calcPickerAction='aplicar';
+  document.getElementById('modalTitle').textContent='✅ Aplicar Proposta à Ficha';
+  document.getElementById('modalBody').innerHTML=`
+    <div id="env-step1">
+      <p style="color:var(--text-muted);font-size:13px;margin:0 0 12px">Seleciona o cliente ou lead a quem aplicar esta proposta</p>
+      <div style="display:flex;gap:0;margin-bottom:12px;background:var(--surface2);border-radius:8px;padding:3px">
+        <button id="env-tab-cli" onclick="_calcEnvSetTab('cli')" style="flex:1;padding:6px 12px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:var(--primary);color:#fff;transition:all .15s">👤 Clientes <span id="env-cnt-cli" style="opacity:.75;font-weight:400"></span></button>
+        <button id="env-tab-pip" onclick="_calcEnvSetTab('pip')" style="flex:1;padding:6px 12px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--text-muted);transition:all .15s">📈 Pipeline <span id="env-cnt-pip" style="opacity:.75;font-weight:400"></span></button>
+      </div>
+      <input type="text" id="env-search" placeholder="Pesquisar..." oninput="_calcFiltrarDestinatarios()"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box">
+      <div id="env-lista" style="max-height:280px;overflow-y:auto"></div>
+    </div>
+    <div id="env-step2" style="display:none"></div>`;
+  document.getElementById('modalSave').style.display='none';
+  document.getElementById('modal').classList.add('show');
+  const d=_calcDestinatarios;
+  const cc=document.getElementById('env-cnt-cli');const cp=document.getElementById('env-cnt-pip');
+  if(cc)cc.textContent=`(${d.cli.length})`;if(cp)cp.textContent=`(${d.pip.length})`;
+  _calcFiltrarDestinatarios();
+}
+
+function _calcSelecionarParaAplicar(nome,email,tel,origem){
+  document.getElementById('env-step1').style.display='none';
+  const step2=document.getElementById('env-step2');
+  step2.style.display='';
+  const servicos=_calcProposta.filter(x=>x.pvpBase>=0);
+  const totalCreditos=_calcProposta.filter(x=>x.pvpBase<0).reduce((s,x)=>s+x.pvpBase,0);
+  const totalPromo=servicos.reduce((s,x)=>s+x.pvpPromo,0)+totalCreditos;
+  const linhas=servicos.map(x=>`
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px;font-weight:600">${x.nome}</span>
+      <span style="font-size:13px;color:${x.pvpPromo<x.pvpBase?'var(--success)':'var(--text)'}">
+        ${x.pvpPromo<x.pvpBase?x.pvpPromo.toFixed(0)+'€':x.pvpBase.toFixed(0)+'€'}
+      </span>
+    </div>`).join('');
+  const creditoLinha=totalCreditos<0?`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--success);padding:6px 0"><span>💳 Crédito troca AMR</span><span>${totalCreditos.toFixed(0)}€</span></div>`:'';
+
+  step2.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button onclick="document.getElementById('env-step1').style.display='';document.getElementById('env-step2').style.display='none'"
+        style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:20px;line-height:1;padding:0">←</button>
+      <div>
+        <div style="font-weight:700;font-size:14px">${nome}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${origem}</div>
+      </div>
+    </div>
+    ${origem==='Lead'?`<div style="background:rgba(var(--primary-rgb,99,102,241),.1);border:1px solid rgba(var(--primary-rgb,99,102,241),.3);border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:14px">
+      🔄 <strong>Este lead será convertido em cliente</strong> e a proposta ficará registada na sua ficha.
+    </div>`:''}
+    <div style="margin-bottom:14px">
+      ${linhas}
+      ${creditoLinha}
+      <div style="display:flex;justify-content:space-between;font-weight:700;font-size:15px;padding:10px 0 0;border-top:2px solid var(--border)">
+        <span>Total</span><span style="color:var(--success)">${totalPromo.toFixed(0)}€</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-sm" style="flex:1;background:var(--success);color:#fff;border:none;font-weight:600"
+        onclick="_calcConfirmarAplicar(${JSON.stringify(nome)},${JSON.stringify(origem)})">
+        ✅ Confirmar e Aplicar
+      </button>
+    </div>`;
+}
+
+async function _calcConfirmarAplicar(nome,origem){
+  const btn=event.target;btn.disabled=true;btn.textContent='A processar...';
+  const hoje=new Date().toISOString().slice(0,10);
+  const servicos=_calcProposta.filter(x=>x.pvpBase>=0);
+  const totalCreditos=_calcProposta.filter(x=>x.pvpBase<0).reduce((s,x)=>s+x.pvpBase,0);
+  const totalPromo=servicos.reduce((s,x)=>s+x.pvpPromo,0)+totalCreditos;
+
+  try{
+    // Se for lead: converter em cliente
+    if(origem==='Lead'){
+      const {data:pipRows}=await _SB.from('pipeline').select('id').eq('Contacto',nome).limit(1);
+      if(pipRows&&pipRows.length>0){
+        await _SB.from('pipeline').update({'Status':'Ganho','Aberta/Fechada':'Fechada'}).eq('id',pipRows[0].id);
+      }
+      const clAll=await api('/api/data/clientes');
+      const maxID=(Array.isArray(clAll)?clAll:[]).reduce((m,c)=>Math.max(m,parseInt(c['ID'])||0),0);
+      await api('/api/data/clientes',{method:'POST',body:{'Nome':nome,'Status':'Ativo','ID':maxID+1}});
+      sectionData['clientes']=null;sectionData['pipeline']=null;_calcDestinatarios=null;
+    }
+
+    // Criar registo em servicos para cada serviço da proposta
+    for(const x of servicos){
+      await api('/api/data/servicos',{method:'POST',body:{
+        'Cliente':nome,'Serviço':x.nome,
+        'Data Conversão':hoje,'Estado do serviço':'Em curso'
+      }});
+    }
+    sectionData['servicos']=null;
+
+    // Registar em log_comercial
+    const resumo=servicos.map(x=>x.nome).join(' + ');
+    const creditoTexto=totalCreditos<0?` (crédito troca AMR ${totalCreditos.toFixed(0)}€)`:'';
+    await api('/api/data/log_comercial',{method:'POST',body:{
+      'Contacto':nome,'Data Ação':hoje,'Canal':'Presencial','Tipo Ação':'Reunião',
+      'Resumo':`Proposta aplicada: ${resumo}${creditoTexto} — Total ${totalPromo.toFixed(0)}€`,
+      'Resultado':'Convertido','Comercial':(currentUser&&currentUser.name)||''
+    }});
+    sectionData['log_comercial']=null;
+
+    closeModal();
+    _calcProposta=[];_calcDestinatarios=null;_calcEnvTab='cli';
+    _renderCalcProposta();
+    toast(`Proposta aplicada a "${nome}" ✓`,'success');
+    setTimeout(()=>openClienteDetalhe(nome),600);
+  }catch(e){
+    btn.disabled=false;btn.textContent='✅ Confirmar e Aplicar';
+    toast('Erro: '+e.message,'error');
+  }
 }
 
 function _calcGerarProposta(){
