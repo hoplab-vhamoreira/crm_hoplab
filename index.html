@@ -429,7 +429,7 @@ async function api(url,opts={}){
   const cM=url.match(/^\/api\/cliente\/(.+)$/);
   if(cM){
     const nome=decodeURIComponent(cM[1]);
-    const[cli,serv,aval,log,pag26,pag25,mot,lc]=await Promise.all([
+    const[cli,serv,aval,log,pag26,pag25,mot,lc,logcom]=await Promise.all([
       _SB.from('clientes').select('*').eq('Nome',nome).single(),
       _SB.from('servicos').select('*').eq('Cliente',nome),
       _SB.from('avaliacoes').select('*').eq('Nome',nome),
@@ -437,11 +437,13 @@ async function api(url,opts={}){
       _SB.from('pag_clientes_2026').select('*').eq('Cliente',nome),
       _SB.from('pag_clientes_2025').select('*').eq('Cliente',nome),
       _SB.from('motor2026').select('*').eq('Cliente',nome).single(),
-      _SB.from('log_contratos').select('*').eq('Cliente',nome)
+      _SB.from('log_contratos').select('*').eq('Cliente',nome),
+      _SB.from('log_comercial').select('*').eq('Contacto',nome).order('Data A\xe7\xe3o',{ascending:false})
     ]);
+    const logComData=(logcom.data||[]).map(l=>({...l,'Dias Atrás':l['Data Ação']?Math.floor((new Date()-new Date(String(l['Data Ação']).slice(0,10)))/86400000):null}));
     return{info:_recomputeClienteContacto(cli.data),servicos:serv.data||[],avaliacoes:aval.data||[],
       historico:log.data||[],pag_2026:pag26.data||[],pag_2025:pag25.data||[],
-      motor:mot.data||null,log_contratos:lc.data||[]};
+      motor:mot.data||null,log_contratos:lc.data||[],log_comercial:logComData};
   }
   const oM=url.match(/^\/api\/on\/(\d+)$/);
   if(oM){
@@ -1106,6 +1108,10 @@ async function renderDataPage(el,section){
   if(!data.length){el.innerHTML=`<div class="page-header"><div><h1>${sec.icon} ${sec.title}</h1></div><div>${(sec.fields&&!sec.noAdd)?`<button class="btn btn-primary" onclick="openAdd('${section}')">+ Adicionar</button>`:''}</div></div><div class="table-wrap" style="padding:40px;text-align:center;color:var(--text-muted)">Sem dados</div>`;return;}
   const allCols=sec.cols||Object.keys(data[0]).filter(c=>c!=='_id').slice(0,8);
   sectionPage[section]=sectionPage[section]||0;
+  if(section==='pipeline'){
+    if(!sectionFilters['pipeline']) sectionFilters['pipeline']={};
+    if(sectionFilters['pipeline']['Aberta/Fechada']===undefined) sectionFilters['pipeline']['Aberta/Fechada']='Aberta';
+  }
   renderTable(el,section,sec,data,allCols);
 }
 
@@ -3898,7 +3904,7 @@ function renderClienteDetalhe(el, nome, d){
   const nPag25    = (d.pag_2025||[]).length;
   const nFaturacao = nPag26 + nPag25;
   const nContratos= (d.log_contratos||[]).length;
-  const nHistorico= (d.historico||[]).length;
+  const nHistorico= (d.log_comercial||[]).length;
 
   // Sidebar info
   const isHibrido = info['Regime'] === 'Híbrido';
@@ -4148,14 +4154,25 @@ function renderClienteDetalhe(el, nome, d){
     </div>
   </div>${contratoTable}`;
 
-  // Tab: Histórico timeline
-  const histHeader=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-    <span style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Histórico de atividade</span>
-    <button class="btn btn-ghost btn-sm" onclick="openAddParaCliente('log_comercial','${nomeEsc}')">📞 Registar contacto</button>
-  </div>`;
-  const histHtml = histHeader+(d.historico&&d.historico.length
-    ? `<div class="timeline">${d.historico.map(h=>buildHistItem(h)).join('')}</div>`
-    : `<div class="tl-empty">Sem histórico registado ainda.<br><small>As alterações futuras aparecerão aqui automaticamente.</small></div>`);
+  // Tab: Histórico de contactos (log_comercial) + auditoria (historico)
+  const _lcRows=(d.log_comercial||[]).map(l=>`<tr>
+    <td style="white-space:nowrap">${l['Data Ação']?_fmtCellVal(l['Data Ação']):'—'}</td>
+    <td>${l['Canal']||'—'}</td>
+    <td>${l['Tipo Ação']||'—'}</td>
+    <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${String(l['Resumo']||'').replace(/"/g,'&quot;')}">${l['Resumo']||'—'}</td>
+    <td>${l['Resultado']||'—'}</td>
+    <td style="color:var(--text-muted);font-size:12px">${l['Comercial']||'—'}</td>
+  </tr>`).join('');
+  const _lcTable=_lcRows
+    ? `<table class="mini-table"><thead><tr><th>Data</th><th>Canal</th><th>Tipo</th><th>Resumo</th><th>Resultado</th><th>Comercial</th></tr></thead><tbody>${_lcRows}</tbody></table>`
+    : `<div class="tl-empty">Sem contactos registados. Clica em "📞 Registar contacto" para começar.</div>`;
+  const _auditHtml=d.historico&&d.historico.length
+    ? `<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Histórico de sistema</div><div class="timeline">${d.historico.map(h=>buildHistItem(h)).join('')}</div></div>`
+    : '';
+  const histHtml=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <span style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Histórico de Contactos</span>
+    <button class="btn btn-ghost btn-sm" onclick="openAddContactoCliente('${nomeEsc}')">📞 Registar contacto</button>
+  </div>${_lcTable}${_auditHtml}`;
 
   el.innerHTML=`
     <div class="page-header">
@@ -4310,6 +4327,43 @@ async function openAddParaCliente(section, clienteNome){
 
     toast('Registo adicionado');
     await openClienteDetalhe(clienteNome);
+  };
+}
+
+async function openAddContactoCliente(nome){
+  const pipData=sectionData['pipeline']||(await api('/api/data/pipeline'));
+  const pipRec=Array.isArray(pipData)?pipData.find(r=>r['Contacto']===nome&&r['Status']==='Ganho'):null;
+  const nON=pipRec?pipRec['Nº ON']:null;
+  const colabs=await getLookup('dados_colaboradores','Nome Oficial');
+  const colabopts=colabs.map(c=>`<option>${c}</option>`).join('');
+  const hoje=new Date().toISOString().slice(0,10);
+  document.getElementById('modalTitle').textContent='Registar Contacto — '+nome;
+  document.getElementById('modalBody').innerHTML=`
+    <div class="form-group"><label>Data</label><input type="date" id="cc_data" value="${hoje}"></div>
+    <div class="form-group"><label>Canal</label><select id="cc_canal"><option>WhatsApp</option><option>Chamada Telefónica</option><option>Email</option><option>Presencial</option></select></div>
+    <div class="form-group"><label>Tipo de Ação</label><select id="cc_tipo"><option>WhatsApp</option><option>Chamada</option><option>Email</option><option>Reunião</option></select></div>
+    <div class="form-group"><label>Resumo</label><input type="text" id="cc_resumo" placeholder="Breve resumo do contacto"></div>
+    <div class="form-group"><label>Resultado</label><select id="cc_resultado"><option>Pendente</option><option>Agendado</option><option>Sem resposta</option><option>Convertido</option></select></div>
+    <div class="form-group"><label>Comercial</label><select id="cc_comercial"><option value=""></option>${colabopts}</select></div>
+  `;
+  document.getElementById('modal').classList.add('show');
+  document.getElementById('modalSave').onclick=async()=>{
+    const rec={
+      'Contacto':nome,
+      'Nº ON':nON||null,
+      'Data Ação':document.getElementById('cc_data').value||null,
+      'Canal':document.getElementById('cc_canal').value||null,
+      'Tipo Ação':document.getElementById('cc_tipo').value||null,
+      'Resumo':document.getElementById('cc_resumo').value||null,
+      'Resultado':document.getElementById('cc_resultado').value||null,
+      'Comercial':document.getElementById('cc_comercial').value||null,
+    };
+    const res=await api('/api/data/log_comercial',{method:'POST',body:rec});
+    if(res?.error){toast('Erro ao registar: '+res.error,'error');return;}
+    sectionData['log_comercial']=null;
+    closeModal();
+    toast('Contacto registado ✓');
+    await openClienteDetalhe(nome);
   };
 }
 
