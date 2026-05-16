@@ -778,9 +778,13 @@ const SECTIONS = {
     fields:[
       {k:'Serviço',t:'text'},
       {k:'Código',t:'text'},
+      {k:'Categoria',t:'select',opts:['Avaliação','Treino Personalizado','Consulta','Pack','Gestão','Inscrição','Add-on','Crédito']},
+      {k:'Tipo de Profissional',t:'text'},
+      {k:'Duração',t:'text'},
       {k:'Descrição',t:'textarea'},
       {k:'PVP Base (c/IVA)',t:'number'},
       {k:'Desconto',t:'number'},
+      {k:'PVP Promocional (c/IVA)',t:'number'},
       {k:'Sinal',t:'number'}
     ]},
   dados_colaboradores: {title:'Colaboradores',icon:'&#x1f464;',group:'Equipa',
@@ -3626,30 +3630,75 @@ function _calcGerarProposta(){
   document.getElementById('modal').classList.add('show');
 }
 
-function _renderCalcPrecario(){
+function _renderCalcPrecario(q=''){
   const el=document.getElementById('calc-precario');
   if(!el) return;
   const fullData=sectionData['precario_publico']||[];
   if(!_calcPrecarioData.length){el.innerHTML=`<div class="tl-empty">Sem dados</div>`;return;}
-  // colunas relevantes para edição de preços
-  const editCols=['Serviço','Código','PVP Base (c/IVA)','Desconto','PVP Promocional (c/IVA)'];
-  const thead=`<thead><tr>${editCols.map(c=>`<th style="white-space:nowrap">${c}</th>`).join('')}<th></th></tr></thead>`;
-  const tbody=_calcPrecarioData.map(p=>{
-    // índice correto no array completo para openEdit/deleteRec
+  const sq=q.toLowerCase();
+  const items=_calcPrecarioData.filter(p=>!sq||p['Serviço'].toLowerCase().includes(sq)||p['Código'].toLowerCase().includes(sq)||(p['Categoria']||'').toLowerCase().includes(sq));
+
+  const rows=items.map(p=>{
     const fullIdx=fullData.findIndex(f=>f['Código']===p['Código']&&f['Serviço']===p['Serviço']);
-    return`<tr>
-      ${editCols.map(c=>`<td>${_fmtCellVal(p[c])}</td>`).join('')}
-      <td class="actions" style="white-space:nowrap">
-        <button onclick="openEdit('precario_publico',${fullIdx})" title="Editar" style="font-size:15px">✏️</button>
-        <button class="del" onclick="deleteRec('precario_publico',${fullIdx})" title="Eliminar">&#x1f5d1;</button>
-      </td>
-    </tr>`;
+    const base=parseFloat(p['PVP Base (c/IVA)'])||0;
+    const promo=parseFloat(p['PVP Promocional (c/IVA)']);
+    const temPromo=!isNaN(promo)&&promo>0&&promo<base;
+    const uid=`prec-${p['Código'].replace(/[^a-z0-9]/gi,'_')}`;
+    return`
+      <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:6px;overflow:hidden">
+        <div onclick="_calcPrecToggle('${uid}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;background:var(--surface)"
+          onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+              <span style="font-weight:700;font-size:14px">${p['Serviço']}</span>
+              <span style="font-size:11px;font-family:monospace;background:var(--surface2);padding:1px 6px;border-radius:4px;color:var(--text-muted)">${p['Código']}</span>
+              ${p['Categoria']?`<span style="font-size:11px;padding:1px 8px;border-radius:10px;border:1px solid var(--border);color:var(--text-muted)">${p['Categoria']}</span>`:''}
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
+              ${p['Tipo de Profissional']?`<span>${p['Tipo de Profissional']}</span>`:''}
+              ${p['Duração']?`<span style="margin-left:8px">⏱ ${p['Duração']}</span>`:''}
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            ${temPromo
+              ?`<div style="font-weight:700;color:var(--success)">${promo.toFixed(0)}€</div><div style="font-size:11px;text-decoration:line-through;color:var(--text-muted)">${base.toFixed(0)}€</div>`
+              :`<div style="font-weight:700">${base<0?base.toFixed(0)+'€':base.toFixed(0)+'€'}</div>`}
+          </div>
+          <span id="${uid}-arrow" style="color:var(--text-muted);font-size:12px;transition:transform .2s">▼</span>
+        </div>
+        <div id="${uid}" style="display:none;padding:14px 16px;border-top:1px solid var(--border);background:var(--surface2)">
+          ${p['Descrição']?`<p style="font-size:13px;color:var(--text);margin:0 0 10px">${p['Descrição']}</p>`:'<p style="font-size:13px;color:var(--text-muted);margin:0 0 10px;font-style:italic">Sem descrição — edita para adicionar.</p>'}
+          <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);margin-bottom:12px">
+            ${p['Tipo de Profissional']?`<span>👤 <strong>Profissional:</strong> ${p['Tipo de Profissional']}</span>`:''}
+            ${p['Duração']?`<span>⏱ <strong>Duração:</strong> ${p['Duração']}</span>`:''}
+            ${p['Sinal']>0?`<span>💶 <strong>Sinal:</strong> ${parseFloat(p['Sinal']).toFixed(0)}€</span>`:''}
+            ${temPromo?`<span>🏷️ <strong>Desconto:</strong> -${(base-promo).toFixed(0)}€</span>`:''}
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="openEdit('precario_publico',${fullIdx});event.stopPropagation()">✏️ Editar</button>
+            <button class="btn btn-ghost btn-sm del" onclick="deleteRec('precario_publico',${fullIdx});event.stopPropagation()">🗑️ Eliminar</button>
+          </div>
+        </div>
+      </div>`;
   }).join('');
+
   el.innerHTML=`
-    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-      <button class="btn btn-primary btn-sm" onclick="openAdd('precario_publico')">+ Adicionar serviço</button>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+      <input type="text" id="prec-search" placeholder="Pesquisar serviço, código ou categoria..." value="${q}"
+        oninput="_renderCalcPrecario(this.value)"
+        style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px">
+      <button class="btn btn-primary btn-sm" onclick="openAdd('precario_publico')">+ Adicionar</button>
     </div>
-    <div class="table-wrap"><table class="tbl">${thead}<tbody>${tbody}</tbody></table></div>`;
+    ${items.length?rows:`<div class="tl-empty">Sem resultados para "${q}"</div>`}`;
+}
+
+function _calcPrecToggle(uid){
+  const panel=document.getElementById(uid);
+  const arrow=document.getElementById(uid+'-arrow');
+  if(!panel) return;
+  const open=panel.style.display==='none';
+  panel.style.display=open?'':'none';
+  if(arrow) arrow.style.transform=open?'rotate(180deg)':'';
 }
 
 async function renderAlertas(el){
