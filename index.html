@@ -3107,7 +3107,7 @@ async function renderCalculadora(el){
   const pr=await api('/api/data/precario_publico');
   sectionData['precario_publico']=pr;
   // só serviços com preço numérico positivo — exclui linhas de cabeçalho e tabelas internas
-  _calcPrecarioData=Array.isArray(pr)?pr.filter(p=>p['Serviço']&&p['Código']&&parseFloat(p['PVP Base (c/IVA)'])!==0):[];
+  _calcPrecarioData=Array.isArray(pr)?pr.filter(p=>{const v=parseFloat(p['PVP Base (c/IVA)']);return p['Serviço']&&p['Código']&&!isNaN(v)&&v!==0;}):[];
 
   el.innerHTML=`
     <div class="page-header"><div><h1>🖩 Calculadora de Serviços</h1><div class="subtitle">Constrói uma proposta a partir do preçário</div></div></div>
@@ -3180,6 +3180,58 @@ function _calcAddServico(codigo,nome,pvpBase,pvpPromo,sinal){
   _calcProposta.push({codigo,nome,pvpBase,pvpPromo,sinal,desc});
   _renderCalcLista((document.getElementById('calc-search')||{}).value||'');
   _renderCalcProposta();
+  // Quando se adiciona a Inscrição, perguntar sobre o AMR incluído
+  if(codigo==='INSC-STUDIO') _calcPromptTrocaAMR();
+}
+
+function _calcPromptTrocaAMR(){
+  // Verificar se já há alguma avaliação ou crédito de troca na proposta
+  const jaTemEval=_calcProposta.some(x=>_EVAL_CODES.has(x.codigo));
+  const jaTemCredito=_calcProposta.some(x=>x.codigo==='CRED-AMR');
+  if(jaTemEval||jaTemCredito) return; // já escolheu
+  // Mostrar banner de aviso na proposta (já está renderizado, injetar)
+  const el=document.getElementById('calc-proposta');
+  if(!el) return;
+  const banner=document.createElement('div');
+  banner.id='calc-amr-prompt';
+  banner.style.cssText='margin-top:10px;padding:12px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.35);border-radius:10px;font-size:13px';
+  banner.innerHTML=`
+    <div style="font-weight:700;margin-bottom:6px">🔬 AMR incluído na Inscrição</div>
+    <div style="color:var(--text-muted);margin-bottom:10px">A inscrição inclui uma Avaliação Metabólica de Repouso (AMR). Pretende manter o AMR ou trocar por outra avaliação?</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="_calcEscolherAMR('manter')">✔ Manter AMR</button>
+      <button class="btn btn-primary btn-sm" style="flex:1" onclick="_calcEscolherAMR('trocar')">🔄 Trocar por outra avaliação</button>
+    </div>`;
+  el.appendChild(banner);
+}
+
+function _calcEscolherAMR(opcao){
+  const b=document.getElementById('calc-amr-prompt');if(b)b.remove();
+  if(opcao==='manter'){
+    // Adicionar AMR à proposta automaticamente
+    const amrPrec=_calcPrecarioData.find(p=>p['Código']==='AMR');
+    if(amrPrec&&!_calcProposta.some(x=>x.codigo==='AMR')){
+      const base=parseFloat(amrPrec['PVP Base (c/IVA)'])||0;
+      const promo=parseFloat(amrPrec['PVP Promocional (c/IVA)'])||base;
+      _calcProposta.push({codigo:'AMR',nome:amrPrec['Serviço'],pvpBase:base,pvpPromo:promo,sinal:parseFloat(amrPrec['Sinal'])||0,desc:amrPrec['Descrição']||''});
+    }
+    _renderCalcLista((document.getElementById('calc-search')||{}).value||'');
+    _renderCalcProposta();
+    toast('AMR adicionado à proposta','success');
+  } else {
+    // Trocar: adicionar o crédito e scrollar para a secção de avaliações
+    const credPrec=_calcPrecarioData.find(p=>p['Código']==='CRED-AMR');
+    if(credPrec&&!_calcProposta.some(x=>x.codigo==='CRED-AMR')){
+      const base=parseFloat(credPrec['PVP Base (c/IVA)'])||0;
+      _calcProposta.push({codigo:'CRED-AMR',nome:credPrec['Serviço'],pvpBase:base,pvpPromo:base,sinal:0,desc:credPrec['Descrição']||''});
+    }
+    _renderCalcLista('');
+    _renderCalcProposta();
+    // Focar a pesquisa em avaliações
+    const si=document.getElementById('calc-search');
+    if(si){si.value='aval';si.dispatchEvent(new Event('input'));}
+    toast('Crédito de troca aplicado — escolhe agora a avaliação ou pack','success');
+  }
 }
 
 function _calcRemoveServico(codigo){
