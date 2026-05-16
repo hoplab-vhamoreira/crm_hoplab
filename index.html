@@ -3146,7 +3146,7 @@ function _renderCalcLista(search=''){
   const el=document.getElementById('calc-lista');
   if(!el) return;
   const q=search.toLowerCase();
-  const items=_calcPrecarioData.filter(p=>!q||p['Serviço'].toLowerCase().includes(q)||p['Código'].toLowerCase().includes(q));
+  const items=_calcPrecarioData.filter(p=>p['Código']!=='CRED-AMR'&&(!q||p['Serviço'].toLowerCase().includes(q)||p['Código'].toLowerCase().includes(q)));
   if(!items.length){el.innerHTML=`<div class="tl-empty">Sem serviços encontrados.</div>`;return;}
   el.innerHTML=items.map(p=>{
     const base=parseFloat(p['PVP Base (c/IVA)'])||0;
