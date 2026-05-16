@@ -1031,14 +1031,15 @@ async function _dbAdmin(el){
   const now=new Date(); const mi=now.getMonth();
   const curMonth=MONTHS[mi]; const prevMonth=mi>0?MONTHS[mi-1]:null;
 
-  const[stats,hist,alrtTop,cliRes,servsRes,pag26Res,pipRes]=await Promise.all([
+  const[stats,hist,alrtTop,cliRes,servsRes,pag26Res,pipRes,alrtCount]=await Promise.all([
     api('/api/stats'),
     _SB.from('historico').select('*').order('timestamp',{ascending:false}).limit(5),
-    _SB.from('alertas').select('*').order('DiasAtraso',{ascending:false}).limit(5),
+    _SB.from('v_alertas').select('*').order('DiasAtraso',{ascending:false}).limit(5),
     _SB.from('clientes').select('*'),
     _SB.from('servicos').select('*'),
     _SB.from('pag_clientes_2026').select('*'),
-    _SB.from('pipeline').select('*')
+    _SB.from('pipeline').select('*'),
+    _SB.from('v_alertas').select('*',{count:'exact',head:true})
   ]);
 
   const cli=cliRes.data||[], servs=servsRes.data||[], pag=pag26Res.data||[], pip=pipRes.data||[];
@@ -1104,7 +1105,7 @@ async function _dbAdmin(el){
 
   // Pipeline
   const pipeAberto=pip.filter(p=>p['Aberta/Fechada']==='Aberta').length;
-  const alertasN=stats.alertas||0;
+  const alertasN=alrtCount.count??0;
 
   // Monthly chart data (last 5 months)
   const chartMonths=MONTHS.slice(Math.max(0,mi-4),mi+1);
