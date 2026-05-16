@@ -380,7 +380,7 @@ const _SB = supabase.createClient(
   'https://bocwqacwalzshjkhjzwi.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvY3dxYWN3YWx6c2hqa2hqendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjYyNTYsImV4cCI6MjA5NDAwMjI1Nn0.0FSXkO69PG4na6XLAOSoJ-r2wNQYwyLoOSMIyDH7AvY'
 );
-const _TABLE_MAP = {'clientes':'clientes','pipeline':'pipeline','log_comercial':'log_comercial','conversoes':'conversoes','avaliacoes':'avaliacoes','servicos':'servicos','log_operacional':'log_operacional','log_contratos':'log_contratos','parceiros':'parceiros','entidades_faturacao':'entidades_faturacao','falhas_sancoes':'falhas_sancoes','catalogo_faltas':'catalogo_faltas','niveis_sancao':'niveis_sancao','pag_clientes_2025':'pag_clientes_2025','pag_clientes_2026':'pag_clientes_2026','totais_pagamentos':'totais_pagamentos','motor2026':'motor2026','dados_colaboradores':'dados_colaboradores','log_colaboradores':'log_colaboradores','ciclos':'ciclos','adesoes_validar':'adesoes_validar','alertas':'alertas','historico':'historico','vendas_log':'vendas_log','vendas_bonus':'vendas_bonus','precario_publico':'precario_publico','calculadora':'calculadora','descontos':'descontos','responsabilidades':'responsabilidades','matriz_partilhas':'matriz_partilhas','substituicoes_treino':'substituicoes_treino','users':'profiles'};
+const _TABLE_MAP = {'clientes':'clientes','pipeline':'pipeline','log_comercial':'log_comercial','conversoes':'conversoes','avaliacoes':'avaliacoes','servicos':'servicos','log_operacional':'log_operacional','log_contratos':'log_contratos','parceiros':'parceiros','entidades_faturacao':'entidades_faturacao','falhas_sancoes':'falhas_sancoes','catalogo_faltas':'catalogo_faltas','niveis_sancao':'niveis_sancao','pag_clientes_2025':'pag_clientes_2025','pag_clientes_2026':'pag_clientes_2026','totais_pagamentos':'totais_pagamentos','motor2026':'motor2026','dados_colaboradores':'dados_colaboradores','log_colaboradores':'log_colaboradores','ciclos':'ciclos','adesoes_validar':'adesoes_validar','alertas':'alertas','historico':'historico','vendas_log':'vendas_log','vendas_bonus':'vendas_bonus','precario_publico':'precario_publico','calculadora':'calculadora','responsabilidades':'responsabilidades','matriz_partilhas':'matriz_partilhas','substituicoes_treino':'substituicoes_treino','users':'profiles'};
 const _idCache = {};
 function _recomputeClienteContacto(r){
   if(!r) return r;
@@ -867,7 +867,6 @@ const SECTIONS = {
   totais_pagamentos: {title:'Totais Pagamentos',icon:'&#x1f4b5;',group:'Financeiro',hidden:true,
     cols:['Professor','Role','Jan Pagamento','Jan Cedência','Jan Saldo NET','Fev Pagamento','Fev Cedência','Fev Saldo NET']},
   calculadora: {title:'Calculadora',icon:'',group:'Financeiro',noAdd:true},
-  descontos: {title:'Descontos',icon:'',group:'Financeiro',noAdd:true,_custom:true},
   precario_publico: {title:'Preçário Público',icon:'&#x1f4c3;',group:'Financeiro',hidden:true,
     cols:['Serviço','Código','PVP Base (c/IVA)','Desconto','PVP Promocional (c/IVA)','Poupança'],
     fields:[
@@ -1029,7 +1028,6 @@ async function navigate(section){
   if(section==='avaliacoes')        return renderAgenda(main);
   if(section==='responsabilidades') return renderResponsabilidadesMatriz(main);
   if(section==='calculadora')       return renderCalculadora(main);
-  if(section==='descontos')         return renderDescontos(main);
   if(section==='falhas_sancoes') return renderFalhas(main);
   if(section==='vendas_bonus')        return renderVendasBonus(main);
   if(section==='historico_faturacao') return renderHistoricoFaturacao(main);
@@ -1395,7 +1393,7 @@ async function _dbAdmin(el){
       </div>
       <div class="db-hero-cards">
           <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('receita')">
-            <div class="db-hc-icon" style="background:rgba(170,255,0,.15)"></div>
+            <div class="db-hc-icon" style="background:rgba(170,255,0,.15)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-text)" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
             <div class="db-hc-body">
               <div class="db-hc-label">Receita ${curMonth}</div>
               <div class="db-hc-value" style="color:var(--primary-text)">${receitaMes>0?receitaMes.toFixed(0)+'€':'—'}</div>
@@ -1403,7 +1401,7 @@ async function _dbAdmin(el){
             </div>
           </div>
           <div class="db-hero-card" style="cursor:pointer" onclick="_dbOpenAtraso()">
-            <div class="db-hc-icon" style="background:rgba(220,38,38,.1)"></div>
+            <div class="db-hc-icon" style="background:rgba(220,38,38,.1)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
             <div class="db-hc-body">
               <div class="db-hc-label">Pag. sem Confirmação</div>
               <div class="db-hc-value" style="color:var(--danger)">${emAtrasoN}</div>
@@ -1411,7 +1409,7 @@ async function _dbAdmin(el){
             </div>
           </div>
           <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('suspensoes')">
-            <div class="db-hc-icon" style="background:rgba(217,119,6,.1)">⏸</div>
+            <div class="db-hc-icon" style="background:rgba(217,119,6,.1)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" stroke-linecap="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></div>
             <div class="db-hc-body">
               <div class="db-hc-label">Suspensões</div>
               <div class="db-hc-value" style="color:var(--warning)">${suspClientes}</div>
@@ -1419,7 +1417,7 @@ async function _dbAdmin(el){
             </div>
           </div>
           <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('clientes')">
-            <div class="db-hc-icon" style="background:rgba(37,99,235,.1)"></div>
+            <div class="db-hc-icon" style="background:rgba(37,99,235,.1)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
             <div class="db-hc-body">
               <div class="db-hc-label">Clientes Ativos</div>
               <div class="db-hc-value" style="color:var(--info)">${cliAtivos}</div>
@@ -1428,7 +1426,7 @@ async function _dbAdmin(el){
             </div>
           </div>
           <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('pipeline')">
-            <div class="db-hc-icon" style="background:rgba(124,58,237,.1)"></div>
+            <div class="db-hc-icon" style="background:rgba(124,58,237,.1)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
             <div class="db-hc-body">
               <div class="db-hc-label">Pipeline Aberto</div>
               <div class="db-hc-value" style="color:#7c3aed">${pipeAberto}</div>
@@ -3632,9 +3630,11 @@ async function renderCalculadora(el){
   el.innerHTML=`
     <div class="page-header"><div><h1>Calculadora de Serviços</h1><div class="subtitle">Constrói uma proposta a partir do preçário</div></div></div>
     <div class="gtab-wrap" style="margin-bottom:20px">
-      <button class="gtab gtab-active" id="calc-tab-btn" onclick="switchGtab(this,'calc-main',['calc-main','calc-precario']);_renderCalcLista()">Calculadora</button>
-      <button class="gtab" onclick="switchGtab(this,'calc-precario',['calc-main','calc-precario']);_renderCalcPrecario()">Preçário</button>
+      <button class="gtab gtab-active" id="calc-tab-btn" onclick="switchGtab(this,'calc-main',['calc-main','calc-precario','calc-descontos']);_renderCalcLista()">Calculadora</button>
+      <button class="gtab" onclick="switchGtab(this,'calc-precario',['calc-main','calc-precario','calc-descontos']);_renderCalcPrecario()">Preçário</button>
+      <button class="gtab" onclick="switchGtab(this,'calc-descontos',['calc-main','calc-precario','calc-descontos']);_renderCalcDescontos()">Descontos</button>
     </div>
+    <div id="calc-descontos" style="display:none"></div>
     <div id="calc-main">
       <div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start">
         <div>
@@ -4217,6 +4217,7 @@ function _calcPrecToggle(header){
   if(arrow) arrow.style.transform=open?'rotate(180deg)':'';
 }
 
+async function _renderCalcDescontos(){return renderDescontos(document.getElementById('calc-descontos'));}
 async function renderDescontos(el){
   el.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--text-muted);font-size:14px">A carregar descontos...</div>`;
   const {data,error}=await _SB.from('descontos').select('*').order('created_at',{ascending:false});
@@ -4276,7 +4277,7 @@ function abrirNovoDesconto(){
     const payload={nome,codigo:document.getElementById('dc_cod').value.trim()||null,tipo:document.getElementById('dc_tipo').value,valor:parseFloat(document.getElementById('dc_val').value)||null,tipo_valor:document.getElementById('dc_tval').value,data_inicio:document.getElementById('dc_ini').value||null,data_fim:document.getElementById('dc_fim').value||null,descricao:document.getElementById('dc_desc').value.trim()||null,ativo:document.getElementById('dc_ativo').checked};
     const{error}=await _SB.from('descontos').insert(payload);
     if(error) return toast('Erro: '+error.message,'error');
-    closeModal(); toast('Desconto criado'); navigate('descontos');
+    closeModal(); toast('Desconto criado'); _renderCalcDescontos();
   };
 }
 async function abrirEditDesconto(id){
@@ -4289,14 +4290,14 @@ async function abrirEditDesconto(id){
     const payload={nome,codigo:document.getElementById('dc_cod').value.trim()||null,tipo:document.getElementById('dc_tipo').value,valor:parseFloat(document.getElementById('dc_val').value)||null,tipo_valor:document.getElementById('dc_tval').value,data_inicio:document.getElementById('dc_ini').value||null,data_fim:document.getElementById('dc_fim').value||null,descricao:document.getElementById('dc_desc').value.trim()||null,ativo:document.getElementById('dc_ativo').checked};
     const{error:e}=await _SB.from('descontos').update(payload).eq('id',id);
     if(e) return toast('Erro: '+e.message,'error');
-    closeModal(); toast('Desconto atualizado'); navigate('descontos');
+    closeModal(); toast('Desconto atualizado'); _renderCalcDescontos();
   };
 }
 async function eliminarDesconto(id,nome){
   if(!confirm(`Eliminar desconto "${nome}"?`)) return;
   const{error}=await _SB.from('descontos').delete().eq('id',id);
   if(error) return toast('Erro: '+error.message,'error');
-  toast('Desconto eliminado'); navigate('descontos');
+  toast('Desconto eliminado'); _renderCalcDescontos();
 }
 
 async function renderAlertas(el){
