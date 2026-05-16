@@ -138,7 +138,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#F5EFE1;background-i
 .db-overview-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .db-overview-title span{font-size:13px;font-weight:700}
 .db-gauge-wrap{text-align:center;margin-bottom:8px}
-.db-gauge-svg{width:160px;height:90px}
+.db-gauge-svg{width:120px;height:68px}
 .db-overview-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 .db-ov-stat{background:var(--surface2);border-radius:10px;padding:10px 12px}
 .db-ov-stat .ovs-label{font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:2px}
@@ -1431,6 +1431,20 @@ async function _dbAdmin(el){
               <div class="db-hc-label">Pipeline Aberto</div>
               <div class="db-hc-value" style="color:#7c3aed">${pipeAberto}</div>
               <span class="db-hc-badge" style="background:rgba(124,58,237,.1);color:#7c3aed">${alertasN} alertas · clique p/ detalhe</span>
+            </div>
+          </div>
+          <div class="db-hero-card" style="grid-column:span 1;align-items:center;justify-content:center;flex-direction:column;gap:6px;padding:12px 16px">
+            <div class="db-hc-label" style="width:100%;text-align:center">Saúde da Empresa</div>
+            ${gaugeSVG}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%">
+              <div style="background:var(--surface2);border-radius:8px;padding:7px 10px;text-align:center">
+                <div style="font-size:9px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Desistências</div>
+                <div style="font-size:16px;font-weight:800;color:var(--danger)">${desist}</div>
+              </div>
+              <div style="background:var(--surface2);border-radius:8px;padding:7px 10px;text-align:center">
+                <div style="font-size:9px;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Novas Adesões</div>
+                <div style="font-size:16px;font-weight:800;color:var(--success)">${novasAdes}</div>
+              </div>
             </div>
           </div>
       </div>
