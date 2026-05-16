@@ -171,6 +171,26 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .db-alert-body .ab-sub{font-size:11px;color:var(--text-muted)}
 .db-alert-days{font-size:12px;font-weight:700;color:var(--danger)}
 @media(max-width:1100px){.db-top{grid-template-columns:1fr}.db-analytics-body{grid-template-columns:1fr}}
+/* Drawer */
+.db-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:498;display:none}
+.db-drawer-overlay.open{display:block}
+.db-drawer{position:fixed;right:-480px;top:0;bottom:0;width:480px;background:var(--surface);border-left:1px solid var(--border);z-index:499;transition:right .25s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-6px 0 32px rgba(0,0,0,.12)}
+.db-drawer.open{right:0}
+.db-drawer-header{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.db-drawer-header h3{font-size:15px;font-weight:700}
+.db-drawer-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted);padding:4px 8px;border-radius:6px}
+.db-drawer-close:hover{background:var(--surface2)}
+.db-drawer-body{flex:1;overflow-y:auto;padding:16px}
+.db-drawer-kpi{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.db-drawer-kpi-item{background:var(--surface2);border-radius:10px;padding:12px 14px}
+.db-drawer-kpi-item .dk-label{font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:3px}
+.db-drawer-kpi-item .dk-val{font-size:20px;font-weight:800}
+.db-drawer-list{display:flex;flex-direction:column;gap:1px}
+.db-drawer-row{display:grid;align-items:center;padding:9px 12px;border-radius:8px;font-size:13px;gap:8px}
+.db-drawer-row:hover{background:var(--surface2)}
+.db-drawer-row .dr-name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.db-drawer-row .dr-sub{font-size:11px;color:var(--text-muted)}
+.db-drawer-row .dr-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:50px;white-space:nowrap;text-align:right}
 /* BACKOFFICE */
 .perm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-top:8px}
 .perm-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:12px}
@@ -1017,6 +1037,44 @@ function _dbMiniTable(title,cols,rows,emptyMsg){
   return `<div class="db-section"><div class="db-section-title">${title}</div><div class="table-wrap"><table class="tbl"><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table></div></div>`;
 }
 
+let _dbCache={};
+function _dbDetail(key){
+  const d=_dbCache[key];if(!d)return;
+  let body='';
+  if(d.kpis){
+    body+=`<div class="db-drawer-kpi">${d.kpis.map(k=>`<div class="db-drawer-kpi-item"><div class="dk-label">${k.label}</div><div class="dk-val" style="color:${k.color||'var(--text)'}">${k.val}</div></div>`).join('')}</div>`;
+  }
+  if(d.rows&&d.rows.length){
+    body+=`<div class="db-drawer-list">${d.rows.map(r=>`<div class="db-drawer-row" style="grid-template-columns:1fr auto">
+      <div><div class="dr-name">${r.name}</div><div class="dr-sub">${r.sub||''}</div></div>
+      <div class="dr-badge" style="background:${r.bc||'var(--surface3)'};color:${r.tc||'var(--text-muted)'}">${r.badge||''}</div>
+    </div>`).join('')}</div>`;
+  }else{
+    body+='<div style="text-align:center;color:var(--text-muted);padding:32px;font-size:13px">Sem dados</div>';
+  }
+  let dr=document.getElementById('_db_drawer');
+  if(!dr){
+    document.body.insertAdjacentHTML('beforeend',`
+      <div class="db-drawer-overlay" id="_db_overlay" onclick="_dbCloseDetail()"></div>
+      <div class="db-drawer" id="_db_drawer">
+        <div class="db-drawer-header">
+          <h3 id="_db_drawer_title"></h3>
+          <button class="db-drawer-close" onclick="_dbCloseDetail()">✕</button>
+        </div>
+        <div class="db-drawer-body" id="_db_drawer_body"></div>
+      </div>`);
+    dr=document.getElementById('_db_drawer');
+  }
+  document.getElementById('_db_drawer_title').textContent=d.title;
+  document.getElementById('_db_drawer_body').innerHTML=body;
+  dr.classList.add('open');
+  document.getElementById('_db_overlay').classList.add('open');
+}
+function _dbCloseDetail(){
+  const dr=document.getElementById('_db_drawer'),ov=document.getElementById('_db_overlay');
+  if(dr)dr.classList.remove('open');if(ov)ov.classList.remove('open');
+}
+
 async function renderDashboard(el){
   el.innerHTML=`<div style="padding:40px;color:var(--text-muted);text-align:center">A carregar...</div>`;
   const role=currentUser.role||'';
@@ -1086,9 +1144,13 @@ async function _dbAdmin(el){
   // Suspensões: clientes com Estado='Suspendeu' em pag_clientes_2026 (sinal claro de problema)
   const suspRows=pag.filter(r=>r['Estado']==='Suspendeu');
   const suspClientes=new Set(suspRows.map(r=>r['Cliente'])).size;
-  // Cancelamentos no período
   const cancRows=pag.filter(r=>r['Estado']==='Cancelou');
   const cancClientes=new Set(cancRows.map(r=>r['Cliente'])).size;
+  // Pag. em atraso: Estado='Ativo' em meses anteriores (pagamento não confirmado)
+  const pastMonths=MONTHS.slice(0,mi);
+  const emAtrasoRows=pag.filter(r=>pastMonths.includes(r['Mês'])&&r['Estado']==='Ativo');
+  const emAtrasoSet=new Set(emAtrasoRows.map(r=>r['Cliente']));
+  const emAtrasoN=emAtrasoSet.size;
 
   // Retenção: clientes ativos/pagos no mês anterior vs atual
   let retPct=null, desist=0, novasAdes=0;
@@ -1128,11 +1190,15 @@ async function _dbAdmin(el){
   const totalCli=cliStudio+cliLab+cliGestao+cliConsulta||1;
   // Barras: clientes por modalidade (histórico); sub: contratos Em curso
   const srvs=[
-    {nome:'Studio / PT',n:cliStudio,sub:`${emCursoStudio} em treino`,color:'#aaff00',bg:'rgba(170,255,0,.15)'},
-    {nome:'Lab & Avaliações',n:cliLab,sub:`${emCursoLab} em curso`,color:'#2563eb',bg:'rgba(37,99,235,.12)'},
-    {nome:'Gestão',n:cliGestao,sub:`${emCursoGestao} em curso · GL4:${gl4At} GL12:${gl12At} GI:${giAt}`,color:'#7c3aed',bg:'rgba(124,58,237,.12)'},
-    {nome:'Consultas',n:cliConsulta,sub:`${emCursoConsulta} em curso`,color:'#16a34a',bg:'rgba(22,163,74,.12)'},
+    {key:'studio',nome:'Studio / PT',n:cliStudio,sub:`${emCursoStudio} em treino`,color:'#aaff00',bg:'rgba(170,255,0,.15)'},
+    {key:'lab',nome:'Lab & Avaliações',n:cliLab,sub:`${emCursoLab} em curso`,color:'#2563eb',bg:'rgba(37,99,235,.12)'},
+    {key:'gestao',nome:'Gestão',n:cliGestao,sub:`${emCursoGestao} em curso · GL4:${gl4At} GL12:${gl12At} GI:${giAt}`,color:'#7c3aed',bg:'rgba(124,58,237,.12)'},
+    {key:'consultas',nome:'Consultas',n:cliConsulta,sub:`${emCursoConsulta} em curso`,color:'#16a34a',bg:'rgba(22,163,74,.12)'},
   ];
+  // Add gestao and consultas to _dbCache (defined after srvs)
+  _dbCache.gestao={title:'Clientes Gestão',kpis:[{label:'Total',val:cliGestao,color:'#7c3aed'},{label:'Em curso',val:emCursoGestao,color:'var(--success)'}],rows:servs.filter(s=>(isGL4(s)||isGL12(s)||isGI(s))&&cliActivosSet.has(s['Cliente'])).reduce((acc,s)=>{if(!acc.find(r=>r.name===s['Cliente']))acc.push({name:s['Cliente'],sub:s['Serviço'],badge:s['Estado do serviço'],bc:'rgba(124,58,237,.1)',tc:'#7c3aed'});return acc;},[])};
+  _dbCache.consultas={title:'Clientes Consultas',kpis:[{label:'Total',val:cliConsulta,color:'var(--success)'},{label:'Em curso',val:emCursoConsulta,color:'var(--success)'}],rows:servs.filter(s=>isConsulta(s)&&cliActivosSet.has(s['Cliente'])).reduce((acc,s)=>{if(!acc.find(r=>r.name===s['Cliente']))acc.push({name:s['Cliente'],sub:s['Serviço'],badge:s['Estado do serviço'],bc:'rgba(22,163,74,.1)',tc:'var(--success)'});return acc;},[])};
+  _dbCache.alertas.rows=(alrtTop.data||[]).map(a=>({name:a['Cliente']||'—',sub:a['Tipo']||'—',badge:a['DiasAtraso']!=null?a['DiasAtraso']+'d':'—',bc:'rgba(220,38,38,.1)',tc:'var(--danger)'}));
 
   // Gauge: retention or client health
   const gaugeVal=retPct!=null?retPct:cliAtivos+cliSusp+cliCanc>0?Math.round((cliAtivos/(cliAtivos+cliSusp+cliCanc))*100):0;
@@ -1164,6 +1230,26 @@ async function _dbAdmin(el){
     <div class="db-alert-days">${a['DiasAtraso']!=null?a['DiasAtraso']+'d':'—'}</div>
   </div>`).join('');
 
+  // Populate _dbCache for drawer details
+  _dbCache={
+    receita:{title:`Receita ${curMonth}`,kpis:[{label:'Total confirmado',val:receitaMes>0?receitaMes.toFixed(0)+'€':'0€',color:'var(--primary-text)'},{label:'Pagamentos',val:pagCurMonth.filter(r=>r['Estado']==='Pago').length,color:'var(--success)'}],
+      rows:pagCurMonth.filter(r=>r['Estado']==='Pago').map(r=>({name:r['Cliente']||'—',sub:r['Modalidade']||'—',badge:parseFloat(r['Valor Pago'])>0?parseFloat(r['Valor Pago']).toFixed(0)+'€':'—',bc:'rgba(22,163,74,.1)',tc:'var(--success)'}))},
+    atraso:{title:'Pagamentos sem confirmação',kpis:[{label:'Clientes',val:emAtrasoN,color:'var(--danger)'},{label:'Meses em aberto',val:emAtrasoRows.length,color:'var(--warning)'}],
+      rows:[...emAtrasoSet].map(c=>{const meses=emAtrasoRows.filter(r=>r['Cliente']===c).map(r=>r['Mês']).join(', ');return{name:c,sub:meses,badge:'Sem confirm.',bc:'rgba(220,38,38,.1)',tc:'var(--danger)'}})},
+    clientes:{title:'Clientes Ativos',kpis:[{label:'Ativos',val:cliAtivos,color:'var(--info)'},{label:'Suspensos',val:cliSusp,color:'var(--warning)'},{label:'Studio',val:cliStudio,color:'var(--primary-text)'},{label:'Lab',val:cliLab,color:'var(--info)'}],
+      rows:cli.filter(isCliAtivo).map(c=>({name:c['Nome']||'—',sub:c['Status']||'—',badge:'Ativo',bc:'rgba(37,99,235,.1)',tc:'var(--info)'}))},
+    suspensoes:{title:'Suspensões e Cancelamentos',kpis:[{label:'Suspensões',val:suspClientes,color:'var(--warning)'},{label:'Cancelamentos',val:cancClientes,color:'var(--danger)'}],
+      rows:[...new Set([...suspRows,...cancRows].map(r=>r['Cliente']))].map(c=>{const s=suspRows.find(r=>r['Cliente']===c);const cc=cancRows.find(r=>r['Cliente']===c);const estado=cc?'Cancelou':'Suspendeu';return{name:c,sub:s?.['Mês']||cc?.['Mês']||'—',badge:estado,bc:cc?'rgba(220,38,38,.1)':'rgba(217,119,6,.1)',tc:cc?'var(--danger)':'var(--warning)'}})},
+    pipeline:{title:'Pipeline Aberto',kpis:[{label:'Leads abertas',val:pipeAberto,color:'var(--warning)'},{label:'Alertas',val:alertasN,color:'var(--danger)'}],
+      rows:pip.filter(p=>p['Aberta/Fechada']==='Aberta').slice(0,40).map(p=>({name:p['Contacto']||p['Nome']||'—',sub:p['Origem']||p['Tipo']||'—',badge:p['Status']||'—',bc:'rgba(217,119,6,.1)',tc:'var(--warning)'}))},
+    alertas:{title:'Alertas Urgentes',kpis:[{label:'Total alertas',val:alertasN,color:'var(--danger)'}],
+      rows:(alrtTop.data||[]).map(a=>({name:a['Cliente']||'—',sub:a['Tipo']||'—',badge:a['DiasAtraso']!=null?a['DiasAtraso']+'d atraso':'—',bc:'rgba(220,38,38,.1)',tc:'var(--danger)'}))},
+    studio:{title:'Clientes Studio / PT',kpis:[{label:'Clientes',val:cliStudio,color:'var(--primary-text)'},{label:'Em treino',val:emCursoStudio,color:'var(--success)'}],
+      rows:servs.filter(s=>isStudio(s)&&cliActivosSet.has(s['Cliente'])).reduce((acc,s)=>{if(!acc.find(r=>r.name===s['Cliente']))acc.push({name:s['Cliente'],sub:s['Serviço'],badge:s['Estado do serviço']==='Em curso'?'Em curso':'Concluído',bc:s['Estado do serviço']==='Em curso'?'rgba(170,255,0,.2)':'var(--surface3)',tc:s['Estado do serviço']==='Em curso'?'var(--primary-text)':'var(--text-muted)'});return acc;},[])},
+    lab:{title:'Clientes Lab & Avaliações',kpis:[{label:'Clientes',val:cliLab,color:'var(--info)'},{label:'Repetição',val:labRepPct+'%',color:'#7c3aed'}],
+      rows:avals.filter(a=>cliActivosSet.has(a['Nome'])).reduce((acc,a)=>{if(!acc.find(r=>r.name===a['Nome']))acc.push({name:a['Nome'],sub:'Avaliação registada',badge:'Lab',bc:'rgba(37,99,235,.1)',tc:'var(--info)'});return acc;},[])},
+  };
+
   el.innerHTML=`
     <!-- TOP ROW -->
     <div class="db-top">
@@ -1173,7 +1259,7 @@ async function _dbAdmin(el){
           <p>Aqui está o resumo de ${curMonth} ${now.getFullYear()}. Como está o negócio?</p>
         </div>
         <div class="db-hero-cards">
-          <div class="db-hero-card" style="cursor:pointer" onclick="navigate('totais_pagamentos')">
+          <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('receita')">
             <div class="db-hc-icon" style="background:rgba(170,255,0,.15)">💶</div>
             <div class="db-hc-body">
               <div class="db-hc-label">Receita ${curMonth}</div>
@@ -1181,15 +1267,23 @@ async function _dbAdmin(el){
               <span class="db-hc-badge" style="background:rgba(170,255,0,.15);color:var(--primary-text)">${pagCurMonth.filter(r=>r['Estado']==='Pago').length} pag. confirmados</span>
             </div>
           </div>
-          <div class="db-hero-card" style="cursor:pointer" onclick="navigate('totais_pagamentos')">
-            <div class="db-hc-icon" style="background:rgba(220,38,38,.1)">⏸️</div>
+          <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('atraso')">
+            <div class="db-hc-icon" style="background:rgba(220,38,38,.1)">⚠️</div>
             <div class="db-hc-body">
-              <div class="db-hc-label">Suspensões</div>
-              <div class="db-hc-value" style="color:var(--danger)">${suspClientes}</div>
-              <span class="db-hc-badge" style="background:rgba(220,38,38,.1);color:var(--danger)">${cancClientes} cancelamentos</span>
+              <div class="db-hc-label">Pag. sem Confirmação</div>
+              <div class="db-hc-value" style="color:var(--danger)">${emAtrasoN}</div>
+              <span class="db-hc-badge" style="background:rgba(220,38,38,.1);color:var(--danger)">${emAtrasoRows.length} meses em aberto</span>
             </div>
           </div>
-          <div class="db-hero-card" style="cursor:pointer" onclick="navigate('clientes')">
+          <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('suspensoes')">
+            <div class="db-hc-icon" style="background:rgba(217,119,6,.1)">⏸️</div>
+            <div class="db-hc-body">
+              <div class="db-hc-label">Suspensões</div>
+              <div class="db-hc-value" style="color:var(--warning)">${suspClientes}</div>
+              <span class="db-hc-badge" style="background:rgba(217,119,6,.1);color:var(--warning)">${cancClientes} cancelamentos</span>
+            </div>
+          </div>
+          <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('clientes')">
             <div class="db-hc-icon" style="background:rgba(37,99,235,.1)">👤</div>
             <div class="db-hc-body">
               <div class="db-hc-label">Clientes Ativos</div>
@@ -1198,12 +1292,12 @@ async function _dbAdmin(el){
               <div style="font-size:10px;color:var(--text-muted);margin-top:4px">${cliSusp} susp · ${cliCanc} canc</div>
             </div>
           </div>
-          <div class="db-hero-card" style="cursor:pointer" onclick="navigate('pipeline')">
-            <div class="db-hc-icon" style="background:rgba(217,119,6,.1)">📈</div>
+          <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('pipeline')">
+            <div class="db-hc-icon" style="background:rgba(124,58,237,.1)">📈</div>
             <div class="db-hc-body">
               <div class="db-hc-label">Pipeline Aberto</div>
-              <div class="db-hc-value" style="color:var(--warning)">${pipeAberto}</div>
-              <span class="db-hc-badge" style="background:rgba(217,119,6,.1);color:var(--warning)">${alertasN} alertas ativos</span>
+              <div class="db-hc-value" style="color:#7c3aed">${pipeAberto}</div>
+              <span class="db-hc-badge" style="background:rgba(124,58,237,.1);color:#7c3aed">${alertasN} alertas · clique p/ detalhe</span>
             </div>
           </div>
         </div>
@@ -1244,7 +1338,7 @@ async function _dbAdmin(el){
       </div>
       <div class="db-analytics-body">
         <div class="db-service-list">
-          ${srvs.map(s=>`<div class="db-srv-row">
+          ${srvs.map(s=>`<div class="db-srv-row" style="cursor:pointer" onclick="_dbDetail('${s.key}')">
             <div class="db-srv-info"><span class="db-srv-name">${s.nome}</span><span class="db-srv-count" style="color:${s.color}">${s.n} clientes</span></div>
             <div class="db-bar-bg"><div class="db-bar-fill" style="width:${Math.round((s.n/totalCli)*100)}%;background:${s.color}"></div></div>
             <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${s.sub}</div>
@@ -1284,7 +1378,7 @@ async function _dbAdmin(el){
         ${histItems||'<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">Sem atividade registada</div>'}
       </div>
       <div class="db-recent">
-        <div class="db-recent-header"><span>⚠️ Alertas Urgentes</span><button class="btn btn-ghost btn-sm" onclick="navigate('alertas')">Ver tudo</button></div>
+        <div class="db-recent-header"><span>⚠️ Alertas Urgentes</span><button class="btn btn-ghost btn-sm" onclick="_dbDetail('alertas')">Ver detalhe</button></div>
         ${alrtItems||'<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">Sem alertas ativos</div>'}
       </div>
     </div>`;
