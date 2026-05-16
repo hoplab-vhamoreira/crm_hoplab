@@ -1069,12 +1069,14 @@ async function _dbAdmin(el){
   const giAt=servs.filter(s=>isGI(s)&&emCurso(s)).length;
   const consultAt=servs.filter(s=>isConsulta(s)&&emCurso(s)).length;
 
-  // Clientes ativos por tipo
+  // Clientes ativos por modalidade (histórico — cliente ativo que já teve o serviço)
   const cliActivosSet=new Set(cli.filter(isCliAtivo).map(c=>c['Nome']));
-  // Studio: clientes ativos com serviço Studio (qualquer estado — PT, Duo, Pilates, etc.)
   const cliStudio=new Set(servs.filter(s=>isStudio(s)&&cliActivosSet.has(s['Cliente'])).map(s=>s['Cliente'])).size;
-  // Lab: clientes ativos com avaliação registada (tabela avaliacoes, campo Nome)
   const cliLab=new Set(avals.filter(a=>cliActivosSet.has(a['Nome'])).map(a=>a['Nome'])).size;
+  const cliGestao=new Set(servs.filter(s=>(isGL4(s)||isGL12(s)||isGI(s))&&cliActivosSet.has(s['Cliente'])).map(s=>s['Cliente'])).size;
+  const cliConsulta=new Set(servs.filter(s=>isConsulta(s)&&cliActivosSet.has(s['Cliente'])).map(s=>s['Cliente'])).size;
+  // Contratos Em curso (ciclo atual ativo)
+  const emCursoStudio=studioAt, emCursoLab=labAt, emCursoGestao=gl4At+gl12At+giAt, emCursoConsulta=consultAt;
 
   // Receita a partir de pag_clientes_2026 (estrutura: Mês, Estado, Valor Pago)
   const pagCurMonth=pag.filter(r=>r['Mês']===curMonth);
@@ -1123,12 +1125,13 @@ async function _dbAdmin(el){
 
   // Service distribution
   const gestaoAt=gl4At+gl12At+giAt;
-  const totalAt=studioAt+labAt+gestaoAt+consultAt||1;
+  const totalCli=cliStudio+cliLab+cliGestao+cliConsulta||1;
+  // Barras: clientes por modalidade (histórico); sub: contratos Em curso
   const srvs=[
-    {nome:'Studio / PT',n:studioAt,color:'#aaff00',bg:'rgba(170,255,0,.15)'},
-    {nome:'Lab & Avaliações',n:labAt,color:'#2563eb',bg:'rgba(37,99,235,.12)'},
-    {nome:'Gestão',n:gestaoAt,color:'#7c3aed',bg:'rgba(124,58,237,.12)'},
-    {nome:'Consultas',n:consultAt,color:'#16a34a',bg:'rgba(22,163,74,.12)'},
+    {nome:'Studio / PT',n:cliStudio,sub:`${emCursoStudio} em treino`,color:'#aaff00',bg:'rgba(170,255,0,.15)'},
+    {nome:'Lab & Avaliações',n:cliLab,sub:`${emCursoLab} em curso`,color:'#2563eb',bg:'rgba(37,99,235,.12)'},
+    {nome:'Gestão',n:cliGestao,sub:`${emCursoGestao} em curso · GL4:${gl4At} GL12:${gl12At} GI:${giAt}`,color:'#7c3aed',bg:'rgba(124,58,237,.12)'},
+    {nome:'Consultas',n:cliConsulta,sub:`${emCursoConsulta} em curso`,color:'#16a34a',bg:'rgba(22,163,74,.12)'},
   ];
 
   // Gauge: retention or client health
@@ -1225,7 +1228,7 @@ async function _dbAdmin(el){
           </div>
           <div class="db-ov-stat">
             <div class="ovs-label">Total Serviços</div>
-            <div class="ovs-val">${studioAt+labAt+gestaoAt+consultAt}</div>
+            <div class="ovs-val">${emCursoStudio+emCursoLab+emCursoGestao+emCursoConsulta}</div>
           </div>
         </div>
       </div>
@@ -1234,7 +1237,7 @@ async function _dbAdmin(el){
     <!-- ANALYTICS -->
     <div class="db-analytics">
       <div class="db-analytics-header">
-        <span class="db-analytics-title">Serviços Ativos</span>
+        <span class="db-analytics-title">Clientes por Modalidade</span>
         <div class="db-cat-tabs">
           ${srvs.map(s=>`<span class="db-cat-tab" style="border-color:${s.color};color:${s.color};background:${s.bg}">${s.nome} <b>${s.n}</b></span>`).join('')}
         </div>
@@ -1242,10 +1245,11 @@ async function _dbAdmin(el){
       <div class="db-analytics-body">
         <div class="db-service-list">
           ${srvs.map(s=>`<div class="db-srv-row">
-            <div class="db-srv-info"><span class="db-srv-name">${s.nome}</span><span class="db-srv-count" style="color:${s.color}">${s.n}</span></div>
-            <div class="db-bar-bg"><div class="db-bar-fill" style="width:${Math.round((s.n/totalAt)*100)}%;background:${s.color}"></div></div>
+            <div class="db-srv-info"><span class="db-srv-name">${s.nome}</span><span class="db-srv-count" style="color:${s.color}">${s.n} clientes</span></div>
+            <div class="db-bar-bg"><div class="db-bar-fill" style="width:${Math.round((s.n/totalCli)*100)}%;background:${s.color}"></div></div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${s.sub}</div>
           </div>`).join('')}
-          <div style="margin-top:8px;font-size:11px;color:var(--text-muted)">GL4: ${gl4At} · GL12: ${gl12At} · GI: ${giAt} · Repetição Lab: ${labRepet}/${labTotalCli}</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text-muted)">Repetição Lab: ${labRepet}/${labTotalCli}</div>
         </div>
         <div class="db-month-chart">
           <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text-muted)">Pagamentos por Mês</div>
