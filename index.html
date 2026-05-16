@@ -1188,10 +1188,13 @@ async function _dbAdmin(el){
   // Service distribution
   const gestaoAt=gl4At+gl12At+giAt;
   const totalCli=cliStudio+cliLab+cliGestao+cliConsulta||1;
-  // Barras: clientes por modalidade (histórico); sub: contratos Em curso
+  // Total avaliações dos clientes ativos (Lab são sessões pontuais, não contratos Em curso)
+  const avalsAtivos=avals.filter(a=>cliActivosSet.has(a['Nome'])).length;
+  const labRepPorCli=cliLab>0?Math.round((labRepet/cliLab)*100):0;
+  // Barras: clientes por modalidade (histórico)
   const srvs=[
-    {key:'studio',nome:'Studio / PT',n:cliStudio,sub:`${emCursoStudio} em treino`,color:'#aaff00',bg:'rgba(170,255,0,.15)'},
-    {key:'lab',nome:'Lab & Avaliações',n:cliLab,sub:`${emCursoLab} em curso`,color:'#2563eb',bg:'rgba(37,99,235,.12)'},
+    {key:'studio',nome:'Studio / PT',n:cliStudio,sub:`${emCursoStudio} com contrato ativo`,color:'#aaff00',bg:'rgba(170,255,0,.15)'},
+    {key:'lab',nome:'Lab & Avaliações',n:cliLab,sub:`${avalsAtivos} avaliações realizadas · ${labRepPct}% repetiram`,color:'#2563eb',bg:'rgba(37,99,235,.12)'},
     {key:'gestao',nome:'Gestão',n:cliGestao,sub:`${emCursoGestao} em curso · GL4:${gl4At} GL12:${gl12At} GI:${giAt}`,color:'#7c3aed',bg:'rgba(124,58,237,.12)'},
     {key:'consultas',nome:'Consultas',n:cliConsulta,sub:`${emCursoConsulta} em curso`,color:'#16a34a',bg:'rgba(22,163,74,.12)'},
   ];
@@ -1246,7 +1249,7 @@ async function _dbAdmin(el){
       rows:(alrtTop.data||[]).map(a=>({name:a['Cliente']||'—',sub:a['Tipo']||'—',badge:a['DiasAtraso']!=null?a['DiasAtraso']+'d atraso':'—',bc:'rgba(220,38,38,.1)',tc:'var(--danger)'}))},
     studio:{title:'Clientes Studio / PT',kpis:[{label:'Clientes',val:cliStudio,color:'var(--primary-text)'},{label:'Em treino',val:emCursoStudio,color:'var(--success)'}],
       rows:servs.filter(s=>isStudio(s)&&cliActivosSet.has(s['Cliente'])).reduce((acc,s)=>{if(!acc.find(r=>r.name===s['Cliente']))acc.push({name:s['Cliente'],sub:s['Serviço'],badge:s['Estado do serviço']==='Em curso'?'Em curso':'Concluído',bc:s['Estado do serviço']==='Em curso'?'rgba(170,255,0,.2)':'var(--surface3)',tc:s['Estado do serviço']==='Em curso'?'var(--primary-text)':'var(--text-muted)'});return acc;},[])},
-    lab:{title:'Clientes Lab & Avaliações',kpis:[{label:'Clientes',val:cliLab,color:'var(--info)'},{label:'Repetição',val:labRepPct+'%',color:'#7c3aed'}],
+    lab:{title:'Clientes Lab & Avaliações',kpis:[{label:'Clientes',val:cliLab,color:'var(--info)'},{label:'Avaliações totais',val:avalsAtivos,color:'var(--info)'},{label:'Repetiram',val:labRepPct+'%',color:'#7c3aed'},{label:'Sessões/cliente',val:cliLab>0?(avalsAtivos/cliLab).toFixed(1):'—',color:'var(--text-muted)'}],
       rows:avals.filter(a=>cliActivosSet.has(a['Nome'])).reduce((acc,a)=>{if(!acc.find(r=>r.name===a['Nome']))acc.push({name:a['Nome'],sub:'Avaliação registada',badge:'Lab',bc:'rgba(37,99,235,.1)',tc:'var(--info)'});return acc;},[])},
   };
 
