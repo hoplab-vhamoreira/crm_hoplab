@@ -4463,6 +4463,38 @@ async function fatEdit(idx){
   };
 }
 
+async function confirmarPagamento(rowId, nomeEsc){
+  const{data:rec,error}=await _SB.from('pag_clientes_2026').select('*').eq('id',rowId).single();
+  if(error||!rec) return toast('Registo não encontrado','error');
+  const formas=['Transferência Multibanco','Débito Direto','Pagamento Mbway','Numerário'];
+  const estados=['Pago','Ativo','Suspendeu','Cancelou'];
+  const opt=(arr,cur)=>arr.map(v=>`<option${v===cur?' selected':''}>${v}</option>`).join('');
+  document.getElementById('modalTitle').textContent=`✅ Confirmar pagamento — ${rec['Mês']||''} · ${nomeEsc}`;
+  document.getElementById('modalBody').innerHTML=`
+    <div class="form-group"><label>Estado</label>
+      <select id="cp_estado">${opt(estados,rec['Estado']||'')}</select></div>
+    <div class="form-group"><label>Valor Pago (€)</label>
+      <input type="number" id="cp_valor" step="0.01" value="${rec['Valor Pago']??rec['Valor a Pagar']??''}"></div>
+    <div class="form-group"><label>Forma de Pagamento</label>
+      <select id="cp_forma"><option value=""></option>${opt(formas,rec['Forma Pagamento']||'')}</select></div>
+    <div class="form-group"><label>Nº Doc</label>
+      <input type="text" id="cp_doc" value="${rec['Nº Doc']||''}"></div>`;
+  document.getElementById('modal').classList.add('show');
+  document.getElementById('modalSave').onclick=async()=>{
+    const updates={
+      'Estado':document.getElementById('cp_estado').value,
+      'Valor Pago':parseFloat(document.getElementById('cp_valor').value)||null,
+      'Forma Pagamento':document.getElementById('cp_forma').value||null,
+      'Nº Doc':document.getElementById('cp_doc').value||null,
+    };
+    const{error:e}=await _SB.from('pag_clientes_2026').update(updates).eq('id',rowId);
+    if(e) return toast('Erro ao guardar: '+e.message,'error');
+    sectionData['pag_clientes_2026']=null;
+    closeModal(); toast('Pagamento confirmado ✓');
+    await openClienteDetalhe(nomeEsc);
+  };
+}
+
 async function fatEdit2025(idx){
   const sec = SECTIONS['pag_clientes_2025'];
   const fields = sec?.fields || [{k:'Mês',t:'select',opts:['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']},{k:'Modalidade',t:'text'},{k:'Valor a Pagar',t:'number'},{k:'Valor Pago',t:'number'},{k:'Forma Pagamento',t:'select',opts:['Transferência Multibanco','Débito Direto','Pagamento Mbway','Numerário']},{k:'Nº Doc',t:'text'}];
@@ -4927,6 +4959,7 @@ function pagBadge(v){
 
 async function openClienteDetalhe(nome){
   const el=document.getElementById('mainContent');
+  el.scrollTop=0; window.scrollTo(0,0);
   el.innerHTML=`<div style="padding:40px;color:var(--text-muted);text-align:center">A carregar ficha de ${nome}...</div>`;
   const d=await api(`/api/cliente/${encodeURIComponent(nome)}`);
   if(d.error){el.innerHTML=`<p style="color:var(--danger)">${d.error}</p>`;return;}
@@ -5139,7 +5172,7 @@ function renderClienteDetalhe(el, nome, d){
       <td style="font-size:12px;color:var(--text-muted)">${p['Forma Pagamento']||'—'}</td>
       <td style="font-size:12px;color:var(--text-muted)">${p['Nº Doc']||'—'}</td>
       <td class="actions">
-        <button onclick="openAddParaCliente('pag_clientes_2026','${nomeEsc}')" title="Adicionar 2026" style="font-size:11px">+</button>
+        <button onclick="confirmarPagamento(${p.id},'${nomeEsc}')" title="Confirmar / Editar pagamento" style="font-size:13px;padding:2px 6px">✏️</button>
       </td>
     </tr>`).join('');
   } else if(d.motor){
