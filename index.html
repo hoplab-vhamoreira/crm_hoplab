@@ -3095,7 +3095,8 @@ function switchGtab(btn,id,panels){
 // ─────────────────────────────────────────────────────────────────────────────
 let _calcProposta = []; // [{nome,codigo,pvpBase,pvpPromo,sinal,desc}]
 let _calcPrecarioData = [];
-let _calcDestinatarios = null; // cache [{nome,email,tel,origem}]
+let _calcDestinatarios = null; // cache {cli:[],pip:[]}
+let _calcEnvTab = 'cli'; // 'cli' | 'pip'
 
 async function renderCalculadora(el){
   el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted)">A carregar preçário...</div>`;
@@ -3221,7 +3222,7 @@ function _renderCalcProposta(){
 
 function _calcLimpar(){
   _calcProposta=[];
-  _calcDestinatarios=null;
+  _calcDestinatarios=null;_calcEnvTab='cli';
   _renderCalcLista((document.getElementById('calc-search')||{}).value||'');
   _renderCalcProposta();
 }
@@ -3238,40 +3239,71 @@ async function _calcEnviarProposta(){
     })).filter(c=>c.nome);
     const nomesCli=new Set(cli.map(c=>c.nome));
     const pip=(Array.isArray(pipRes)?pipRes:[])
-      .filter(p=>p['Aberta/Fechada']==='Aberta'&&p['Contacto']&&!nomesCli.has(p['Contacto']))
-      .map(p=>({nome:p['Contacto'],email:'',tel:'',origem:'Lead'}));
-    _calcDestinatarios=[...cli,...pip];
+      .filter(p=>p['Contacto']&&!nomesCli.has(p['Contacto']))
+      .map(p=>({nome:p['Contacto'],email:'',tel:'',origem:'Lead',status:p['Status']||'',aberta:p['Aberta/Fechada']||''}))
+      .filter((p,i,a)=>a.findIndex(x=>x.nome===p.nome)===i);
+    _calcDestinatarios={cli,pip};
   }
+  _calcEnvTab='cli';
   document.getElementById('modalTitle').textContent='📤 Enviar Proposta';
   document.getElementById('modalBody').innerHTML=`
     <div id="env-step1">
-      <p style="color:var(--text-muted);font-size:13px;margin:0 0 12px">Seleciona o destinatário da proposta</p>
-      <input type="text" id="env-search" placeholder="Pesquisar cliente ou lead..."
+      <div style="display:flex;gap:0;margin-bottom:12px;background:var(--surface2);border-radius:8px;padding:3px">
+        <button id="env-tab-cli" onclick="_calcEnvSetTab('cli')"
+          style="flex:1;padding:6px 12px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:var(--primary);color:#fff;transition:all .15s">
+          👤 Clientes <span id="env-cnt-cli" style="opacity:.75;font-weight:400"></span>
+        </button>
+        <button id="env-tab-pip" onclick="_calcEnvSetTab('pip')"
+          style="flex:1;padding:6px 12px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--text-muted);transition:all .15s">
+          📈 Pipeline <span id="env-cnt-pip" style="opacity:.75;font-weight:400"></span>
+        </button>
+      </div>
+      <input type="text" id="env-search" placeholder="Pesquisar..."
         oninput="_calcFiltrarDestinatarios()"
         style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box">
-      <div id="env-lista" style="max-height:300px;overflow-y:auto"></div>
+      <div id="env-lista" style="max-height:280px;overflow-y:auto"></div>
     </div>
     <div id="env-step2" style="display:none"></div>`;
   document.getElementById('modalSave').style.display='none';
   document.getElementById('modal').classList.add('show');
+  // update counts
+  const d=_calcDestinatarios;
+  const cc=document.getElementById('env-cnt-cli');
+  const cp=document.getElementById('env-cnt-pip');
+  if(cc) cc.textContent=`(${d.cli.length})`;
+  if(cp) cp.textContent=`(${d.pip.length})`;
+  _calcFiltrarDestinatarios();
+}
+
+function _calcEnvSetTab(tab){
+  _calcEnvTab=tab;
+  const btnCli=document.getElementById('env-tab-cli');
+  const btnPip=document.getElementById('env-tab-pip');
+  if(btnCli){btnCli.style.background=tab==='cli'?'var(--primary)':'transparent';btnCli.style.color=tab==='cli'?'#fff':'var(--text-muted)';}
+  if(btnPip){btnPip.style.background=tab==='pip'?'var(--primary)':'transparent';btnPip.style.color=tab==='pip'?'#fff':'var(--text-muted)';}
+  const si=document.getElementById('env-search');
+  if(si) si.value='';
   _calcFiltrarDestinatarios();
 }
 
 function _calcFiltrarDestinatarios(){
   const q=((document.getElementById('env-search')||{}).value||'').toLowerCase();
   const el=document.getElementById('env-lista');
-  if(!el) return;
-  const items=(_calcDestinatarios||[]).filter(d=>!q||d.nome.toLowerCase().includes(q)).slice(0,25);
+  if(!el||!_calcDestinatarios) return;
+  const pool=_calcEnvTab==='cli'?_calcDestinatarios.cli:_calcDestinatarios.pip;
+  const items=pool.filter(d=>!q||d.nome.toLowerCase().includes(q)).slice(0,30);
   if(!items.length){el.innerHTML=`<div style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px">Sem resultados</div>`;return;}
   el.innerHTML=items.map(d=>`
     <div onclick="_calcSelecionarDestinatario(${JSON.stringify(d.nome)},${JSON.stringify(d.email)},${JSON.stringify(d.tel)},${JSON.stringify(d.origem)})"
       style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;margin-bottom:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .15s"
       onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
-      <div>
+      <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px">${d.nome}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${d.email||'<em>sem email</em>'} ${d.tel?'&nbsp;·&nbsp;'+d.tel:''}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+          ${d.email||'<em>sem email</em>'}${d.tel?'&nbsp;·&nbsp;'+d.tel:''}
+          ${d.status?`&nbsp;·&nbsp;<span style="color:var(--text-muted)">${d.status}${d.aberta?' · '+d.aberta:''}</span>`:''}
+        </div>
       </div>
-      <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--surface2);color:var(--text-muted);flex-shrink:0;margin-left:8px">${d.origem}</span>
     </div>`).join('');
 }
 
