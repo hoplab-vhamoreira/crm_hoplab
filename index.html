@@ -3100,9 +3100,12 @@ let _calcEnvTab = 'cli'; // 'cli' | 'pip'
 
 async function renderCalculadora(el){
   el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted)">A carregar preçário...</div>`;
-  const pr=sectionData['precario_publico']||(await api('/api/data/precario_publico'));
-  if(!sectionData['precario_publico']) sectionData['precario_publico']=pr;
-  _calcPrecarioData=Array.isArray(pr)?pr.filter(p=>p['Serviço']&&p['Código']):[];
+  // sempre recarrega do servidor para apanhar edições recentes
+  delete sectionData['precario_publico'];
+  const pr=await api('/api/data/precario_publico');
+  sectionData['precario_publico']=pr;
+  // só serviços com preço numérico positivo — exclui linhas de cabeçalho e tabelas internas
+  _calcPrecarioData=Array.isArray(pr)?pr.filter(p=>p['Serviço']&&p['Código']&&parseFloat(p['PVP Base (c/IVA)'])>0):[];
 
   el.innerHTML=`
     <div class="page-header"><div><h1>🖩 Calculadora de Serviços</h1><div class="subtitle">Constrói uma proposta a partir do preçário</div></div></div>
