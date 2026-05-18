@@ -5326,8 +5326,8 @@ function _renderClientesMD(el){
     <div class="md-wrap">
       <div class="md-list">
         <div class="md-list-search">
-          <input type="text" placeholder="Pesquisar clientes..." value="${_cliFilter.replace(/"/g,'&quot;')}"
-            oninput="_cliFilter=this.value;_renderClientesMD(document.getElementById('mainContent'))">
+          <input id="cli-search" type="text" placeholder="Pesquisar clientes..." value="${_cliFilter.replace(/"/g,'&quot;')}"
+            oninput="_filterCliInput(this.value)">
         </div>
         <div class="md-filters">
           <button class="md-filter-btn${!_cliStatusFilter?' active':''}" onclick="_cliStatusFilter='';_renderClientesMD(document.getElementById('mainContent'))">Todos</button>
@@ -5344,6 +5344,13 @@ function _renderClientesMD(el){
       </div>
     </div>`;
   if(_cliSelected) _loadCliDetail(_cliSelected);
+}
+
+function _filterCliInput(val){
+  _cliFilter=val;
+  _renderClientesMD(document.getElementById('mainContent'));
+  const inp=document.getElementById('cli-search');
+  if(inp){inp.focus();inp.setSelectionRange(val.length,val.length);}
 }
 
 function _selectCliente(nome){
@@ -5575,8 +5582,8 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
     nFat += d.pag_2026.length;
     fatRows += d.pag_2026.map(p=>`<tr>
       <td>${p['Mês']||'—'}</td><td style="font-size:12px">${p['Modalidade']||'—'}</td>
-      <td style="text-align:right;font-weight:600">${p['Valor a Pagar']!=null?p['Valor a Pagar']+'€':'—'}</td>
-      <td style="text-align:right">${p['Valor Pago']!=null?p['Valor Pago']+'€':'—'}</td>
+      <td style="text-align:right;font-weight:600">${p['Valor a Pagar']!=null?Math.round(parseFloat(p['Valor a Pagar']))+'€':'—'}</td>
+      <td style="text-align:right">${p['Valor Pago']!=null?Math.round(parseFloat(p['Valor Pago']))+'€':'—'}</td>
       <td>${pagBadge(p['_Estado_Pag'])}</td>
       <td style="font-size:12px;color:var(--text-muted)">${p['Forma Pagamento']||'—'}</td>
       <td style="font-size:12px;color:var(--text-muted)">${p['Nº Doc']||'—'}</td>
@@ -5604,8 +5611,8 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
     nFat += d.pag_2025.length;
     fatRows += d.pag_2025.map(p=>`<tr>
       <td>${p['Mês']||'—'}</td><td style="font-size:12px">${p['Modalidade']||'—'}</td>
-      <td style="text-align:right;font-weight:600">${p['Valor a Pagar']!=null?p['Valor a Pagar']+'€':'—'}</td>
-      <td style="text-align:right">${p['Valor Pago']!=null?p['Valor Pago']+'€':'—'}</td>
+      <td style="text-align:right;font-weight:600">${p['Valor a Pagar']!=null?Math.round(parseFloat(p['Valor a Pagar']))+'€':'—'}</td>
+      <td style="text-align:right">${p['Valor Pago']!=null?Math.round(parseFloat(p['Valor Pago']))+'€':'—'}</td>
       <td>${pagBadge(p['_Estado_Pag'])}</td>
       <td style="font-size:12px;color:var(--text-muted)">${p['Forma Pagamento']||'—'}</td>
       <td colspan="2"></td>
@@ -6036,8 +6043,8 @@ function _renderPipelineMD(el){
     <div class="md-wrap">
       <div class="md-list">
         <div class="md-list-search">
-          <input type="text" placeholder="Pesquisar pipeline..." value="${_pipFilter.replace(/"/g,'&quot;')}"
-            oninput="_pipFilter=this.value;_renderPipelineMD(document.getElementById('mainContent'))">
+          <input id="pip-search" type="text" placeholder="Pesquisar pipeline..." value="${_pipFilter.replace(/"/g,'&quot;')}"
+            oninput="_filterPipInput(this.value)">
         </div>
         <div class="md-filters">
           <button class="md-filter-btn${!_pipStatusFilter?' active':''}" onclick="_pipStatusFilter='';_renderPipelineMD(document.getElementById('mainContent'))">Abertas</button>
@@ -6054,6 +6061,13 @@ function _renderPipelineMD(el){
       </div>
     </div>`;
   if(_pipSelected) _loadPipDetail(_pipSelected);
+}
+
+function _filterPipInput(val){
+  _pipFilter=val;
+  _renderPipelineMD(document.getElementById('mainContent'));
+  const inp=document.getElementById('pip-search');
+  if(inp){inp.focus();inp.setSelectionRange(val.length,val.length);}
 }
 
 function _selectPipeline(nON){
