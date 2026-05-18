@@ -600,6 +600,13 @@ async function api(url,opts={}){
   if(url.startsWith('/api/autofill')){const p=new URLSearchParams(url.split('?')[1]||'');const f=p.get('return_field');const sel=f&&f.includes(' ')?`"${f}"`:f;const{data}=await _SB.from(_TABLE_MAP[p.get('src')]||p.get('src')).select(sel);return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];}
   const eM=url.match(/^\/api\/clientes\/(.+)\/estado$/);
   if(eM&&method==='POST'){const nome=decodeURIComponent(eM[1]);const{error}=await _SB.from('clientes').update({'Status':body.status}).eq('Nome',nome);if(error)return{error:error.message};return{ok:true};}
+  // Rota direta por database id: /api/data/{table}/dbid/{id}
+  const dbidM=url.match(/^\/api\/data\/([^\/]+)\/dbid\/(\d+)$/);
+  if(dbidM){
+    const table=_TABLE_MAP[dbidM[1]]||dbidM[1];const dbId=parseInt(dbidM[2]);
+    if(method==='DELETE'){const{error}=await _SB.from(table).delete().eq('id',dbId);return error?{error:error.message}:{ok:true};}
+    if(method==='PUT'){const{data,error}=await _SB.from(table).update(body).eq('id',dbId).select().single();return error?{error:error.message}:data;}
+  }
   const dM=url.match(/^\/api\/data\/([^\/]+)(?:\/(\d+))?$/);
   if(dM){const table=_TABLE_MAP[dM[1]]||dM[1];const idx=dM[2]!==undefined?parseInt(dM[2]):null;
     if(method==='GET')return _sbGetAll(table);
@@ -5512,8 +5519,10 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
         <td>${d.motor['Total 2026']?parseFloat(d.motor['Total 2026']).toFixed(2)+'€/ano':'—'}</td>
       </tr>` : '';
   const servsRows = servicosAtivos.map(s=>{
+    const btnEdit = s['_idx']!=null
+      ? `<button onclick="openEditDetalhe('servicos',${s['_idx']},${JSON.stringify(s).replace(/</g,'\\u003c')},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Editar" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">✏</button>` : '';
     const btnDel = s['_idx']!=null
-      ? `<button onclick="deleteDetalhe('servicos',${s['_idx']},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Eliminar" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'"></button>` : '';
+      ? `<button onclick="deleteDetalhe('servicos',${s['_idx']},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Eliminar" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">🗑</button>` : '';
     return `<tr>
       <td>${estadoServBadge(s['Estado do serviço'])}</td>
       <td>${s['Serviço']||'—'}</td>
@@ -5521,7 +5530,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
       <td>${s['Técnico Responsável']||'—'}</td>
       <td>${fmtDate(s['Data Conversão'])}</td>
       <td>${s['Ciclo']||'—'}</td>
-      <td>${btnDel}</td>
+      <td style="white-space:nowrap">${btnEdit}${btnDel}</td>
     </tr>`;
   }).join('');
   const servsTable = (motorRow||servsRows)
@@ -5653,8 +5662,11 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const contratoTable = d.log_contratos&&d.log_contratos.length
     ? `<div class="mini-table-wrap"><table class="mini-table"><thead><tr><th>Data início</th><th>Estado</th><th>Motivo</th><th>Data fim</th><th>Desconto</th><th>Por</th><th>Notas</th><th></th></tr></thead><tbody>
        ${d.log_contratos.map(c=>{
+         const cRec={'Cliente':nome,'Estado':c['Estado'],'Motivo':c['Motivo'],'Data Início':c['Data_Inicio'],'Data Fim':c['Data_Fim'],'Registado por':c['Registado_por'],'Notas':c['Notas']};
+         const btnEdit = c['_idx']!=null
+           ? `<button onclick="openEditDetalhe('log_contratos',${c['_idx']},${JSON.stringify(cRec).replace(/</g,'\\u003c')},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Editar" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">✏</button>` : '';
          const btnDel = c['_idx']!=null
-           ? `<button onclick="deleteDetalhe('log_contratos',${c['_idx']},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Eliminar" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'"></button>` : '';
+           ? `<button onclick="deleteDetalhe('log_contratos',${c['_idx']},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Eliminar" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">🗑</button>` : '';
          const desc = c['Desconto_pct'] ? `${Math.round(c['Desconto_pct']*100)}%` : '—';
          return `<tr>
            <td>${fmtDate(c['Data_Inicio'])}</td>
@@ -5664,7 +5676,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
            <td>${desc}</td>
            <td>${c['Registado_por']||'—'}</td>
            <td>${c['Notas']||'—'}</td>
-           <td>${btnDel}</td>
+           <td style="white-space:nowrap">${btnEdit}${btnDel}</td>
          </tr>`;
        }).join('')}
        </tbody></table></div>`
@@ -5775,12 +5787,35 @@ const CLIENT_FIELD_JS={
   log_contratos:'Cliente', log_comercial:'Contacto',
 };
 
-async function deleteDetalhe(colecao, idx, clienteNome){
+async function deleteDetalhe(colecao, dbId, clienteNome){
   if(!confirm('Eliminar este registo?')) return;
-  await api(`/api/data/${colecao}/${idx}`,{method:'DELETE'});
+  const res=await api(`/api/data/${colecao}/dbid/${dbId}`,{method:'DELETE'});
+  if(res?.error){toast('Erro ao eliminar: '+res.error,'error');return;}
   sectionData[colecao]=null;
   toast('Registo eliminado');
   await openClienteDetalhe(clienteNome);
+}
+
+async function openEditDetalhe(section, dbId, rec, clienteNome){
+  const sec=SECTIONS[section];
+  if(!sec||!sec.fields) return toast('Secção sem campos definidos','error');
+  document.getElementById('modalTitle').textContent='Editar — '+(sec.title||section);
+  document.getElementById('modalBody').innerHTML='<div style="color:var(--text-muted);padding:20px 0">A carregar campos...</div>';
+  document.getElementById('modal').classList.add('show');
+  let html=''; const setups=[];
+  for(const f of sec.fields){const r=await buildFieldHtml(f,rec[f.k]??'');html+=r.html;if(r.setup)setups.push(r.setup);}
+  document.getElementById('modalBody').innerHTML=html;
+  runFieldSetups(setups);
+  document.getElementById('modalSave').onclick=async()=>{
+    const updates={};
+    for(const f of sec.fields) updates[f.k]=getFieldValue(f);
+    const res=await api(`/api/data/${section}/dbid/${dbId}`,{method:'PUT',body:updates});
+    if(res?.error){toast('Erro ao guardar: '+res.error,'error');return;}
+    sectionData[section]=null;
+    closeModal();
+    toast('Registo atualizado');
+    await openClienteDetalhe(clienteNome);
+  };
 }
 
 async function openAddParaCliente(section, clienteNome){
