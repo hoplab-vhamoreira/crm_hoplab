@@ -292,6 +292,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 .serv-action-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px 6px;border-radius:6px;font-size:13px;transition:.12s}
 .serv-action-btn:hover{color:var(--primary);background:var(--surface2)}
 .serv-action-btn.danger:hover{color:var(--danger);background:rgba(239,68,68,.08)}
+.serv-card-dim{opacity:.55}
+.serv-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);margin:14px 0 6px}
 /* estado badges */
 .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
 .badge-ok{background:rgba(34,197,94,.15);color:var(--success)}
@@ -5537,13 +5539,12 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
           <div class="serv-card-price">${d.motor['Total 2026']?parseFloat(d.motor['Total 2026']).toFixed(2)+'€/ano':'—'}</div>
         </div>
       </div>` : '';
-  const servsCards = servicosAtivos.map(s=>{
-    const sJSON = JSON.stringify(s).replace(/</g,'\\u003c').replace(/'/g,"\\'");
+  function _servCard(s, dimmed){
     const btnEdit = s['_idx']!=null
       ? `<button onclick="openEditDetalhe('servicos',${s['_idx']},${JSON.stringify(s).replace(/</g,'\\u003c')},'${nomeEsc}')" class="serv-action-btn" title="Editar">✏</button>` : '';
     const btnDel = s['_idx']!=null
       ? `<button onclick="deleteDetalhe('servicos',${s['_idx']},'${nomeEsc}')" class="serv-action-btn danger" title="Eliminar">🗑</button>` : '';
-    return `<div class="serv-card">
+    return `<div class="serv-card${dimmed?' serv-card-dim':''}">
       <div class="serv-card-top">
         <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
           ${estadoServBadge(s['Estado do serviço'])}
@@ -5559,11 +5560,17 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
       </div>
       ${s['Data Conversão']?`<div class="serv-card-date">Início: ${fmtDate(s['Data Conversão'])}</div>`:''}
     </div>`;
-  }).join('');
-  const servsTable = (motorCard||servsCards)
-    ? `<div class="serv-cards">${motorCard}${servsCards}</div>`
-    : `<div class="tl-empty">Sem serviços activos</div>`;
-  const servsHtml=tabHeader('Serviços activos','servicos')+servsTable;
+  }
+  const todosServicos = d.servicos||[];
+  const servsAtivosCards = servicosAtivos.map(s=>_servCard(s,false)).join('');
+  const servsConcluidos = todosServicos.filter(s=>{const e=(s['Estado do serviço']||'').trim();return e==='Concluído'||e==='Concluido';});
+  const servsConcluidosCards = servsConcluidos.length
+    ? `<div class="serv-section-label">Anteriores</div>${servsConcluidos.map(s=>_servCard(s,true)).join('')}`
+    : '';
+  const servsTable = (motorCard||servsAtivosCards||servsConcluidosCards)
+    ? `<div class="serv-cards">${motorCard}${servsAtivosCards}${servsConcluidosCards}</div>`
+    : `<div class="tl-empty">Sem serviços registados</div>`;
+  const servsHtml=tabHeader('Serviços','servicos')+servsTable;
 
   // Tab: Avaliações
   function avalBadge(status){
