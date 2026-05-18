@@ -5294,7 +5294,7 @@ function _renderClientesMD(el){
     const diasHtml=dias!=null&&dias!==''?` · <span style="color:${Number(dias)>60?'var(--danger)':Number(dias)>30?'var(--warning)':'var(--text-muted)'}">${dias}d</span>`:'';
     const isActive=_cliSelected===nome;
     const nomeEsc=nome.replace(/'/g,"\\'");
-    return `<div class="md-item${isActive?' active':''}" onclick="_selectCliente('${nomeEsc}')">
+    return `<div class="md-item${isActive?' active':''}" onclick="_selectCliente('${nomeEsc}')" ondblclick="_openCliFullPage('${nomeEsc}')">
       <div class="md-avatar">${initials}</div>
       <div class="md-item-body">
         <div class="md-name">${nome}</div>
@@ -5337,6 +5337,14 @@ function _renderClientesMD(el){
 function _selectCliente(nome){
   _cliSelected=nome;
   _renderClientesMD(document.getElementById('mainContent'));
+}
+
+async function _openCliFullPage(nome){
+  const el=document.getElementById('mainContent');
+  el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted)">A carregar ${nome}...</div>`;
+  const d=await api(`/api/cliente/${encodeURIComponent(nome)}`);
+  if(d.error){el.innerHTML=`<p style="color:var(--danger)">${d.error}</p>`;return;}
+  renderClienteDetalhe(el,nome,d,false);
 }
 
 async function _loadCliDetail(nome){
@@ -5995,7 +6003,8 @@ function _renderPipelineMD(el){
     const dataInicio=r['Data Início']?r['Data Início'].substring(0,10):'';
     const isActive=_pipSelected===nON;
     const clickFn=nON?`_selectPipeline(${nON})`:`openEdit('pipeline',${data.indexOf(r)})`;
-    return `<div class="md-item${isActive?' active':''}" onclick="${clickFn}">
+    const dblFn=nON?`_openPipFullPage(${nON})`:'';
+    return `<div class="md-item${isActive?' active':''}" onclick="${clickFn}"${dblFn?` ondblclick="${dblFn}"`:''}">
       <div class="md-avatar" style="background:var(--navy-soft)">${initials}</div>
       <div class="md-item-body">
         <div class="md-name">${contacto}</div>
@@ -6038,6 +6047,14 @@ function _renderPipelineMD(el){
 function _selectPipeline(nON){
   _pipSelected=nON;
   _renderPipelineMD(document.getElementById('mainContent'));
+}
+
+async function _openPipFullPage(nON){
+  const el=document.getElementById('mainContent');
+  el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted)">A carregar ON ${nON}...</div>`;
+  const d=await api(`/api/on/${nON}`);
+  if(d.error){el.innerHTML=`<p style="color:var(--danger)">${d.error}</p>`;return;}
+  renderONDetalhe(el,nON,d,false);
 }
 
 async function _loadPipDetail(nON){
