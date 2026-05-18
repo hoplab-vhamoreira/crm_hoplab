@@ -585,7 +585,7 @@ async function api(url,opts={}){
     const log=(logRes.data||[]).map((l,i)=>({...l,_idx:i,'Dias Atrás':l['Data Ação']?Math.floor((new Date()-new Date(String(l['Data Ação']).slice(0,10)))/86400000):null}));
     return{info,log_comercial:log,historico:[]};
   }
-  const lM=url.match(/^\/api\/lookup\/([^\/]+)\/(.+)$/);
+  const lM=url.match(/^\/api\/lookup\/([^\/]+)\/([^?]+)/);
   if(lM){
     const f=decodeURIComponent(lM[2]);
     const qs=url.includes('?')?new URLSearchParams(url.split('?')[1]):null;
