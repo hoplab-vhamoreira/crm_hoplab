@@ -282,13 +282,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 .mini-table tr:hover td{background:rgba(170,255,0,.05)}
 .mini-table th:last-child,.mini-table td:last-child{position:sticky;right:0;background:var(--surface);z-index:1}
 .mini-table tr:hover td:last-child{background:rgba(170,255,0,.05)}
-.serv-cards{display:flex;flex-direction:column;gap:8px}
-.serv-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
-.serv-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.serv-cards{display:flex;flex-direction:column;gap:6px}
+.serv-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px}
+.serv-card-row{display:grid;grid-template-columns:auto 1fr auto auto auto;align-items:center;gap:12px}
 .serv-card-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.serv-card-sub{font-size:11px;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.serv-card-sub{font-size:11px;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .serv-card-price{font-size:12px;font-weight:600;color:var(--navy);white-space:nowrap}
-.serv-card-date{font-size:11px;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
+.serv-card-tech{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.serv-card-date{font-size:11px;color:var(--text-muted);margin-top:5px;padding-top:5px;border-top:1px solid var(--border)}
 .serv-action-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px 6px;border-radius:6px;font-size:13px;transition:.12s}
 .serv-action-btn:hover{color:var(--primary);background:var(--surface2)}
 .serv-action-btn.danger:hover{color:var(--danger);background:rgba(239,68,68,.08)}
@@ -5528,16 +5529,16 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const motorJaNoServico = motorCodigo && motorEstado==='Ativo' && servicosAtivos.some(s=>(s['Código']||'')=== motorCodigo);
   const motorCard = (d.motor && !motorJaNoServico)
     ? `<div class="serv-card" style="border-left:3px solid var(--primary);background:rgba(99,102,241,.05)">
-        <div class="serv-card-top">
-          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
-            ${estadoMotorBadge(d.motor['Estado Hoje'])}
-            <div>
-              <div class="serv-card-name">${d.motor['Plano Actual']||'—'} <span style="font-size:10px;color:var(--text-muted)">(Motor)</span></div>
-              <div class="serv-card-sub">${info['PT']||''} · Início ${fmtDate(d.motor['Data Início'])}</div>
-            </div>
+        <div class="serv-card-row">
+          ${estadoMotorBadge(d.motor['Estado Hoje'])}
+          <div style="min-width:0">
+            <div class="serv-card-name">${d.motor['Plano Actual']||'—'} <span style="font-size:10px;font-weight:400;color:var(--text-muted)">(Motor)</span></div>
           </div>
+          <div class="serv-card-tech">${info['PT']||'—'}</div>
           <div class="serv-card-price">${d.motor['Total 2026']?parseFloat(d.motor['Total 2026']).toFixed(2)+'€/ano':'—'}</div>
+          <div></div>
         </div>
+        ${d.motor['Data Início']?`<div class="serv-card-date">Início: ${fmtDate(d.motor['Data Início'])}</div>`:''}
       </div>` : '';
   function _servCard(s, dimmed){
     const btnEdit = s['_idx']!=null
@@ -5545,18 +5546,14 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
     const btnDel = s['_idx']!=null
       ? `<button onclick="deleteDetalhe('servicos',${s['_idx']},'${nomeEsc}')" class="serv-action-btn danger" title="Eliminar">🗑</button>` : '';
     return `<div class="serv-card${dimmed?' serv-card-dim':''}">
-      <div class="serv-card-top">
-        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
-          ${estadoServBadge(s['Estado do serviço'])}
-          <div style="min-width:0">
-            <div class="serv-card-name">${s['Serviço']||'—'}</div>
-            <div class="serv-card-sub">${s['Código']||''} · ${s['Técnico Responsável']||'—'}</div>
-          </div>
+      <div class="serv-card-row">
+        ${estadoServBadge(s['Estado do serviço'])}
+        <div style="min-width:0">
+          <div class="serv-card-name">${s['Serviço']||'—'} <span style="font-size:10px;font-weight:400;color:var(--text-muted)">${s['Código']||''}</span></div>
         </div>
-        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-          <div class="serv-card-price">${s['Ciclo']||'—'}</div>
-          ${btnEdit}${btnDel}
-        </div>
+        <div class="serv-card-tech">${s['Técnico Responsável']||'—'}</div>
+        <div class="serv-card-price">${s['Ciclo']||'—'}</div>
+        <div style="display:flex;gap:2px">${btnEdit}${btnDel}</div>
       </div>
       ${s['Data Conversão']?`<div class="serv-card-date">Início: ${fmtDate(s['Data Conversão'])}</div>`:''}
     </div>`;
