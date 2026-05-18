@@ -211,8 +211,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 .role-tab{display:inline-block;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text-muted);border:1px solid var(--border);margin-right:6px;margin-bottom:8px}
 .role-tab.active{background:var(--primary);color:#111827;border-color:var(--primary-text)}
 /* CLIENTE DETALHE */
-.cd-wrap{display:flex;gap:24px;align-items:flex-start}
-.cd-sidebar{width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
+.cd-wrap{display:flex;flex-direction:column;gap:16px}
+.cd-sidebar{width:100%;display:flex;flex-direction:column;gap:12px}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0 28px}
 .cd-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .cd-name{font-size:20px;font-weight:700;margin-bottom:4px}
 .cd-status{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:16px}
@@ -248,7 +249,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 .md-item-body .md-sub{font-size:11px;color:var(--text-muted);margin-top:2px}
 .md-detail{overflow-y:auto;background:var(--surface2);padding:0 24px 24px}
 .md-empty-pane{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);gap:12px;font-size:13px}
-.md-detail .cd-sidebar{width:360px}
+.md-detail .cd-sidebar{width:100%}
 .md-detail .page-header{padding:16px 0 10px}
 .md-detail,.md-detail *{font-size:12px}
 .md-detail h1,.md-detail .cd-name{font-size:15px!important;font-weight:700!important}
@@ -369,7 +370,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
   .stats-grid{grid-template-columns:repeat(2,1fr)}
   .modal{max-width:500px}
   .md-wrap{grid-template-columns:280px 1fr}
-  .md-detail .cd-sidebar{width:280px!important}
 }
 </style>
 </head>
@@ -5775,7 +5775,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
 
     <div class="cd-wrap">
       <div class="cd-sidebar">
-        <div class="cd-card"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;font-weight:700">Informação</div>${infoRows}</div>
+        <div class="cd-card"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;font-weight:700">Informação</div><div class="info-grid">${infoRows}</div></div>
       </div>
       <div class="cd-main">
         <div class="tabs">
