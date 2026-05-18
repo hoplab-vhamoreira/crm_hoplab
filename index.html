@@ -877,6 +877,13 @@ const SECTIONS = {
       {k:'Data Prevista',t:'date'},
       {k:'Ação',t:'select',opts:['Msg Marcação','Marcação','Realizado','Cancelado','Remarcado']}
     ]},
+  motor2026: {hidden:true,title:'Motor 2026',icon:'&#x26a1;',group:'Gestão',
+    fields:[
+      {k:'Plano Actual',t:'text'},
+      {k:'Data Início',t:'date'},
+      {k:'Estado Hoje',t:'select',opts:['Ativo','Suspenso','Cancelado']},
+      {k:'Mês Inscrição (override)',t:'text'},
+    ]},
   log_contratos: {hidden:true,title:'Log Contratos',icon:'&#x1f4d1;',group:'Operacional',
     cols:['Cliente','Estado','Motivo','Data Início','Data Fim','Registado por'],
     fields:[
@@ -5536,7 +5543,10 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
           </div>
           <div class="serv-card-tech">${info['PT']||'—'}</div>
           <div class="serv-card-price">${d.motor['Total 2026']?parseFloat(d.motor['Total 2026']).toFixed(2)+'€/ano':'—'}</div>
-          <div></div>
+          <div style="display:flex;gap:2px">
+            <button onclick="openEditDetalhe('motor2026',${d.motor.id},${JSON.stringify(d.motor).replace(/</g,'\\u003c')},'${nomeEsc}')" class="serv-action-btn" title="Editar">✏</button>
+            <button onclick="deleteDetalhe('motor2026',${d.motor.id},'${nomeEsc}')" class="serv-action-btn danger" title="Eliminar">🗑</button>
+          </div>
         </div>
         ${d.motor['Data Início']?`<div class="serv-card-date">Início: ${fmtDate(d.motor['Data Início'])}</div>`:''}
       </div>` : '';
