@@ -505,7 +505,7 @@ async function api(url,opts={}){
     return rows;
   }
   if(url==='/api/historico_faturacao'){const[r25,r26]=await Promise.all([_SB.from('pag_clientes_2025').select('*'),_SB.from('pag_clientes_2026').select('*')]);return{pag2025:r25.data||[],pag2026:r26.data||[]};}
-  if(url==='/api/avaliacoes/lista'){const{data}=await _SB.from('avaliacoes').select('*').order('Data',{ascending:false});return data||[];}
+  if(url==='/api/avaliacoes/lista'){const{data}=await _SB.from('avaliacoes').select('*').order('Data',{ascending:false});return(data||[]).map(r=>({...r,_idx:r.id}));}
   if(url==='/api/vendas/angariacoes'){
     const[sv,dc]=await Promise.all([_SB.from('servicos').select('*'),_SB.from('dados_colaboradores').select('*')]);
     const colabs=dc.data||[];
@@ -569,10 +569,11 @@ async function api(url,opts={}){
       _SB.from('log_contratos').select('*').eq('Cliente',nome),
       _SB.from('log_comercial').select('*').eq('Contacto',nome).order('Data A\xe7\xe3o',{ascending:false})
     ]);
+    const mIdx=arr=>(arr||[]).map(r=>({...r,_idx:r.id}));
     const logComData=(logcom.data||[]).map(l=>({...l,'Dias Atrás':l['Data Ação']?Math.floor((new Date()-new Date(String(l['Data Ação']).slice(0,10)))/86400000):null}));
-    return{info:_recomputeClienteContacto(cli.data),servicos:serv.data||[],avaliacoes:aval.data||[],
-      historico:log.data||[],pag_2026:pag26.data||[],pag_2025:pag25.data||[],
-      motor:mot.data||null,log_contratos:lc.data||[],log_comercial:logComData};
+    return{info:_recomputeClienteContacto(cli.data),servicos:mIdx(serv.data),avaliacoes:mIdx(aval.data),
+      historico:log.data||[],pag_2026:mIdx(pag26.data),pag_2025:mIdx(pag25.data),
+      motor:mot.data||null,log_contratos:mIdx(lc.data),log_comercial:logComData};
   }
   const oM=url.match(/^\/api\/on\/(\d+)$/);
   if(oM){
@@ -5556,8 +5557,10 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
          const diasDesde = a['_AvalDiasDesde']!=null ? `${a['_AvalDiasDesde']} dias` : (a['Dias para Avaliação']!=null&&a['Dias para Avaliação']<0 ? `em ${Math.abs(a['Dias para Avaliação'])} dias` : '—');
          const fonteTag = a['_fonte'] ? `<span style="font-size:10px;color:var(--text-muted);margin-left:4px">(${a['_fonte']})</span>` : '';
          const col = a['_colecao']||'avaliacoes';
+         const btnEdit = a['_idx']!=null
+           ? `<button onclick="abrirEditarAval(${a['_idx']})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Editar" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">✏</button>` : '';
          const btnDel = a['_idx']!=null
-           ? `<button onclick="deleteDetalhe('${col}',${a['_idx']},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Eliminar" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'"></button>` : '';
+           ? `<button onclick="deleteDetalhe('${col}',${a['_idx']},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Eliminar" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">🗑</button>` : '';
          return `<tr style="${rowStyle}">
            <td>${avalBadge(status)}</td>
            <td>${a['Serviço']||'—'}${fonteTag}</td>
@@ -5565,7 +5568,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
            <td>${diasDesde}</td>
            <td>${a['Técnico Responsável']||'—'}</td>
            <td>${a['Nível']||'—'}</td>
-           <td>${btnDel}</td>
+           <td style="white-space:nowrap">${btnEdit}${btnDel}</td>
          </tr>`;
        }).join('')}
        </tbody></table></div>`
@@ -5811,13 +5814,13 @@ async function openAddParaCliente(section, clienteNome){
     for(const f of sec.fields) rec[f.k]=getFieldValue(f);
 
     // Auto-preencher Código a partir do precário antes de guardar
+    let _isPrimeiroPT = false;
     if(section==='servicos' && rec['Serviço']){
       const precData = sectionData['precario_publico'] || (await api('/api/data/precario_publico'));
       sectionData['precario_publico'] = Array.isArray(precData)?precData:[];
       const precItem = sectionData['precario_publico'].find(p=>p['Serviço']===rec['Serviço']);
       const baseCode = precItem?.['Código']||'';
       if(baseCode){
-        // Serviços PT/DUO: gerar código sequencial (ex: PT2-30-026)
         if(/^(PT|DUO)/i.test(baseCode)){
           const allServs = await api('/api/data/servicos');
           const prefix = baseCode+'-';
@@ -5825,6 +5828,10 @@ async function openAddParaCliente(section, clienteNome){
             .map(s=>s['Código']||'').filter(c=>c.startsWith(prefix))
             .reduce((m,c)=>{const n=parseInt(c.split('-').pop());return isNaN(n)?m:Math.max(m,n);},0);
           rec['Código'] = prefix+String(maxN+1).padStart(3,'0');
+          // Verificar se é o 1º serviço PT/DUO do cliente
+          const clientePTServs=(Array.isArray(allServs)?allServs:[]).filter(s=>
+            s['Cliente']===clienteNome && /^(PT|DUO)/i.test(s['Código']||''));
+          _isPrimeiroPT = clientePTServs.length===0;
         } else {
           rec['Código'] = baseCode;
         }
@@ -5865,6 +5872,30 @@ async function openAddParaCliente(section, clienteNome){
         sectionData['ciclos']=null;
         if(!cr.error) toast(`Servi\xe7o adicionado \xb7 Ciclo ${codigo} #${proxNum} criado `);
         else toast(`Servi\xe7o adicionado \xb7 Erro ao criar ciclo: ${cr.error}`,'error');
+        await openClienteDetalhe(clienteNome);
+        return;
+      }
+    }
+
+    // PT/DUO 1º serviço → propor criação de Inscrição (AMR)
+    if(section==='servicos' && _isPrimeiroPT){
+      if(confirm(`Primeiro serviço PT de ${clienteNome}.\nCriar Avaliação de Inscrição (AMR)?`)){
+        const allAvals = await api('/api/data/avaliacoes');
+        const maxAMR = (Array.isArray(allAvals)?allAvals:[])
+          .map(a=>a['_CodServ']||'').filter(c=>/^AMR-\d+$/.test(c))
+          .reduce((m,c)=>{const n=parseInt(c.split('-')[1]);return isNaN(n)?m:Math.max(m,n);},0);
+        const novoCod='AMR-'+String(maxAMR+1).padStart(3,'0');
+        const ar=await api('/api/data/avaliacoes',{method:'POST',body:{
+          'Nome':clienteNome,
+          'Serviço':'AMR (Aval. Metab. Repouso)',
+          '_CodServ':novoCod,
+          'Origem':'Inscrição',
+          'Nível':'N1 - Avaliar',
+          'Cobrança':'Já pago (incluído no serviço)',
+        }});
+        sectionData['avaliacoes']=null;
+        if(!ar.error) toast(`Serviço adicionado · Inscrição ${novoCod} criada`,'success');
+        else toast(`Serviço adicionado · Erro na inscrição: ${ar.error}`,'error');
         await openClienteDetalhe(clienteNome);
         return;
       }
