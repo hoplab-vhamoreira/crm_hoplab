@@ -5565,11 +5565,11 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const servsAtivosCards = servicosAtivos.map(s=>_servCard(s,false)).join('');
   const servsConcluidos = todosServicos.filter(s=>{const e=(s['Estado do serviço']||'').trim();return e==='Concluído'||e==='Concluido';});
   const servsConcluidosCards = servsConcluidos.length
-    ? `<div class="serv-section-label">Anteriores</div>${servsConcluidos.map(s=>_servCard(s,true)).join('')}`
+    ? `<div class="serv-section-label">Serviços anteriores</div>${servsConcluidos.map(s=>_servCard(s,true)).join('')}`
     : '';
-  const servsTable = (motorCard||servsAtivosCards||servsConcluidosCards)
-    ? `<div class="serv-cards">${motorCard}${servsAtivosCards}${servsConcluidosCards}</div>`
-    : `<div class="tl-empty">Sem serviços registados</div>`;
+  const servsTable = (motorCard||servsAtivosCards)
+    ? `<div class="serv-cards">${motorCard}${servsAtivosCards}</div>`
+    : `<div class="tl-empty">Sem serviços activos</div>`;
   const servsHtml=tabHeader('Serviços','servicos')+servsTable;
 
   // Tab: Avaliações
@@ -5739,7 +5739,10 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const _auditHtml=d.historico&&d.historico.length
     ? `<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Histórico de sistema</div><div class="timeline">${d.historico.map(h=>buildHistItem(h)).join('')}</div></div>`
     : '';
-  const histHtml=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+  const _servsAntHtml = servsConcluidosCards
+    ? `<div style="margin-bottom:20px">${servsConcluidosCards}</div>`
+    : '';
+  const histHtml=`${_servsAntHtml}<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
     <span style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Histórico de Contactos</span>
     <button class="btn btn-ghost btn-sm" onclick="openAddContactoCliente('${nomeEsc}')">Registar contacto</button>
   </div>${_lcTable}${_auditHtml}`;
