@@ -282,6 +282,16 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 .mini-table tr:hover td{background:rgba(170,255,0,.05)}
 .mini-table th:last-child,.mini-table td:last-child{position:sticky;right:0;background:var(--surface);z-index:1}
 .mini-table tr:hover td:last-child{background:rgba(170,255,0,.05)}
+.serv-cards{display:flex;flex-direction:column;gap:8px}
+.serv-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.serv-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.serv-card-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.serv-card-sub{font-size:11px;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.serv-card-price{font-size:12px;font-weight:600;color:var(--navy);white-space:nowrap}
+.serv-card-date{font-size:11px;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
+.serv-action-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px 6px;border-radius:6px;font-size:13px;transition:.12s}
+.serv-action-btn:hover{color:var(--primary);background:var(--surface2)}
+.serv-action-btn.danger:hover{color:var(--danger);background:rgba(239,68,68,.08)}
 /* estado badges */
 .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
 .badge-ok{background:rgba(34,197,94,.15);color:var(--success)}
@@ -5514,34 +5524,44 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const motorCodigo = d.motor ? (d.motor['Plano Actual']||'') : '';
   const motorEstado = d.motor ? (d.motor['Estado Hoje']||'Ativo') : '';
   const motorJaNoServico = motorCodigo && motorEstado==='Ativo' && servicosAtivos.some(s=>(s['Código']||'')=== motorCodigo);
-  const motorRow = (d.motor && !motorJaNoServico)
-    ? `<tr style="background:rgba(99,102,241,.05)">
-        <td>${estadoMotorBadge(d.motor['Estado Hoje'])}</td>
-        <td><strong>${d.motor['Plano Actual']||'—'}</strong> <span style="font-size:10px;color:var(--text-muted)">(Motor)</span></td>
-        <td>—</td>
-        <td>${info['PT']||'—'}</td>
-        <td>${fmtDate(d.motor['Data Início'])}</td>
-        <td>${d.motor['Total 2026']?parseFloat(d.motor['Total 2026']).toFixed(2)+'€/ano':'—'}</td>
-      </tr>` : '';
-  const servsRows = servicosAtivos.map(s=>{
+  const motorCard = (d.motor && !motorJaNoServico)
+    ? `<div class="serv-card" style="border-left:3px solid var(--primary);background:rgba(99,102,241,.05)">
+        <div class="serv-card-top">
+          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+            ${estadoMotorBadge(d.motor['Estado Hoje'])}
+            <div>
+              <div class="serv-card-name">${d.motor['Plano Actual']||'—'} <span style="font-size:10px;color:var(--text-muted)">(Motor)</span></div>
+              <div class="serv-card-sub">${info['PT']||''} · Início ${fmtDate(d.motor['Data Início'])}</div>
+            </div>
+          </div>
+          <div class="serv-card-price">${d.motor['Total 2026']?parseFloat(d.motor['Total 2026']).toFixed(2)+'€/ano':'—'}</div>
+        </div>
+      </div>` : '';
+  const servsCards = servicosAtivos.map(s=>{
+    const sJSON = JSON.stringify(s).replace(/</g,'\\u003c').replace(/'/g,"\\'");
     const btnEdit = s['_idx']!=null
-      ? `<button onclick="openEditDetalhe('servicos',${s['_idx']},${JSON.stringify(s).replace(/</g,'\\u003c')},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Editar" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">✏</button>` : '';
+      ? `<button onclick="openEditDetalhe('servicos',${s['_idx']},${JSON.stringify(s).replace(/</g,'\\u003c')},'${nomeEsc}')" class="serv-action-btn" title="Editar">✏</button>` : '';
     const btnDel = s['_idx']!=null
-      ? `<button onclick="deleteDetalhe('servicos',${s['_idx']},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Eliminar" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">🗑</button>` : '';
-    return `<tr>
-      <td>${estadoServBadge(s['Estado do serviço'])}</td>
-      <td>${s['Serviço']||'—'}</td>
-      <td>${s['Código']||'—'}</td>
-      <td>${s['Técnico Responsável']||'—'}</td>
-      <td>${fmtDate(s['Data Conversão'])}</td>
-      <td>${s['Ciclo']||'—'}</td>
-      <td style="white-space:nowrap">${btnEdit}${btnDel}</td>
-    </tr>`;
+      ? `<button onclick="deleteDetalhe('servicos',${s['_idx']},'${nomeEsc}')" class="serv-action-btn danger" title="Eliminar">🗑</button>` : '';
+    return `<div class="serv-card">
+      <div class="serv-card-top">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+          ${estadoServBadge(s['Estado do serviço'])}
+          <div style="min-width:0">
+            <div class="serv-card-name">${s['Serviço']||'—'}</div>
+            <div class="serv-card-sub">${s['Código']||''} · ${s['Técnico Responsável']||'—'}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          <div class="serv-card-price">${s['Ciclo']||'—'}</div>
+          ${btnEdit}${btnDel}
+        </div>
+      </div>
+      ${s['Data Conversão']?`<div class="serv-card-date">Início: ${fmtDate(s['Data Conversão'])}</div>`:''}
+    </div>`;
   }).join('');
-  const servsTable = (motorRow||servsRows)
-    ? `<div class="mini-table-wrap"><table class="mini-table"><thead><tr><th>Estado</th><th>Serviço / Plano</th><th>Código</th><th>Técnico</th><th>Início</th><th>Ciclo / Total</th><th></th></tr></thead><tbody>
-       ${motorRow}${servsRows}
-       </tbody></table></div>`
+  const servsTable = (motorCard||servsCards)
+    ? `<div class="serv-cards">${motorCard}${servsCards}</div>`
     : `<div class="tl-empty">Sem serviços activos</div>`;
   const servsHtml=tabHeader('Serviços activos','servicos')+servsTable;
 
