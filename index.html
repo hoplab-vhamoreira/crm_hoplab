@@ -5718,7 +5718,10 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
         ${inPane?'':`<button class="btn btn-ghost btn-sm" onclick="navigate('clientes')" style="font-size:18px;padding:6px 10px">←</button>`}
         <div>
           <h1 class="cd-name">${nome}</h1>
-          <div style="margin-top:6px">${renderStatusBadges(info.Status)}</div>
+          <div style="margin-top:6px">${renderStatusBadges(
+            (info.Status==='Sem Serviço' && (servicosAtivos.some(s=>s['Estado do serviço']==='Em curso') || temMotor))
+              ? 'Ativo' : info.Status
+          )}</div>
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
@@ -5933,6 +5936,16 @@ async function openAddParaCliente(section, clienteNome){
         else toast(`Serviço adicionado · Erro na inscrição: ${ar.error}`,'error');
         await openClienteDetalhe(clienteNome);
         return;
+      }
+    }
+
+    // Atualizar Status do cliente se "Sem Serviço" e serviço está Em curso
+    if(section==='servicos' && rec['Estado do serviço']==='Em curso'){
+      const cliData=sectionData['clientes']||(await api('/api/data/clientes'));
+      const cli=(Array.isArray(cliData)?cliData:[]).find(c=>c['Nome']===clienteNome);
+      if(cli?.['Status']==='Sem Serviço'){
+        await api(`/api/clientes/${encodeURIComponent(clienteNome)}/estado`,{method:'POST',body:{status:'Ativo'}});
+        sectionData['clientes']=null;
       }
     }
 
