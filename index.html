@@ -248,7 +248,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 .md-item-body .md-sub{font-size:11px;color:var(--text-muted);margin-top:2px}
 .md-detail{overflow-y:auto;background:var(--surface2);padding:0 24px 24px}
 .md-empty-pane{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);gap:12px;font-size:13px}
-.md-detail .cd-sidebar{width:240px}
+.md-detail .cd-sidebar{width:360px}
 .md-detail .page-header{padding:16px 0 10px}
 .md-detail,.md-detail *{font-size:12px}
 .md-detail h1,.md-detail .cd-name{font-size:15px!important;font-weight:700!important}
@@ -586,7 +586,16 @@ async function api(url,opts={}){
     return{info,log_comercial:log,historico:[]};
   }
   const lM=url.match(/^\/api\/lookup\/([^\/]+)\/(.+)$/);
-  if(lM){const f=decodeURIComponent(lM[2]);const sel=f.includes(' ')?`"${f}"`:f;const{data}=await _SB.from(_TABLE_MAP[lM[1]]||lM[1]).select(sel);return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];}
+  if(lM){
+    const f=decodeURIComponent(lM[2]);
+    const qs=url.includes('?')?new URLSearchParams(url.split('?')[1]):null;
+    const ff=qs?.get('filter_field');
+    const fsel=f.includes(' ')?`"${f}"`:f;
+    let q=_SB.from(_TABLE_MAP[lM[1]]||lM[1]).select(ff?`${fsel},"${ff}"`:fsel);
+    if(ff) q=q.not(ff,'is',null).neq(ff,'');
+    const{data}=await q;
+    return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];
+  }
   if(url.startsWith('/api/autofill')){const p=new URLSearchParams(url.split('?')[1]||'');const f=p.get('return_field');const sel=f&&f.includes(' ')?`"${f}"`:f;const{data}=await _SB.from(_TABLE_MAP[p.get('src')]||p.get('src')).select(sel);return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];}
   const eM=url.match(/^\/api\/clientes\/(.+)\/estado$/);
   if(eM&&method==='POST'){const nome=decodeURIComponent(eM[1]);const{error}=await _SB.from('clientes').update({'Status':body.status}).eq('Nome',nome);if(error)return{error:error.message};return{ok:true};}
@@ -813,7 +822,7 @@ const SECTIONS = {
     cols:['Cliente','Serviço','Código','Técnico Responsável','Nível','Data Conversão','Estado do serviço'],
     fields:[
       {k:'Cliente',t:'lookup',src:'clientes',sf:'Nome'},
-      {k:'Serviço',t:'lookup',src:'precario_publico',sf:'Serviço'},
+      {k:'Serviço',t:'lookup',src:'precario_publico',sf:'Serviço',sfFilter:'Código'},
       {k:'Técnico Responsável',t:'lookup',src:'dados_colaboradores',sf:'Nome Oficial'},
       {k:'Venda de',t:'lookup',src:'dados_colaboradores',sf:'Nome Oficial'},
       {k:'Data Conversão',t:'date'},
@@ -1977,10 +1986,11 @@ function closeModal(){
 
 // Cache de lookups para não pedir ao servidor repetidamente
 const _lookupCache={};
-async function getLookup(src,sf){
-  const key=`${src}.${sf}`;
+async function getLookup(src,sf,sfFilter){
+  const key=`${src}.${sf}${sfFilter?'|'+sfFilter:''}`;
   if(!_lookupCache[key]){
-    const vals=await api(`/api/lookup/${src}/${encodeURIComponent(sf)}`);
+    const url=`/api/lookup/${src}/${encodeURIComponent(sf)}${sfFilter?'?filter_field='+encodeURIComponent(sfFilter):''}`;
+    const vals=await api(url);
     _lookupCache[key]=Array.isArray(vals)?vals:[];
   }
   return _lookupCache[key];
@@ -2007,7 +2017,7 @@ async function buildFieldHtml(f, val=''){
   } else if(f.t==='select'){
     inner=`<select id="${safeId}">${(f.opts||[]).map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')}</select>`;
   } else if(f.t==='lookup'){
-    const opts=await getLookup(f.src,f.sf);
+    const opts=await getLookup(f.src,f.sf,f.sfFilter);
     const dlId=`dl_${safeId}`;
     const optsHtml=opts.map(o=>`<option value="${o.replace(/"/g,'&quot;')}">`).join('');
     inner=`<input type="text" id="${safeId}" value="${String(val).replace(/"/g,'&quot;')}" list="${dlId}" autocomplete="off" placeholder="Escrever para pesquisar...">
@@ -5799,6 +5809,28 @@ async function openAddParaCliente(section, clienteNome){
   document.getElementById('modalSave').onclick=async()=>{
     const rec={};
     for(const f of sec.fields) rec[f.k]=getFieldValue(f);
+
+    // Auto-preencher Código a partir do precário antes de guardar
+    if(section==='servicos' && rec['Serviço']){
+      const precData = sectionData['precario_publico'] || (await api('/api/data/precario_publico'));
+      sectionData['precario_publico'] = Array.isArray(precData)?precData:[];
+      const precItem = sectionData['precario_publico'].find(p=>p['Serviço']===rec['Serviço']);
+      const baseCode = precItem?.['Código']||'';
+      if(baseCode){
+        // Serviços PT/DUO: gerar código sequencial (ex: PT2-30-026)
+        if(/^(PT|DUO)/i.test(baseCode)){
+          const allServs = await api('/api/data/servicos');
+          const prefix = baseCode+'-';
+          const maxN = (Array.isArray(allServs)?allServs:[])
+            .map(s=>s['Código']||'').filter(c=>c.startsWith(prefix))
+            .reduce((m,c)=>{const n=parseInt(c.split('-').pop());return isNaN(n)?m:Math.max(m,n);},0);
+          rec['Código'] = prefix+String(maxN+1).padStart(3,'0');
+        } else {
+          rec['Código'] = baseCode;
+        }
+      }
+    }
+
     const res = await api(`/api/data/${section}`,{method:'POST',body:rec});
     if(res?.error){ toast('Erro ao adicionar: '+res.error,'error'); return; }
     sectionData[section]=null;
