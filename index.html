@@ -261,7 +261,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 .md-detail .cd-info-row .lbl{font-size:10px!important}
 .md-detail .cd-info-row .val{font-size:12px!important}
 .md-detail .btn{font-size:11px!important;padding:5px 10px!important}
-@media(max-width:900px){.md-wrap{grid-template-columns:1fr;height:auto}.md-list{max-height:45vh}.md-detail{min-height:55vh}}
+@media(max-width:1024px){.md-wrap{grid-template-columns:1fr;height:auto}.md-list{max-height:40vh;border-right:none;border-bottom:1px solid var(--border)}.md-detail{min-height:50vh}}
 /* TIMELINE */
 .timeline{display:flex;flex-direction:column;gap:0}
 .tl-item{display:flex;gap:16px;padding:14px 0;border-bottom:1px solid var(--border)}
@@ -314,17 +314,18 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 .hamburger{display:none;position:fixed;top:12px;left:12px;z-index:200;background:#141720;border:1px solid #2a3050;color:#aaff00;padding:8px 11px;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99}
 .sidebar-overlay.show{display:block}
-@media(max-width:768px){
+@media(max-width:1024px){
   .hamburger{display:block}
   .sidebar{transform:translateX(-100%);transition:transform .25s ease;z-index:101}
   .sidebar.mob-open{transform:translateX(0)}
-  .main{margin-left:0!important;padding:60px 14px calc(24px + env(safe-area-inset-bottom,16px))}
+  .main{margin-left:0!important;padding:60px 20px calc(24px + env(safe-area-inset-bottom,16px))}
   .modal{width:92%;max-width:560px}
   .login-box{width:90%;max-width:400px;padding:32px 20px}
   .stats-grid{grid-template-columns:repeat(2,1fr)!important}
   .db-grid-2{grid-template-columns:1fr}
   .cd-wrap{flex-direction:column}
-  .cd-sidebar{width:100%}
+  .cd-sidebar{width:100%!important}
+  .md-detail .cd-sidebar{width:100%!important}
   .page-header{flex-wrap:wrap;gap:10px}
   .table-toolbar{flex-wrap:wrap}
   .tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -347,11 +348,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
   .stat-card{padding:14px}
   .stat-card .value{font-size:22px}
 }
-@media(min-width:769px) and (max-width:1024px){
+@media(min-width:1025px) and (max-width:1280px){
   :root{--sidebar-w:220px}
-  .main{padding:20px 32px}
+  .main{padding:20px 28px}
   .stats-grid{grid-template-columns:repeat(2,1fr)}
   .modal{max-width:500px}
+  .md-wrap{grid-template-columns:280px 1fr}
+  .md-detail .cd-sidebar{width:280px!important}
 }
 </style>
 </head>
