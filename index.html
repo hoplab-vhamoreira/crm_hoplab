@@ -5466,7 +5466,8 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const motorCodeForCount = temMotor ? (d.motor['Plano Actual']||'') : '';
   const motorEstadoForCount = temMotor ? (d.motor['Estado Hoje']||'Ativo') : '';
   const motorJaContado = motorCodeForCount && motorEstadoForCount==='Ativo' && servicosAtivos.some(s=>(s['Código']||'')=== motorCodeForCount);
-  const nServicos = servicosAtivos.length + (temMotor && !motorJaContado ? 1 : 0);
+  const nConvsOutros = (d.conversoes||[]).filter(c=>!/^(PT|DUO)/i.test(c['Código Serviço']||'')).length;
+  const nServicos = servicosAtivos.length + (temMotor && !motorJaContado ? 1 : 0) + nConvsOutros;
   const nAvals    = (d.avaliacoes||[]).length;
   const nPag26    = temPag26 ? d.pag_2026.length
                   : temMotor ? MESES_S.filter(m=>d.motor[m]&&d.motor[m]>0).length : 0;
@@ -5585,11 +5586,34 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const servsAtivosCards = servicosAtivos.map(s=>_servCard(s,false)).join('');
   const servsConcluidos = todosServicos.filter(s=>{const e=(s['Estado do serviço']||'').trim();return e==='Concluído'||e==='Concluido';});
   const servsConcluidosCards = servsConcluidos.length
-    ? `<div class="serv-section-label">Serviços anteriores</div>${servsConcluidos.map(s=>_servCard(s,true)).join('')}`
+    ? `<div class="serv-section-label">Planos anteriores</div>${servsConcluidos.map(s=>_servCard(s,true)).join('')}`
     : '';
-  const servsTable = (motorCard||servsAtivosCards)
-    ? `<div class="serv-cards">${motorCard}${servsAtivosCards}</div>`
-    : `<div class="tl-empty">Sem serviços activos</div>`;
+
+  // Conversoes — excluir PT/DUO (já no motor/servicos)
+  const _isPTDUO = cod => /^(PT|DUO)/i.test(cod||'');
+  const convsOutros = (d.conversoes||[]).filter(c=>!_isPTDUO(c['Código Serviço']));
+  function _convCard(c){
+    const btnDel = c['_idx']!=null
+      ? `<button onclick="deleteDetalhe('conversoes',${c['_idx']},'${nomeEsc}')" class="serv-action-btn danger" title="Eliminar">🗑</button>` : '';
+    return `<div class="serv-card">
+      <div class="serv-card-row">
+        <span class="badge badge-info" style="flex-shrink:0">${fmtDate(c['Data da Marcação/Início'])}</span>
+        <div style="min-width:0">
+          <div class="serv-card-name">${c['Serviço']||'—'} <span style="font-size:10px;font-weight:400;color:var(--text-muted)">${c['Código Serviço']||''}</span></div>
+        </div>
+        <div class="serv-card-tech">${c['Técnico Responsável']||c['Venda de']||'—'}</div>
+        <div class="serv-card-price">${c['Valor total a Cobrar Serviço']!=null?parseFloat(c['Valor total a Cobrar Serviço']).toFixed(0)+'€':'—'}</div>
+        <div style="display:flex;gap:2px">${btnDel}</div>
+      </div>
+    </div>`;
+  }
+  const convsCards = convsOutros.length
+    ? `<div class="serv-section-label">Outros Serviços</div>${convsOutros.map(c=>_convCard(c)).join('')}`
+    : '';
+
+  const servsTable = (motorCard||servsAtivosCards||convsCards)
+    ? `<div class="serv-cards">${motorCard}${servsAtivosCards}${convsCards}${servsConcluidosCards}</div>`
+    : `<div class="tl-empty">Sem serviços registados</div>`;
   const servsHtml=tabHeader('Serviços','servicos')+servsTable;
 
   // Tab: Avaliações
@@ -5777,9 +5801,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const _servsAntHtml = servsConcluidosCards
     ? `<div style="margin-bottom:20px">${servsConcluidosCards}</div>`
     : '';
-  const _convHtml = _convTable
-    ? `<div style="margin-bottom:20px"><div class="serv-section-label" style="margin-bottom:8px">Conversões</div>${_convTable}</div>`
-    : '';
+  const _convHtml = ''; // conversoes agora aparecem na tab Serviços
   const histHtml=`${_servsAntHtml}${_convHtml}<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
     <span style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Histórico de Contactos</span>
     <button class="btn btn-ghost btn-sm" onclick="openAddContactoCliente('${nomeEsc}')">Registar contacto</button>
