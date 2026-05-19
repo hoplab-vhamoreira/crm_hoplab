@@ -5331,7 +5331,7 @@ function fmtDate(d){
 function _codigoToLabel(cod){
   if(!cod) return '—';
   const c=String(cod).trim();
-  if(/^PT-?MIX/i.test(c)) return 'PT Mix';
+  if(/^PT-?MIX/i.test(c)) return 'PT 1x 30m + 1x 60m';
   const pt=c.match(/^PT(\d+)-(\d+)-\d+/i);
   if(pt) return `PT ${pt[1]}x ${pt[2]} minutos`;
   const cd=c.match(/^CEDDUO(\d+)-(\d+)-\d+/i);
