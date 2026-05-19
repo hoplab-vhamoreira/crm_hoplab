@@ -5724,7 +5724,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
       const passado=i<mesAtual, atual=i===mesAtual;
       const rowStyle=atual?'background:rgba(99,102,241,.08)':'';
       const badge=passado?`<span class="badge badge-warn">Sem registo</span>`:atual?`<span class="badge badge-info">Mês actual</span>`:`<span class="badge" style="background:rgba(148,163,184,.1);color:var(--text-muted)">Futuro</span>`;
-      return `<tr style="${rowStyle}"><td>${MESES_PT[i]}</td><td style="font-size:12px">${d.motor['Plano Actual']||'—'}</td><td style="text-align:right;font-weight:600">${val}€</td><td style="text-align:right">—</td><td>${badge}</td><td colspan="3"></td></tr>`;
+      return `<tr style="${rowStyle}"><td>${MESES_PT[i]}</td><td style="font-size:12px">${_codigoToLabel(d.motor['Plano Actual'])||'—'}</td><td style="text-align:right;font-weight:600">${val}€</td><td style="text-align:right">—</td><td>${badge}</td><td colspan="3"></td></tr>`;
     }).filter(Boolean).join('');
   } else {
     fatRows += anoSep(2026) + `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);font-size:12px;padding:10px">Sem registos em 2026</td></tr>`;
