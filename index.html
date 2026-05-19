@@ -5611,7 +5611,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
       <div class="serv-card-row">
         ${estadoServBadge(s['Estado do serviço'])}
         <div style="min-width:0">
-          <div class="serv-card-name">${s['Serviço']||_codigoToLabel(s['Código'])||'—'}</div>
+          <div class="serv-card-name">${_codigoToLabel(s['Serviço']||s['Código'])||'—'}</div>
           ${s['Código']?`<div style="font-size:10px;color:var(--text-muted);margin-top:1px">${s['Código']}</div>`:''}
         </div>
         <div class="serv-card-tech">${s['Técnico Responsável']||'—'}</div>
