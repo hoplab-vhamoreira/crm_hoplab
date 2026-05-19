@@ -576,7 +576,7 @@ async function api(url,opts={}){
   const cM=url.match(/^\/api\/cliente\/(.+)$/);
   if(cM){
     const nome=decodeURIComponent(cM[1]);
-    const[cli,serv,aval,log,pag26,pag25,mot,lc,logcom]=await Promise.all([
+    const[cli,serv,aval,log,pag26,pag25,mot,lc,logcom,conv]=await Promise.all([
       _SB.from('clientes').select('*').eq('Nome',nome).single(),
       _SB.from('servicos').select('*').eq('Cliente',nome),
       _SB.from('avaliacoes').select('*').eq('Nome',nome),
@@ -585,13 +585,14 @@ async function api(url,opts={}){
       _SB.from('pag_clientes_2025').select('*').eq('Cliente',nome),
       _SB.from('motor2026').select('*').eq('Cliente',nome).single(),
       _SB.from('log_contratos').select('*').eq('Cliente',nome),
-      _SB.from('log_comercial').select('*').eq('Contacto',nome).order('Data A\xe7\xe3o',{ascending:false})
+      _SB.from('log_comercial').select('*').eq('Contacto',nome).order('Data A\xe7\xe3o',{ascending:false}),
+      _SB.from('conversoes').select('*').eq('Cliente',nome).order('Data da Marca\xe7\xe3o/In\xedcio',{ascending:false})
     ]);
     const mIdx=arr=>(arr||[]).map(r=>({...r,_idx:r.id}));
     const logComData=(logcom.data||[]).map(l=>({...l,'Dias Atrás':l['Data Ação']?Math.floor((new Date()-new Date(String(l['Data Ação']).slice(0,10)))/86400000):null}));
     return{info:_recomputeClienteContacto(cli.data),servicos:mIdx(serv.data),avaliacoes:mIdx(aval.data),
       historico:log.data||[],pag_2026:mIdx(pag26.data),pag_2025:mIdx(pag25.data),
-      motor:mot.data||null,log_contratos:mIdx(lc.data),log_comercial:logComData};
+      motor:mot.data||null,log_contratos:mIdx(lc.data),log_comercial:logComData,conversoes:mIdx(conv.data)};
   }
   const oM=url.match(/^\/api\/on\/(\d+)$/);
   if(oM){
@@ -5472,7 +5473,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const nPag25    = (d.pag_2025||[]).length;
   const nFaturacao = nPag26 + nPag25;
   const nContratos= (d.log_contratos||[]).length;
-  const nHistorico= (d.log_comercial||[]).length;
+  const nHistorico= (d.log_comercial||[]).length + (d.conversoes||[]).length;
 
   // Sidebar info
   const isHibrido = info['Regime'] === 'Híbrido';
@@ -5758,10 +5759,28 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const _auditHtml=d.historico&&d.historico.length
     ? `<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Histórico de sistema</div><div class="timeline">${d.historico.map(h=>buildHistItem(h)).join('')}</div></div>`
     : '';
+  // Conversões
+  const _convRows=(d.conversoes||[]).map(c=>`<tr>
+    <td>${fmtDate(c['Data da Marcação/Início'])}</td>
+    <td style="font-weight:500">${c['Serviço']||'—'}</td>
+    <td style="font-size:11px;color:var(--text-muted)">${c['Código Serviço']||'—'}</td>
+    <td style="text-align:right">${c['Valor total a Cobrar Serviço']!=null?parseFloat(c['Valor total a Cobrar Serviço']).toFixed(0)+'€':'—'}</td>
+    <td>${c['Técnico Responsável']||c['Venda de']||'—'}</td>
+    <td style="white-space:nowrap">
+      ${c['_idx']!=null?`<button onclick="deleteDetalhe('conversoes',${c['_idx']},'${nomeEsc}')" class="serv-action-btn danger" title="Eliminar">🗑</button>`:''}
+    </td>
+  </tr>`).join('');
+  const _convTable=_convRows
+    ? `<div class="mini-table-wrap"><table class="mini-table"><thead><tr><th>Data</th><th>Serviço</th><th>Código</th><th style="text-align:right">Valor</th><th>Técnico</th><th></th></tr></thead><tbody>${_convRows}</tbody></table></div>`
+    : '';
+
   const _servsAntHtml = servsConcluidosCards
     ? `<div style="margin-bottom:20px">${servsConcluidosCards}</div>`
     : '';
-  const histHtml=`${_servsAntHtml}<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+  const _convHtml = _convTable
+    ? `<div style="margin-bottom:20px"><div class="serv-section-label" style="margin-bottom:8px">Conversões</div>${_convTable}</div>`
+    : '';
+  const histHtml=`${_servsAntHtml}${_convHtml}<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
     <span style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Histórico de Contactos</span>
     <button class="btn btn-ghost btn-sm" onclick="openAddContactoCliente('${nomeEsc}')">Registar contacto</button>
   </div>${_lcTable}${_auditHtml}`;
