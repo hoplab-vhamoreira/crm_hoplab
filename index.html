@@ -625,7 +625,19 @@ async function api(url,opts={}){
     const{data}=await q;
     return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];
   }
-  if(url.startsWith('/api/autofill')){const p=new URLSearchParams(url.split('?')[1]||'');const f=p.get('return_field');const sel=f&&f.includes(' ')?`"${f}"`:f;const{data}=await _SB.from(_TABLE_MAP[p.get('src')]||p.get('src')).select(sel);return data?[...new Set(data.map(r=>r[f]).filter(Boolean))].sort():[];}
+  if(url.startsWith('/api/autofill')){
+    const p=new URLSearchParams(url.split('?')[1]||'');
+    const src=_TABLE_MAP[p.get('src')]||p.get('src');
+    const rf=p.get('return_field'); const mf=p.get('match_field'); const mv=p.get('match_val');
+    const rfSel=rf&&rf.includes(' ')?`"${rf}"`:rf;
+    if(mv&&mf){
+      let q=_SB.from(src).select(rfSel).eq(mf,mv).limit(1);
+      const{data}=await q;
+      return{value:data&&data[0]?data[0][rf]:null};
+    }
+    const{data}=await _SB.from(src).select(rfSel);
+    return data?[...new Set(data.map(r=>r[rf]).filter(Boolean))].sort():[];
+  }
   const eM=url.match(/^\/api\/clientes\/(.+)\/estado$/);
   if(eM&&method==='POST'){const nome=decodeURIComponent(eM[1]);const{error}=await _SB.from('clientes').update({'Status':body.status}).eq('Nome',nome);if(error)return{error:error.message};return{ok:true};}
   // Rota direta por database id: /api/data/{table}/dbid/{id}
@@ -775,6 +787,8 @@ const SECTIONS = {
       {k:'NIF',t:'text'},
       {k:'Morada',t:'text'},
       {k:'Localidade',t:'text'},
+      {k:'Parceiro',t:'lookup',src:'parceiros',sf:'Nome / Empresa',
+        fills:[{src:'parceiros',mf:'Nome / Empresa',rf:'Código',tf:'Segmento'}]},
       {k:'Segmento',t:'text'},
       {k:'PT',t:'lookup',src:'dados_colaboradores',sf:'Nome Oficial'},
       {k:'Nutricionista',t:'lookup',src:'dados_colaboradores',sf:'Nome Oficial'},
@@ -2111,15 +2125,13 @@ async function buildFieldHtml(f, val=''){
     setup = ()=>{
       const inp=document.getElementById(safeId);
       if(!inp) return;
-      inp.addEventListener('change', ()=>{
-        f.fills.forEach(fl=>{
+      inp.addEventListener('change', async ()=>{
+        for(const fl of f.fills){
           const tgtId=`field_${fl.tf.replace(/[^a-zA-Z0-9]/g,'_')}`;
-          fetch(`/api/autofill?src=${encodeURIComponent(fl.src)}&match_field=${encodeURIComponent(fl.mf)}&return_field=${encodeURIComponent(fl.rf)}&match_val=${encodeURIComponent(inp.value)}`)
-            .then(r=>r.json()).then(r=>{
-              const tgt=document.getElementById(tgtId);
-              if(tgt && r.value!=null && !tgt.value) tgt.value=r.value;
-            });
-        });
+          const r=await api(`/api/autofill?src=${encodeURIComponent(fl.src)}&match_field=${encodeURIComponent(fl.mf)}&return_field=${encodeURIComponent(fl.rf)}&match_val=${encodeURIComponent(inp.value)}`);
+          const tgt=document.getElementById(tgtId);
+          if(tgt && r?.value!=null) tgt.value=r.value;
+        }
       });
     };
   }
