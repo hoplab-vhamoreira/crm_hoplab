@@ -5328,6 +5328,21 @@ function fmtDate(d){
   return s||'—';
 }
 
+function _codigoToLabel(cod){
+  if(!cod) return '—';
+  const c=String(cod).trim();
+  if(/^PT-?MIX/i.test(c)) return 'PT Mix';
+  const pt=c.match(/^PT(\d+)-(\d+)-\d+/i);
+  if(pt) return `PT ${pt[1]}x ${pt[2]} minutos`;
+  const cd=c.match(/^CEDDUO(\d+)-(\d+)-\d+/i);
+  if(cd) return `CED+DUO ${cd[2]}x ${cd[1]} minutos`;
+  const duo=c.match(/^DUO(\d+)-(\d+)-\d+/i);
+  if(duo) return `DUO ${duo[2]}x ${duo[1]} minutos`;
+  const ced=c.match(/^CED(\d+)-(\d+)-\d+/i);
+  if(ced) return `CED ${ced[2]}x ${ced[1]} minutos`;
+  return c;
+}
+
 function pagBadge(v){
   if(!v||v==='—') return `<span class="badge badge-info">—</span>`;
   if(v.includes('')) return `<span class="badge badge-ok">${v}</span>`;
@@ -5374,7 +5389,7 @@ function _renderClientesMD(el){
       <div class="md-avatar">${initials}</div>
       <div class="md-item-body">
         <div class="md-name">${nome}</div>
-        <div class="md-sub">${[statusBase,plano].filter(Boolean).join(' · ')||'—'}${diasHtml}</div>
+        <div class="md-sub">${[statusBase,plano?_codigoToLabel(plano):null].filter(Boolean).join(' · ')||'—'}${diasHtml}</div>
       </div>
     </div>`;
   }).join('')||`<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">Sem resultados</div>`;
@@ -5563,7 +5578,8 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
         <div class="serv-card-row">
           ${estadoMotorBadge(d.motor['Estado Hoje'])}
           <div style="min-width:0">
-            <div class="serv-card-name">${d.motor['Plano Actual']||'—'} <span style="font-size:10px;font-weight:400;color:var(--text-muted)">(Motor)</span></div>
+            <div class="serv-card-name">${_codigoToLabel(d.motor['Plano Actual'])} <span style="font-size:10px;font-weight:400;color:var(--text-muted)">(Motor)</span></div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:1px">${d.motor['Plano Actual']||''}</div>
           </div>
           <div class="serv-card-tech">${info['PT']||'—'}</div>
           <div class="serv-card-price">${d.motor['Total 2026']?parseFloat(d.motor['Total 2026']).toFixed(2)+'€/ano':'—'}</div>
@@ -5583,7 +5599,8 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
       <div class="serv-card-row">
         ${estadoServBadge(s['Estado do serviço'])}
         <div style="min-width:0">
-          <div class="serv-card-name">${s['Serviço']||'—'} <span style="font-size:10px;font-weight:400;color:var(--text-muted)">${s['Código']||''}</span></div>
+          <div class="serv-card-name">${s['Serviço']||_codigoToLabel(s['Código'])||'—'}</div>
+          ${s['Código']?`<div style="font-size:10px;color:var(--text-muted);margin-top:1px">${s['Código']}</div>`:''}
         </div>
         <div class="serv-card-tech">${s['Técnico Responsável']||'—'}</div>
         <div class="serv-card-price">${s['Ciclo']||'—'}</div>
