@@ -5568,7 +5568,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
           <div class="serv-card-tech">${info['PT']||'—'}</div>
           <div class="serv-card-price">${d.motor['Total 2026']?parseFloat(d.motor['Total 2026']).toFixed(2)+'€/ano':'—'}</div>
           <div style="display:flex;gap:2px">
-            <button onclick="openEditDetalhe('motor2026',${d.motor.id},${JSON.stringify(d.motor).replace(/</g,'\\u003c')},'${nomeEsc}')" class="serv-action-btn" title="Editar">✏</button>
+            <button onclick="openEditDetalhe('motor2026',${d.motor.id},${JSON.stringify(d.motor).replace(/</g,'\\u003c').replace(/"/g,'&quot;')},'${nomeEsc}')" class="serv-action-btn" title="Editar">✏</button>
             <button onclick="deleteDetalhe('motor2026',${d.motor.id},'${nomeEsc}')" class="serv-action-btn danger" title="Eliminar">🗑</button>
           </div>
         </div>
@@ -5576,7 +5576,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
       </div>` : '';
   function _servCard(s, dimmed){
     const btnEdit = s['_idx']!=null
-      ? `<button onclick="openEditDetalhe('servicos',${s['_idx']},${JSON.stringify(s).replace(/</g,'\\u003c')},'${nomeEsc}')" class="serv-action-btn" title="Editar">✏</button>` : '';
+      ? `<button onclick="openEditDetalhe('servicos',${s['_idx']},${JSON.stringify(s).replace(/</g,'\\u003c').replace(/"/g,'&quot;')},'${nomeEsc}')" class="serv-action-btn" title="Editar">✏</button>` : '';
     const btnDel = s['_idx']!=null
       ? `<button onclick="deleteDetalhe('servicos',${s['_idx']},'${nomeEsc}')" class="serv-action-btn danger" title="Eliminar">🗑</button>` : '';
     return `<div class="serv-card${dimmed?' serv-card-dim':''}">
@@ -5750,7 +5750,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
        ${d.log_contratos.map(c=>{
          const cRec={'Cliente':nome,'Estado':c['Estado'],'Motivo':c['Motivo'],'Data Início':c['Data_Inicio'],'Data Fim':c['Data_Fim'],'Registado por':c['Registado_por'],'Notas':c['Notas']};
          const btnEdit = c['_idx']!=null
-           ? `<button onclick="openEditDetalhe('log_contratos',${c['_idx']},${JSON.stringify(cRec).replace(/</g,'\\u003c')},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Editar" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">✏</button>` : '';
+           ? `<button onclick="openEditDetalhe('log_contratos',${c['_idx']},${JSON.stringify(cRec).replace(/</g,'\\u003c').replace(/"/g,'&quot;')},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Editar" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">✏</button>` : '';
          const btnDel = c['_idx']!=null
            ? `<button onclick="deleteDetalhe('log_contratos',${c['_idx']},'${nomeEsc}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px" title="Eliminar" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">🗑</button>` : '';
          const desc = c['Desconto_pct'] ? `${Math.round(c['Desconto_pct']*100)}%` : '—';
