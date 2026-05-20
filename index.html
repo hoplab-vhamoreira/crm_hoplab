@@ -5612,15 +5612,21 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
 
   // Auto-calcular status — nunca depender do valor manual para estes casos
   const _temServicoAtivo = servicosAtivos.length > 0 || !!d.motor;
-  const _temAval = (d.avaliacoes||[]).length > 0;
+  const _temAval = (d.avaliacoes||[]).length > 0 || (d.conversoes||[]).some(c=>{
+    const sv=(c['Serviço']||'').toLowerCase();
+    const cd=(c['Código Serviço']||'').toUpperCase();
+    return sv.includes('avalia')||sv.includes('pack')||cd.startsWith('PV-')||cd.startsWith('AVAL');
+  });
+  const _canceladoPorContrato = !_temServicoAtivo && (d.log_contratos||[]).some(c=>c['Estado']==='Cancelado'&&!c['Data_Fim']);
   const _statusManual = info.Status||'';
   const _STATUS_SIMPLES = ['Ativo','Avaliação expirada','Sem Serviço','Suspenso','Cancelado'];
   const _statusProtegido = !_STATUS_SIMPLES.includes(_statusManual);
   let _statusCalculado = _statusManual;
   if(!_statusProtegido){
-    if(_temServicoAtivo) _statusCalculado = 'Ativo';
-    else if(_temAval)    _statusCalculado = 'Avaliação expirada';
-    else                 _statusCalculado = 'Sem Serviço';
+    if(_canceladoPorContrato)    _statusCalculado = 'Cancelado';
+    else if(_temServicoAtivo)    _statusCalculado = 'Ativo';
+    else if(_temAval)            _statusCalculado = 'Avaliação expirada';
+    else                         _statusCalculado = 'Sem Serviço';
   }
   // Corrigir na DB silenciosamente se divergir e atualizar cache + lista
   if(_statusCalculado !== _statusManual){
