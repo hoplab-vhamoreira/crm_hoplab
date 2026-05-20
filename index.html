@@ -5601,13 +5601,31 @@ async function openClienteDetalhe(nome){
 
 function renderClienteDetalhe(el, nome, d, inPane=false){
   const info=d.info||{};
-  const sc=statusClass(info.Status);
 
   // Serviços activos (excluir Concluídos)
   const servicosAtivos = (d.servicos||[]).filter(s=>{
     const e=(s['Estado do serviço']||'').trim();
     return e!=='Concluído' && e!=='Concluido';
   });
+
+  // Auto-calcular status — nunca depender do valor manual para estes casos
+  const _temServicoAtivo = servicosAtivos.length > 0 || !!d.motor;
+  const _temAval = (d.avaliacoes||[]).length > 0;
+  const _statusManual = info.Status||'';
+  const _statusProtegido = ['Suspenso','Cancelado'].includes(_statusManual);
+  let _statusCalculado = _statusManual;
+  if(!_statusProtegido){
+    if(_temServicoAtivo) _statusCalculado = 'Ativo';
+    else if(_temAval)    _statusCalculado = 'Avaliação expirada';
+    else                 _statusCalculado = 'Sem Serviço';
+  }
+  // Corrigir na DB silenciosamente se divergir
+  if(_statusCalculado !== _statusManual){
+    api(`/api/clientes/${encodeURIComponent(nome)}/estado`,{method:'POST',body:{status:_statusCalculado}})
+      .then(()=>{ if(sectionData['clientes']) sectionData['clientes']=null; });
+  }
+  info.Status = _statusCalculado;
+  const sc=statusClass(info.Status);
 
   // KPIs rápidos
   const mesAtualIdx=new Date().getMonth(); // 0-based (Jan=0)
@@ -5983,10 +6001,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
         ${inPane?'':`<button class="btn btn-ghost btn-sm" onclick="navigate('clientes')" style="font-size:18px;padding:6px 10px">←</button>`}
         <div>
           <h1 class="cd-name">${nome}</h1>
-          <div style="margin-top:6px">${renderStatusBadges(
-            (info.Status==='Sem Serviço' && (servicosAtivos.some(s=>s['Estado do serviço']==='Em curso') || temMotor))
-              ? 'Ativo' : info.Status
-          )}</div>
+          <div style="margin-top:6px">${renderStatusBadges(info.Status)}</div>
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
