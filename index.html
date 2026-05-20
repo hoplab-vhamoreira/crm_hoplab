@@ -5763,15 +5763,9 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   }
   const todosServicos = d.servicos||[];
   const servsAtivosCards = servicosAtivos.map(s=>_servCard(s,false)).join('');
-  // Se o motor (motor2026) está ativo e é PT/DUO, ocultar servicos concluídos do mesmo tipo
-  // (o motor é a fonte de verdade; os registos antigos em servicos são redundantes)
-  const _isPTDUOServ = cod => /^(PT|DUO)/i.test(cod||'');
-  const motorAtivoPT = motorCodigo && motorEstado==='Ativo' && _isPTDUOServ(motorCodigo);
   const servsConcluidos = todosServicos.filter(s=>{
     const e=(s['Estado do serviço']||'').trim();
-    if(!(e==='Concluído'||e==='Concluido')) return false;
-    if(motorAtivoPT && _isPTDUOServ(s['Código']||s['Serviço']||'')) return false;
-    return true;
+    return e==='Concluído' || e==='Concluido';
   });
   const servsConcluidosCards = servsConcluidos.length
     ? `<div class="serv-section-label">Planos anteriores</div>${servsConcluidos.map(s=>_servCard(s,true)).join('')}`
