@@ -5619,10 +5619,17 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
     else if(_temAval)    _statusCalculado = 'Avaliação expirada';
     else                 _statusCalculado = 'Sem Serviço';
   }
-  // Corrigir na DB silenciosamente se divergir
+  // Corrigir na DB silenciosamente se divergir e atualizar cache + lista
   if(_statusCalculado !== _statusManual){
     api(`/api/clientes/${encodeURIComponent(nome)}/estado`,{method:'POST',body:{status:_statusCalculado}})
-      .then(()=>{ if(sectionData['clientes']) sectionData['clientes']=null; });
+      .then(()=>{
+        if(sectionData['clientes']){
+          const entry=sectionData['clientes'].find(c=>c['Nome']===nome);
+          if(entry) entry['Status']=_statusCalculado;
+          if(document.querySelector('.md-wrap'))
+            _renderClientesMD(document.getElementById('mainContent'));
+        }
+      });
   }
   info.Status = _statusCalculado;
   const sc=statusClass(info.Status);
