@@ -593,7 +593,7 @@ async function api(url,opts={}){
       _SB.from('historico').select('*').eq('cliente',nome).order('timestamp',{ascending:false}),
       _SB.from('pag_clientes_2026').select('*').eq('Cliente',nome),
       _SB.from('pag_clientes_2025').select('*').eq('Cliente',nome),
-      _SB.from('motor2026').select('*').eq('Cliente',nome).single(),
+      _SB.from('motor2026').select('*').eq('Cliente',nome).order('id',{ascending:false}).limit(1).maybeSingle(),
       _SB.from('log_contratos').select('*').eq('Cliente',nome),
       _SB.from('log_comercial').select('*').eq('Contacto',nome).order('Data A\xe7\xe3o',{ascending:false}),
       _SB.from('conversoes').select('*').eq('Cliente',nome).order('Data da Marca\xe7\xe3o/In\xedcio',{ascending:false})
