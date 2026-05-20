@@ -2136,14 +2136,17 @@ async function buildFieldHtml(f, val=''){
     setup = ()=>{
       const inp=document.getElementById(safeId);
       if(!inp) return;
-      inp.addEventListener('change', async ()=>{
+      const doFills = async ()=>{
+        if(!inp.value) return;
         for(const fl of f.fills){
           const tgtId=`field_${fl.tf.replace(/[^a-zA-Z0-9]/g,'_')}`;
           const r=await api(`/api/autofill?src=${encodeURIComponent(fl.src)}&match_field=${encodeURIComponent(fl.mf)}&return_field=${encodeURIComponent(fl.rf)}&match_val=${encodeURIComponent(inp.value)}`);
           const tgt=document.getElementById(tgtId);
           if(tgt && r?.value!=null) tgt.value=r.value;
         }
-      });
+      };
+      inp.addEventListener('change', doFills);
+      doFills(); // trigger immediately if editing existing record with value already set
     };
   }
 
@@ -4541,17 +4544,34 @@ function _renderAlertasView(el, todos){
   const counts = {};
   TABS.forEach(k=>{ counts[k] = base.filter(_alertasTabFilter(k)).length; });
 
-  //  Helpers visuais 
+  //  Helpers visuais
   const prioBadge = p => {
     if(p===1) return `<span class="badge badge-danger" style="font-size:10px">Alta</span>`;
     if(p===2) return `<span class="badge badge-warn"   style="font-size:10px">Média</span>`;
     return           `<span class="badge"              style="font-size:10px;background:rgba(148,163,184,.15);color:var(--text-muted)">Baixa</span>`;
   };
+  const TIPO_ACOES = {
+    'Ciclo expirado':                  'Renovar o ciclo do cliente',
+    'Contrato em falta':               'Enviar e assinar contrato',
+    'Relatório de ciclo por entregar': 'Elaborar e entregar o relatório do ciclo',
+    'Forms por preencher':             'Preencher os formulários pendentes',
+    'Contrato/Regulamento':            'Verificar e assinar contrato/regulamento',
+    'Avaliação Pendente':              'Agendar ou realizar avaliação',
+    'Tarefa Colaborador':              'Completar tarefa atribuída',
+    'Follow-up Pipeline':              'Fazer follow-up com o cliente',
+    'Gestão de Ciclo':                 'Tratar questão de gestão de ciclo',
+  };
+  const CICLO_CODIGOS = {'GL4':'Gest. Light 4sem','GL12':'Gest. Light 12sem','GI':'Gest. Integral','GP':'Gest. Premium'};
+  const detalheDisplay = s => {
+    if(!s) return '—';
+    return s.replace(/^(GL4|GL12|GI|GP)(\s+#\d+)?/,(_,cod,num)=>(CICLO_CODIGOS[cod]||cod)+(num||''));
+  };
   const tipoBadge = t => {
     if(!t) return '—';
     const icon = t.includes('Contrato')?'':t.includes('Avaliação')?'':t.includes('Colaborador')?'':t.includes('Pipeline')?'':t.includes('Gestão')?'':'';
     const label = t.replace(/^[^\s]+\s/,'').trim();
-    return `<span style="white-space:nowrap">${icon} <span style="font-size:12px">${label||t}</span></span>`;
+    const acao = TIPO_ACOES[label] || TIPO_ACOES[t] || '';
+    return `<span>${icon} <span style="font-size:12px">${label||t}</span>${acao?`<br><span style="font-size:10px;color:var(--text-muted);font-style:italic">${acao}</span>`:''}</span>`;
   };
   const fonteBadge = f => {
     const cor = f==='Colaboradores'?'var(--info)':f==='Pipeline'?'var(--primary)':f==='Avaliações'?'var(--warning)':f==='Gestão'?'#a855f7':'var(--success)';
@@ -4598,10 +4618,11 @@ function _renderAlertasView(el, todos){
   const rows = visivel.map(r=>{
     const idx = r._idx;
     const dataStr = r.DataLimite ? fmtDate(r.DataLimite) : '—';
+    const safeNome = (r.Cliente||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     return `<tr>
       <td>${tipoBadge(r.Tipo||'')}</td>
-      <td style="font-weight:500">${r.Cliente||'—'}</td>
-      <td style="font-size:12px;color:var(--text-muted);max-width:220px">${r.Detalhe||'—'}</td>
+      <td style="font-weight:500"><span onclick="openClienteDetalhe('${safeNome}')" style="cursor:pointer;border-bottom:1px dotted var(--text-muted)" title="Abrir ficha do cliente">${r.Cliente||'—'}</span></td>
+      <td style="font-size:12px;color:var(--text-muted);max-width:220px">${detalheDisplay(r.Detalhe)}</td>
       <td style="font-size:12px">${r.Responsável||'<span style="color:var(--text-muted)">—</span>'}</td>
       <td style="font-size:12px;white-space:nowrap">${dataStr}</td>
       ${diasCell(r)}
@@ -5628,7 +5649,6 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
           ${estadoMotorBadge(d.motor['Estado Hoje'])}
           <div style="min-width:0">
             <div class="serv-card-name">${_codigoToLabel(d.motor['Plano Actual'])} <span style="font-size:10px;font-weight:400;color:var(--text-muted)">(Motor)</span></div>
-            <div style="font-size:10px;color:var(--text-muted);margin-top:1px">${d.motor['Plano Actual']||''}</div>
           </div>
           <div class="serv-card-tech">${info['PT']||'—'}</div>
           <div class="serv-card-price">${d.motor['Total 2026']?parseFloat(d.motor['Total 2026']).toFixed(2)+'€/ano':'—'}</div>
@@ -5649,7 +5669,6 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
         ${estadoServBadge(s['Estado do serviço'])}
         <div style="min-width:0">
           <div class="serv-card-name">${_codigoToLabel(s['Serviço']||s['Código'])||'—'}</div>
-          ${s['Código']?`<div style="font-size:10px;color:var(--text-muted);margin-top:1px">${s['Código']}</div>`:''}
         </div>
         <div class="serv-card-tech">${s['Técnico Responsável']||'—'}</div>
         <div class="serv-card-price">${s['Ciclo']||'—'}</div>
