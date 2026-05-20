@@ -1448,7 +1448,7 @@ async function _dbAdmin(el){
   }
   // Chart: subscrições ativas por mês (pag_2026)
   const subsByMonth={};
-  pag.forEach(r=>{if(!r['Mês']) return; if(!subsByMonth[r['Mês']]) subsByMonth[r['Mês']]=new Set(); subsByMonth[r['Mês']].add(r['Cliente']);});
+  pag.forEach(r=>{if(!r['Mês']) return; if(r['Estado']!=='Ativo'&&r['Estado']!=='Pago') return; if(!subsByMonth[r['Mês']]) subsByMonth[r['Mês']]=new Set(); subsByMonth[r['Mês']].add(r['Cliente']);});
   const subsMonthData=MONTHS.slice(0,mi+1).map(m=>({label:m.slice(0,3),val:subsByMonth[m]?subsByMonth[m].size:0})).filter(m=>m.val>0);
   // SVG line chart helper
   function _svgLine(data,color,h=110){
@@ -1705,8 +1705,8 @@ async function _dbDireccao(el){
     _SB.from('alertas').select('*',{count:'exact',head:true})
   ]);
   const pagRows=pag.data||[];
-  const receitaMes=pagRows.reduce((s,r)=>s+(parseFloat(r[`${curMonth} Pagamento`])||0),0);
-  const receitaYTD=pagRows.reduce((s,r)=>s+ytdMonths.reduce((sm,m)=>sm+(parseFloat(r[`${m} Pagamento`])||0),0),0);
+  const receitaMes=pagRows.filter(r=>r['Mês']===curMonth&&r['Estado']==='Pago').reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
+  const receitaYTD=pagRows.filter(r=>ytdMonths.includes(r['Mês'])&&r['Estado']==='Pago').reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
   const pipeAberto=(pipe.data||[]).filter(r=>r['Aberta/Fechada']==='Aberta').length;
   const convTotal=(conv.data||[]).length;
   const vendasQ=(vl.data||[]).filter(r=>r['Trimestre']===curQ);
@@ -1744,7 +1744,7 @@ async function _dbComercial(el){
   const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const mi=now.getMonth();
   const[lc,pipe,conv,alrt]=await Promise.all([
-    _SB.from('log_comercial').select('*').lte('Data Próxima Ação',todayStr).order('Data Próxima Ação',{ascending:true}).limit(30),
+    _SB.from('log_comercial').select('*').lte('Data Próxima Ação',todayStr).order('Data Próxima Ação',{ascending:true}),
     _SB.from('pipeline').select('*').order('Data',{ascending:false}).limit(20),
     _SB.from('conversoes').select('*'),
     _SB.from('alertas').select('*',{count:'exact',head:true})
@@ -1782,9 +1782,46 @@ async function _dbComercial(el){
 
 async function _dbTecnico(el){
   const nome=currentUser.name;
+  const role=currentUser.role||'';
+  const isEquipa=!['Técnico','Coordenador'].includes(role);
   const now=new Date(); const todayStr=now.toISOString().split('T')[0];
   const in7=new Date(now); in7.setDate(in7.getDate()+7);
   const in7Str=in7.toISOString().split('T')[0];
+
+  if(isEquipa){
+    // Visão de equipa para Admin/outros: todos os serviços e avaliações
+    const[servs,avals,alrts]=await Promise.all([
+      _SB.from('servicos').select('*').neq('Estado do serviço','Concluído'),
+      _SB.from('avaliacoes').select('*').gte('Data',todayStr).lte('Data',in7Str),
+      _SB.from('v_alertas').select('*',{count:'exact',head:true})
+    ]);
+    const allServs=servs.data||[];
+    const allAvals=avals.data||[];
+    const tecnicos=[...new Set(allServs.map(r=>r['Técnico Responsável']).filter(Boolean))];
+    const cards=[
+      _dbKpiCard('Serviços Ativos',allServs.length,'total equipa','green',"navigate('servicos')"),
+      _dbKpiCard('Avaliações (7 dias)',allAvals.length,'','blue',"navigate('avaliacoes')"),
+      _dbKpiCard('Técnicos com Serviços',tecnicos.length,'','purple',"navigate('servicos')"),
+      _dbKpiCard('Alertas Técnicos',alrts.count||0,'','amber',"navigate('alertas')"),
+    ].join('');
+    const byTecnico=tecnicos.map(t=>{
+      const n=allServs.filter(s=>s['Técnico Responsável']===t).length;
+      return[t,n,allServs.filter(s=>s['Técnico Responsável']===t&&s['Estado do serviço']==='Em curso').length,'—'];
+    }).sort((a,b)=>b[1]-a[1]);
+    const avalRows=allAvals.sort((a,b)=>new Date(a['Data'])-new Date(b['Data'])).slice(0,8).map(r=>[
+      r['Data']||'—',r['Nome']||r['Cliente']||'—',r['Serviço']||'—',r['Apareceu']||'—'
+    ]);
+    el.innerHTML=`
+      <div class="page-header"><div><h1>Dashboard — Técnico (Equipa)</h1><div class="subtitle">Visão agregada de toda a equipa</div></div></div>
+      <div class="stats-grid">${cards}</div>
+      <div class="db-grid-2">
+        ${_dbMiniTable('Serviços por Técnico',['Técnico','Total','Em Curso','—'],byTecnico,'Sem serviços ativos')}
+        ${_dbMiniTable('Próximas Avaliações (7 dias)',['Data','Cliente','Serviço','Apareceu'],avalRows,'Sem avaliações nos próximos 7 dias')}
+      </div>`;
+    return;
+  }
+
+  // Visão pessoal para Técnico/Coordenador
   const[servs,avals,alrts]=await Promise.all([
     _SB.from('servicos').select('*').eq('Técnico Responsável',nome).neq('Estado do serviço','Concluído'),
     _SB.from('avaliacoes').select('*').gte('Data',todayStr).lte('Data',in7Str),
