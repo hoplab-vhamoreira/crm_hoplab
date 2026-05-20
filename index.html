@@ -5505,6 +5505,8 @@ function _renderClientesMD(el){
           <button class="md-filter-btn${_cliStatusFilter==='Ativo'?' active':''}" onclick="_cliStatusFilter='Ativo';_renderClientesMD(document.getElementById('mainContent'))">Ativos</button>
           <button class="md-filter-btn${_cliStatusFilter==='Suspenso'?' active':''}" onclick="_cliStatusFilter='Suspenso';_renderClientesMD(document.getElementById('mainContent'))">Suspensos</button>
           <button class="md-filter-btn${_cliStatusFilter==='Cancelado'?' active':''}" onclick="_cliStatusFilter='Cancelado';_renderClientesMD(document.getElementById('mainContent'))">Cancelados</button>
+          <button class="md-filter-btn${_cliStatusFilter==='Sem Serviço'?' active':''}" onclick="_cliStatusFilter='Sem Serviço';_renderClientesMD(document.getElementById('mainContent'))">Sem Serviço</button>
+          <button class="md-filter-btn${_cliStatusFilter==='Avaliação expirada'?' active':''}" onclick="_cliStatusFilter='Avaliação expirada';_renderClientesMD(document.getElementById('mainContent'))">Aval. Expirada</button>
         </div>
         <div class="md-items">${listItems}</div>
       </div>
@@ -5612,7 +5614,8 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const _temServicoAtivo = servicosAtivos.length > 0 || !!d.motor;
   const _temAval = (d.avaliacoes||[]).length > 0;
   const _statusManual = info.Status||'';
-  const _statusProtegido = ['Suspenso','Cancelado'].includes(_statusManual);
+  const _STATUS_SIMPLES = ['Ativo','Avaliação expirada','Sem Serviço','Suspenso','Cancelado'];
+  const _statusProtegido = !_STATUS_SIMPLES.includes(_statusManual);
   let _statusCalculado = _statusManual;
   if(!_statusProtegido){
     if(_temServicoAtivo) _statusCalculado = 'Ativo';
