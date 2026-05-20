@@ -432,6 +432,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script>
 //  SUPABASE ADAPTER 
 const _SB = supabase.createClient(
@@ -5545,15 +5546,15 @@ function openExportClientes(){
       <button class="btn btn-ghost btn-sm" onclick="document.querySelectorAll('#modalBody input').forEach(i=>i.checked=false)">Limpar</button>
     </div>`;
   const ms=document.getElementById('modalSave');
-  ms.textContent='Exportar CSV';
+  ms.textContent='Exportar Excel';
   ms.onclick=()=>{
     const cols=COLS.filter(c=>document.getElementById(cid(c.k))?.checked);
     if(!cols.length){toast('Seleciona pelo menos um campo','error');return;}
-    const esc=v=>{const s=String(v==null?'':v).replace(/"/g,'""');return s.search(/[,"\n]/g)>=0?`"${s}"`:s;};
-    const lines=[cols.map(c=>esc(c.k)).join(','),...filtered.map(r=>cols.map(c=>esc(r[c.k]??'')).join(','))];
-    const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
-    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:`clientes_${new Date().toISOString().slice(0,10)}.csv`});
-    a.click();URL.revokeObjectURL(a.href);
+    const rows=[cols.map(c=>c.k),...filtered.map(r=>cols.map(c=>r[c.k]??''))];
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Clientes');
+    XLSX.writeFile(wb,`clientes_${new Date().toISOString().slice(0,10)}.xlsx`);
     closeModal();toast(`${filtered.length} clientes exportados`,'success');
   };
   document.getElementById('modal').classList.add('show');
