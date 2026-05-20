@@ -1331,6 +1331,7 @@ async function renderDashboard(el){
 }
 
 async function _dbAdmin(el){
+  try{
   const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const now=new Date(); const mi=now.getMonth();
   const curMonth=MONTHS[mi]; const prevMonth=mi>0?MONTHS[mi-1]:null;
@@ -1345,8 +1346,8 @@ async function _dbAdmin(el){
     _SB.from('pipeline').select('*'),
     _SB.from('v_alertas').select('*',{count:'exact',head:true}),
     _SB.from('avaliacoes').select('Nome,Data'),
-    _SB.from('motor2026').select('Cliente,Jan,Fev,Mar,Abr,Mai,Jun,Jul,Ago,Set,Out,Nov,Dez,"Estado Hoje"'),
-    _SB.from('conversoes').select('"Código Serviço","Valor total a Cobrar Serviço","Data da Marcação/Início"')
+    _SB.from('motor2026').select('*'),
+    _SB.from('conversoes').select('*')
   ]);
 
   const cli=cliRes.data||[], servs=servsRes.data||[], pag=pag26Res.data||[], pip=pipRes.data||[], avals=avalRes.data||[], motor=motRes.data||[];
@@ -1703,6 +1704,10 @@ async function _dbAdmin(el){
         ${alrtItems||'<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">Sem alertas ativos</div>'}
       </div>
     </div>`;
+  }catch(err){
+    el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--danger)">Erro ao carregar dashboard:<br><code style="font-size:12px">${err.message}</code></div>`;
+    console.error('_dbAdmin error:',err);
+  }
 }
 
 async function _dbDireccao(el){
