@@ -1384,31 +1384,34 @@ async function _dbAdmin(el){
   // Contratos Em curso (ciclo atual ativo)
   const emCursoStudio=studioAt, emCursoLab=labAt, emCursoGestao=gl4At+gl12At+giAt, emCursoConsulta=consultAt;
 
-  // Receita a partir de pag_clientes_2026 (estrutura: Mês, Estado, Valor Pago)
-  const pagCurMonth=pag.filter(r=>r['Mês']===curMonth);
-  const pagPrevMonth=prevMonth?pag.filter(r=>r['Mês']===prevMonth):[];
-  const receitaMes=pagCurMonth.filter(r=>r['Estado']==='Pago').reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
+  // Último mês com pagamentos lançados em pag_clientes_2026
+  const mesesComDados=MONTHS.filter(m=>pag.some(r=>r['Mês']===m&&(r['Estado']==='Ativo'||r['Estado']==='Pago')&&parseFloat(r['Valor Pago']||0)>0));
+  const ultimoMesLancado=mesesComDados.length?mesesComDados[mesesComDados.length-1]:null;
+  const pagUltimoMes=ultimoMesLancado?pag.filter(r=>r['Mês']===ultimoMesLancado&&(r['Estado']==='Ativo'||r['Estado']==='Pago')):[];
+  const receitaMes=pagUltimoMes.reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
+  const receitaMesLabel=ultimoMesLancado||curMonth;
+  const nPagConfirmados=pagUltimoMes.length;
 
-  // Suspensões: clientes com Estado='Suspendeu' em pag_clientes_2026 (sinal claro de problema)
-  const suspRows=pag.filter(r=>r['Estado']==='Suspendeu');
-  const suspClientes=new Set(suspRows.map(r=>r['Cliente'])).size;
-  const cancRows=pag.filter(r=>r['Estado']==='Cancelou');
-  const cancClientes=new Set(cancRows.map(r=>r['Cliente'])).size;
-  // Pag. em atraso: Estado='Ativo' em meses anteriores (pagamento não confirmado)
-  const pastMonths=MONTHS.slice(0,mi);
-  const emAtrasoRows=pag.filter(r=>pastMonths.includes(r['Mês'])&&r['Estado']==='Ativo');
-  const emAtrasoSet=new Set(emAtrasoRows.map(r=>r['Cliente']));
-  const emAtrasoN=emAtrasoSet.size;
+  // Clientes sem confirmação: têm plano em motor2026 no último mês lançado mas sem registo em pag_clientes_2026
+  const MOT_COL_MAP={'Janeiro':'Jan','Fevereiro':'Fev','Março':'Mar','Abril':'Abr','Maio':'Mai','Junho':'Jun','Julho':'Jul','Agosto':'Ago','Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
+  const pagUltimoMesClientes=new Set(pagUltimoMes.map(r=>r['Cliente']));
+  const motColAtual=ultimoMesLancado?MOT_COL_MAP[ultimoMesLancado]:'Jan';
+  const semConfirmacao=motor.filter(r=>parseFloat(r[motColAtual]||0)>0&&!pagUltimoMesClientes.has(r['Cliente']));
+  const emAtrasoN=semConfirmacao.length;
+  const emAtrasoRows=semConfirmacao;
 
-  // Retenção: clientes ativos/pagos no mês anterior vs atual
-  let retPct=null, desist=0, novasAdes=0;
-  if(prevMonth&&pag.length){
-    const prevAtivos=new Set(pagPrevMonth.filter(r=>r['Estado']==='Ativo'||r['Estado']==='Pago').map(r=>r['Cliente']));
-    const curAtivos=new Set(pagCurMonth.filter(r=>r['Estado']==='Ativo'||r['Estado']==='Pago').map(r=>r['Cliente']));
-    const retidos=[...prevAtivos].filter(c=>curAtivos.has(c)).length;
-    desist=prevAtivos.size-retidos;
-    novasAdes=[...curAtivos].filter(c=>!prevAtivos.has(c)).length;
-    retPct=prevAtivos.size>0?Math.round((retidos/prevAtivos.size)*100):null;
+  // Desistências e novas adesões: comparar motor2026 mês a mês
+  const MOT_COLS_ALL=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const motColAnterior=mi>0?MOT_COLS_ALL[mi-1]:null;
+  const motColAtual2=MOT_COLS_ALL[mi];
+  let desist=0, novasAdes=0, retPct=null;
+  if(motColAnterior){
+    const prevMotAtivos=new Set(motor.filter(r=>parseFloat(r[motColAnterior]||0)>0).map(r=>r['Cliente']));
+    const curMotAtivos=new Set(motor.filter(r=>parseFloat(r[motColAtual2]||0)>0).map(r=>r['Cliente']));
+    const retidos=[...prevMotAtivos].filter(c=>curMotAtivos.has(c)).length;
+    desist=prevMotAtivos.size-retidos;
+    novasAdes=[...curMotAtivos].filter(c=>!prevMotAtivos.has(c)).length;
+    retPct=prevMotAtivos.size>0?Math.round((retidos/prevMotAtivos.size)*100):null;
   }
 
   // Repetição Lab
@@ -1529,11 +1532,10 @@ async function _dbAdmin(el){
 
   // Populate _dbCache for drawer details
   _dbCache={
-    receita:{title:`Receita ${curMonth}`,kpis:[{label:'Total confirmado',val:receitaMes>0?receitaMes.toFixed(0)+'€':'0€',color:'var(--primary-text)'},{label:'Pagamentos',val:pagCurMonth.filter(r=>r['Estado']==='Pago').length,color:'var(--success)'}],
-      rows:pagCurMonth.filter(r=>r['Estado']==='Pago').map(r=>({name:r['Cliente']||'—',sub:r['Modalidade']||'—',badge:parseFloat(r['Valor Pago'])>0?parseFloat(r['Valor Pago']).toFixed(0)+'€':'—',bc:'rgba(22,163,74,.1)',tc:'var(--success)'}))},
-    atraso:{title:'Pagamentos sem confirmação',kpis:[{label:'Clientes',val:emAtrasoN,color:'var(--danger)'},{label:'Meses em aberto',val:emAtrasoRows.length,color:'var(--warning)'}],
-      _rawRows:emAtrasoRows,
-      rows:[...emAtrasoSet].map(c=>{const meses=emAtrasoRows.filter(r=>r['Cliente']===c).map(r=>r['Mês']).join(', ');const sc=c.replace(/'/g,"\\'");return{name:c,sub:meses,badge:'Sem confirm.',bc:'rgba(220,38,38,.1)',tc:'var(--danger)',link:`_dbCloseDetail();openClienteDetalhe('${sc}')`}})},
+    receita:{title:`Receita ${receitaMesLabel}`,kpis:[{label:'Total',val:receitaMes>0?receitaMes.toFixed(0)+'€':'0€',color:'var(--primary-text)'},{label:'Registos',val:nPagConfirmados,color:'var(--success)'}],
+      rows:pagUltimoMes.map(r=>({name:r['Cliente']||'—',sub:r['Modalidade']||'—',badge:parseFloat(r['Valor Pago'])>0?parseFloat(r['Valor Pago']).toFixed(0)+'€':'—',bc:'rgba(22,163,74,.1)',tc:'var(--success)'}))},
+    atraso:{title:`Sem registo em ${receitaMesLabel}`,kpis:[{label:'Clientes',val:emAtrasoN,color:'var(--danger)'}],
+      rows:semConfirmacao.map(r=>{const sc=(r['Cliente']||'').replace(/'/g,"\\'");return{name:r['Cliente']||'—',sub:`Plano: ${r['Plano Actual']||'—'} · ${motColAtual}: ${r[motColAtual]||0}€`,badge:'Sem registo',bc:'rgba(220,38,38,.1)',tc:'var(--danger)',link:`_dbCloseDetail();openClienteDetalhe('${sc}')`}})},
     clientes:{title:'Clientes Ativos',kpis:[{label:'Ativos',val:cliAtivos,color:'var(--info)'},{label:'Suspensos',val:cliSusp,color:'var(--warning)'},{label:'Studio',val:cliStudio,color:'var(--primary-text)'},{label:'Lab',val:cliLab,color:'var(--info)'}],
       rows:cli.filter(isCliAtivo).map(c=>({name:c['Nome']||'—',sub:c['Status']||'—',badge:'Ativo',bc:'rgba(37,99,235,.1)',tc:'var(--info)'}))},
     suspensoes:{title:'Suspensões e Cancelamentos',kpis:[{label:'Suspensões',val:suspClientes,color:'var(--warning)'},{label:'Cancelamentos',val:cancClientes,color:'var(--danger)'}],
@@ -1561,9 +1563,9 @@ async function _dbAdmin(el){
           <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('receita')">
             <div class="db-hc-icon" style="background:rgba(170,255,0,.15)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-text)" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
             <div class="db-hc-body">
-              <div class="db-hc-label">Receita ${curMonth}</div>
+              <div class="db-hc-label">Receita ${receitaMesLabel}</div>
               <div class="db-hc-value" style="color:var(--primary-text)">${receitaMes>0?receitaMes.toFixed(0)+'€':'—'}</div>
-              <span class="db-hc-badge" style="background:rgba(170,255,0,.15);color:var(--primary-text)">${pagCurMonth.filter(r=>r['Estado']==='Pago').length} pag. confirmados</span>
+              <span class="db-hc-badge" style="background:rgba(170,255,0,.15);color:var(--primary-text)">${nPagConfirmados} pag. confirmados</span>
             </div>
           </div>
           <div class="db-hero-card" style="cursor:pointer" onclick="_dbOpenAtraso()">
@@ -1571,7 +1573,7 @@ async function _dbAdmin(el){
             <div class="db-hc-body">
               <div class="db-hc-label">Pag. sem Confirmação</div>
               <div class="db-hc-value" style="color:var(--danger)">${emAtrasoN}</div>
-              <span class="db-hc-badge" style="background:rgba(220,38,38,.1);color:var(--danger)">${emAtrasoRows.length} meses em aberto</span>
+              <span class="db-hc-badge" style="background:rgba(220,38,38,.1);color:var(--danger)">sem registo em ${receitaMesLabel}</span>
             </div>
           </div>
           <div class="db-hero-card" style="cursor:pointer" onclick="_dbDetail('suspensoes')">
