@@ -1427,20 +1427,13 @@ async function _dbAdmin(el){
   const pipeAberto=pip.filter(p=>p['Aberta/Fechada']==='Aberta').length;
   const alertasN=alrtCount.count??0;
 
-  // Monthly chart data (last 5 months) — PT recurring (pag_clientes_2026) + non-PT conversoes
+  // Monthly chart data (last 5 months) — pag_clientes_2026 já inclui PT, Lab, CED, Duo, etc.
   const chartMonths=MONTHS.slice(Math.max(0,mi-4),mi+1);
-  const MONTH_IDX={'Janeiro':1,'Fevereiro':2,'Março':3,'Abril':4,'Maio':5,'Junho':6,'Julho':7,'Agosto':8,'Setembro':9,'Outubro':10,'Novembro':11,'Dezembro':12};
   const monthData=chartMonths.map(m=>{
     const rows=pag.filter(r=>r['Mês']===m);
-    const pagoPT=rows.filter(r=>r['Estado']==='Pago'||r['Estado']==='Ativo').reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
-    const mIdx=MONTH_IDX[m];
-    const pagoOutros=conv2026.filter(r=>{
-      if(!r['Data da Marcação/Início']) return false;
-      if(new Date(r['Data da Marcação/Início']).getMonth()+1!==mIdx) return false;
-      return !((r['Código Serviço']||'').match(/^PT/i));
-    }).reduce((s,r)=>s+(parseFloat(r['Valor total a Cobrar Serviço'])||0),0);
+    const pago=rows.filter(r=>r['Estado']==='Pago'||r['Estado']==='Ativo').reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
     const ativos=rows.filter(r=>r['Estado']==='Ativo').length;
-    return{m:m.slice(0,3),pago:pagoPT+pagoOutros,ativos};
+    return{m:m.slice(0,3),pago,ativos};
   });
   const maxPago=Math.max(...monthData.map(x=>x.pago),1);
   const maxAtivos=Math.max(...monthData.map(x=>x.ativos),1);
