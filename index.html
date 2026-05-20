@@ -1346,10 +1346,11 @@ async function _dbAdmin(el){
     _SB.from('v_alertas').select('*',{count:'exact',head:true}),
     _SB.from('avaliacoes').select('Nome,Data'),
     _SB.from('motor2026').select('Cliente,Jan,Fev,Mar,Abr,Mai,Jun,Jul,Ago,Set,Out,Nov,Dez,"Estado Hoje"'),
-    _SB.from('conversoes').select('"Código Serviço","Valor total a Cobrar Serviço","Data da Marcação/Início"').gte('Data da Marcação/Início','2026-01-01').lt('Data da Marcação/Início','2027-01-01')
+    _SB.from('conversoes').select('"Código Serviço","Valor total a Cobrar Serviço","Data da Marcação/Início"')
   ]);
 
-  const cli=cliRes.data||[], servs=servsRes.data||[], pag=pag26Res.data||[], pip=pipRes.data||[], avals=avalRes.data||[], motor=motRes.data||[], conv2026=convRes.data||[];
+  const cli=cliRes.data||[], servs=servsRes.data||[], pag=pag26Res.data||[], pip=pipRes.data||[], avals=avalRes.data||[], motor=motRes.data||[];
+  const conv2026=(convRes.data||[]).filter(r=>{const d=r['Data da Marcação/Início']; return d&&d>='2026-01-01'&&d<'2027-01-01';});
 
   // Status do cliente: valor pode ser "Ativo ·  Sem Avaliação", "Híbrido ativo ·...", etc.
   const isCliAtivo=c=>/^Ativo|^Híbrido ativo/i.test(c['Status']||'');
