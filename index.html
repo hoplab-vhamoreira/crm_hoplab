@@ -1424,7 +1424,7 @@ async function _dbAdmin(el){
   const chartMonths=MONTHS.slice(Math.max(0,mi-4),mi+1);
   const monthData=chartMonths.map(m=>{
     const rows=pag.filter(r=>r['Mês']===m);
-    const pago=rows.filter(r=>r['Estado']==='Pago').reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
+    const pago=rows.filter(r=>r['Estado']==='Pago'||r['Estado']==='Ativo').reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
     const ativos=rows.filter(r=>r['Estado']==='Ativo').length;
     return{m:m.slice(0,3),pago,ativos};
   });
