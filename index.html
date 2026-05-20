@@ -1335,7 +1335,7 @@ async function _dbAdmin(el){
   const now=new Date(); const mi=now.getMonth();
   const curMonth=MONTHS[mi]; const prevMonth=mi>0?MONTHS[mi-1]:null;
 
-  const[stats,hist,alrtTop,cliRes,servsRes,pag26Res,pipRes,alrtCount,avalRes,motRes]=await Promise.all([
+  const[stats,hist,alrtTop,cliRes,servsRes,pag26Res,pipRes,alrtCount,avalRes,motRes,convRes]=await Promise.all([
     api('/api/stats'),
     _SB.from('historico').select('*').order('timestamp',{ascending:false}).limit(5),
     _SB.from('v_alertas').select('*').order('DiasAtraso',{ascending:false}).limit(5),
@@ -1345,10 +1345,11 @@ async function _dbAdmin(el){
     _SB.from('pipeline').select('*'),
     _SB.from('v_alertas').select('*',{count:'exact',head:true}),
     _SB.from('avaliacoes').select('Nome,Data'),
-    _SB.from('motor2026').select('Cliente,Jan,Fev,Mar,Abr,Mai,Jun,Jul,Ago,Set,Out,Nov,Dez,"Estado Hoje"')
+    _SB.from('motor2026').select('Cliente,Jan,Fev,Mar,Abr,Mai,Jun,Jul,Ago,Set,Out,Nov,Dez,"Estado Hoje"'),
+    _SB.from('conversoes').select('"Código Serviço","Valor total a Cobrar Serviço","Data da Marcação/Início"').gte('Data da Marcação/Início','2026-01-01').lt('Data da Marcação/Início','2027-01-01')
   ]);
 
-  const cli=cliRes.data||[], servs=servsRes.data||[], pag=pag26Res.data||[], pip=pipRes.data||[], avals=avalRes.data||[], motor=motRes.data||[];
+  const cli=cliRes.data||[], servs=servsRes.data||[], pag=pag26Res.data||[], pip=pipRes.data||[], avals=avalRes.data||[], motor=motRes.data||[], conv2026=convRes.data||[];
 
   // Status do cliente: valor pode ser "Ativo ·  Sem Avaliação", "Híbrido ativo ·...", etc.
   const isCliAtivo=c=>/^Ativo|^Híbrido ativo/i.test(c['Status']||'');
@@ -1421,13 +1422,20 @@ async function _dbAdmin(el){
   const pipeAberto=pip.filter(p=>p['Aberta/Fechada']==='Aberta').length;
   const alertasN=alrtCount.count??0;
 
-  // Monthly chart data (last 5 months)
+  // Monthly chart data (last 5 months) — PT recurring (pag_clientes_2026) + non-PT conversoes
   const chartMonths=MONTHS.slice(Math.max(0,mi-4),mi+1);
+  const MONTH_IDX={'Janeiro':1,'Fevereiro':2,'Março':3,'Abril':4,'Maio':5,'Junho':6,'Julho':7,'Agosto':8,'Setembro':9,'Outubro':10,'Novembro':11,'Dezembro':12};
   const monthData=chartMonths.map(m=>{
     const rows=pag.filter(r=>r['Mês']===m);
-    const pago=rows.filter(r=>r['Estado']==='Pago'||r['Estado']==='Ativo').reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
+    const pagoPT=rows.filter(r=>r['Estado']==='Pago'||r['Estado']==='Ativo').reduce((s,r)=>s+(parseFloat(r['Valor Pago'])||0),0);
+    const mIdx=MONTH_IDX[m];
+    const pagoOutros=conv2026.filter(r=>{
+      if(!r['Data da Marcação/Início']) return false;
+      if(new Date(r['Data da Marcação/Início']).getMonth()+1!==mIdx) return false;
+      return !((r['Código Serviço']||'').match(/^PT/i));
+    }).reduce((s,r)=>s+(parseFloat(r['Valor total a Cobrar Serviço'])||0),0);
     const ativos=rows.filter(r=>r['Estado']==='Ativo').length;
-    return{m:m.slice(0,3),pago,ativos};
+    return{m:m.slice(0,3),pago:pagoPT+pagoOutros,ativos};
   });
   const maxPago=Math.max(...monthData.map(x=>x.pago),1);
   const maxAtivos=Math.max(...monthData.map(x=>x.ativos),1);
