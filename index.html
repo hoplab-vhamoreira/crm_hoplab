@@ -1843,6 +1843,17 @@ function _fmtCellVal(v){
     const [y,m,d]=s.split('-');
     return `${d}/${m}/${y}`;
   }
+  // Excel serial date (e.g. 46023) → DD/MM/YYYY
+  if(/^\d{4,5}$/.test(s)){
+    const n=Number(s);
+    if(n>25000&&n<60000){
+      const d=new Date(Math.round((n-25569)*86400000));
+      const dd=String(d.getUTCDate()).padStart(2,'0');
+      const mm=String(d.getUTCMonth()+1).padStart(2,'0');
+      const yyyy=d.getUTCFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+  }
   return s;
 }
 
@@ -2609,6 +2620,7 @@ async function deleteRec(section,idx){
 // GESTÃO DE CLIENTES (GL4 / GL12 / GI)
 // 
 let _gestaoTab = 'GL4';
+let _gestaoStatusFilter = 'Em curso';
 async function renderGestaoClientes(el){
   if(!sectionData['ciclos']){
     const d = await api('/api/data/ciclos');
@@ -2670,7 +2682,22 @@ function _renderGestaoInner(inner, ciclos){
     return `<span class="badge badge-info" style="font-size:11px">${st}</span>`;
   };
 
-  const rows = filtrados.map(c=>{
+  // Aplicar filtro de status
+  const visiveis = _gestaoStatusFilter === 'Todos'
+    ? filtrados
+    : filtrados.filter(c => {
+        const st = c['Status']||'';
+        if(_gestaoStatusFilter === 'Em curso')  return st === 'Em curso';
+        if(_gestaoStatusFilter === 'Expirado')  return st.includes('Expirado');
+        if(_gestaoStatusFilter === 'Concluído') return st === 'Concluído';
+        return true;
+      });
+
+  const _sfBtn = (label, val) =>
+    `<button class="md-filter-btn${_gestaoStatusFilter===val?' active':''}"
+      onclick="_gestaoStatusFilter='${val}';_renderGestaoInner(document.getElementById('gestaoInner'),sectionData['ciclos']||[])">${label}</button>`;
+
+  const rows = visiveis.map(c=>{
     const nome    = c['Cliente']||'—';
     const nomeEsc = encodeURIComponent(nome);
 
@@ -2693,6 +2720,10 @@ function _renderGestaoInner(inner, ciclos){
     </tr>`;
   }).join('');
 
+  const emptyMsg = _gestaoStatusFilter !== 'Todos'
+    ? `<div style="padding:30px;text-align:center;color:var(--text-muted)">Sem ciclos com status "${_gestaoStatusFilter}" — usa o filtro "Todos" para ver todos.</div>`
+    : `<div style="padding:30px;text-align:center;color:var(--text-muted)">Sem ciclos registados.</div>`;
+
   inner.innerHTML = `
     <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap">
       <div class="stat-card" style="flex:1;padding:12px 16px"><div class="label">Total</div><div class="value purple">${total}</div></div>
@@ -2700,14 +2731,20 @@ function _renderGestaoInner(inner, ciclos){
       <div class="stat-card" style="flex:1;padding:12px 16px"><div class="label">Concluídos</div><div class="value" style="color:var(--text-muted)">${concluido}</div></div>
       <div class="stat-card" style="flex:1;padding:12px 16px"><div class="label">Com atraso</div><div class="value amber">${atrasados}</div></div>
     </div>
-    <div class="table-wrap">
+    <div class="md-filters" style="margin-bottom:12px">
+      ${_sfBtn('Em curso','Em curso')}
+      ${_sfBtn('Expirados','Expirado')}
+      ${_sfBtn('Concluídos','Concluído')}
+      ${_sfBtn('Todos','Todos')}
+    </div>
+    ${visiveis.length ? `<div class="table-wrap">
       <div class="tbl-scroll">
         <table class="tbl">
           <thead><tr><th>Cliente</th><th>Status</th><th>Semana Atual</th><th>Início</th><th>Fim</th><th>Validade</th>${semCols}</tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
-    </div>`;
+    </div>` : emptyMsg}`;
 }
 function _renderGestaoContent(el){
   el.innerHTML = `
