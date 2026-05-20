@@ -582,7 +582,31 @@ async function api(url,opts={}){
   if(falhaDelM&&method==='DELETE'){const{error}=await _SB.from('falhas_sancoes').delete().eq('id',parseInt(falhaDelM[1]));if(error)return{error:error.message};return{ok:true};}
   if(url==='/api/users'){const{data}=await _SB.from('profiles').select('*').order('id');return data||[];}
   if(url==='/api/permissions')return{};
-  if(url.startsWith('/api/agenda')){const{data}=await _SB.from('avaliacoes').select('*').order('Data');return data||[];}
+  if(url.startsWith('/api/agenda')){
+    const _aqp=new URLSearchParams(url.includes('?')?url.split('?')[1]:'');
+    const _aper=_aqp.get('periodo')||'semana';
+    const _aref=_aqp.get('data')?new Date(_aqp.get('data')):new Date();
+    let _aStart,_aEnd;
+    if(_aper==='hoje'){
+      _aStart=_aEnd=_aref.toISOString().slice(0,10);
+    } else if(_aper==='semana'){
+      const dow=_aref.getDay(); const diff=dow===0?-6:1-dow;
+      const mon=new Date(_aref); mon.setDate(_aref.getDate()+diff);
+      const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+      _aStart=mon.toISOString().slice(0,10); _aEnd=sun.toISOString().slice(0,10);
+    } else {
+      _aStart=new Date(_aref.getFullYear(),_aref.getMonth(),1).toISOString().slice(0,10);
+      _aEnd=new Date(_aref.getFullYear(),_aref.getMonth()+1,0).toISOString().slice(0,10);
+    }
+    const{data:_ad}=await _SB.from('avaliacoes').select('*').gte('Data',_aStart).lte('Data',_aEnd).order('Data').order('Hora');
+    const events=(_ad||[]).map(r=>({
+      data:(r['Data']||'').slice(0,10), hora:r['Hora']||null,
+      cliente:r['Nome']||'', servico:r['Serviço']||'', tecnico:r['Técnico Responsável']||'',
+      nivel:r['Nível']||'', status:r['Status Geral Avaliação']||'', apareceu:r['Apareceu']||null,
+      sinal:r['Sinal']||null, tipo:'Avaliação', _idx:r['id']
+    }));
+    return{events};
+  }
   const cM=url.match(/^\/api\/cliente\/(.+)$/);
   if(cM){
     const nome=decodeURIComponent(cM[1]);
