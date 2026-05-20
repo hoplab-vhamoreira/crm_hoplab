@@ -784,9 +784,11 @@ const SECTIONS = {
       {k:'Nome',t:'text'},
       {k:'Email',t:'text'},
       {k:'Telemóvel',t:'text'},
+      {k:'Data de Nascimento',t:'date'},
       {k:'NIF',t:'text'},
       {k:'Morada',t:'text'},
       {k:'Localidade',t:'text'},
+      {k:'Distrito',t:'text'},
       {k:'Parceiro',t:'lookup',src:'parceiros',sf:'Nome / Empresa',
         fills:[{src:'parceiros',mf:'Nome / Empresa',rf:'Código',tf:'Segmento'}]},
       {k:'Segmento',t:'text'},
@@ -1276,13 +1278,29 @@ async function _dbRegularizarSelecionados(){
   };
 }
 
+let _dbViewMode='admin';
 async function renderDashboard(el){
-  el.innerHTML=`<div style="padding:40px;color:var(--text-muted);text-align:center">A carregar...</div>`;
   const role=currentUser.role||'';
-  if(role==='Direcção') return _dbDireccao(el);
-  if(role==='Comercial') return _dbComercial(el);
-  if(role==='Técnico'||role==='Coordenador') return _dbTecnico(el);
-  return _dbAdmin(el);
+  const isAdmin=!['Direcção','Comercial','Técnico','Coordenador'].includes(role);
+  if(!isAdmin){
+    el.innerHTML=`<div style="padding:40px;color:var(--text-muted);text-align:center">A carregar...</div>`;
+    if(role==='Direcção') return _dbDireccao(el);
+    if(role==='Comercial') return _dbComercial(el);
+    if(role==='Técnico'||role==='Coordenador') return _dbTecnico(el);
+    return _dbAdmin(el);
+  }
+  const DB_TABS=[{k:'admin',l:'Geral'},{k:'comercial',l:'Comercial'},{k:'tecnico',l:'Técnico'},{k:'direccao',l:'Direcção'}];
+  el.innerHTML=`
+    <div style="display:flex;gap:6px;padding:20px 24px 8px;border-bottom:1px solid var(--border)">
+      ${DB_TABS.map(t=>`<button class="gtab${_dbViewMode===t.k?' gtab-active':''}"
+        onclick="_dbViewMode='${t.k}';renderDashboard(document.getElementById('mainContent'))">${t.l}</button>`).join('')}
+    </div>
+    <div id="db-view-content"><div style="padding:40px;color:var(--text-muted);text-align:center">A carregar...</div></div>`;
+  const c=document.getElementById('db-view-content');
+  if(_dbViewMode==='comercial') return _dbComercial(c);
+  if(_dbViewMode==='tecnico')   return _dbTecnico(c);
+  if(_dbViewMode==='direccao')  return _dbDireccao(c);
+  return _dbAdmin(c);
 }
 
 async function _dbAdmin(el){
@@ -5469,6 +5487,7 @@ function _renderClientesMD(el){
       <div><h1>Clientes</h1><div class="subtitle">${filtered.length} de ${data.length} clientes</div></div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-ghost btn-sm" onclick="sectionData['clientes']=null;_cliSelected=null;renderClientes(document.getElementById('mainContent'))">Atualizar</button>
+        <button class="btn btn-ghost btn-sm" onclick="openExportClientes()">Exportar</button>
         <button class="btn btn-primary btn-sm" onclick="openAdd('clientes')">+ Novo</button>
       </div>
     </div>
@@ -5494,6 +5513,50 @@ function _renderClientesMD(el){
       </div>
     </div>`;
   if(_cliSelected) _loadCliDetail(_cliSelected);
+}
+
+function openExportClientes(){
+  const data=sectionData['clientes']||[];
+  const q=_cliFilter.toLowerCase();
+  const filtered=data.filter(r=>{
+    const matchQ=!q||(r['Nome']||'').toLowerCase().includes(q)||(r['Email']||'').toLowerCase().includes(q);
+    const matchS=!_cliStatusFilter||(r['Status']||'').toLowerCase().includes(_cliStatusFilter.toLowerCase());
+    return matchQ&&matchS;
+  });
+  const COLS=[
+    {k:'Nome',on:true},{k:'Status',on:true},{k:'Email',on:true},{k:'Telemóvel',on:true},
+    {k:'Data de Nascimento',on:false},{k:'NIF',on:false},{k:'Morada',on:false},
+    {k:'Localidade',on:true},{k:'Distrito',on:false},{k:'Parceiro',on:false},
+    {k:'Segmento',on:false},{k:'PT',on:false},{k:'Nutricionista',on:false},
+    {k:'Plano',on:false},{k:'Método Pagamento',on:false},
+    {k:'Último Contacto',on:false},{k:'Comentários',on:false},
+  ];
+  const cid=k=>'exp_'+k.replace(/[^\w]/g,'_');
+  document.getElementById('modalTitle').textContent=`Exportar Clientes (${filtered.length} registos)`;
+  document.getElementById('modalBody').innerHTML=`
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Campos a incluir:</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-bottom:12px">
+      ${COLS.map(c=>`<label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:3px 0;font-size:13px">
+        <input type="checkbox" id="${cid(c.k)}"${c.on?' checked':''}>
+        ${c.k}</label>`).join('')}
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-ghost btn-sm" onclick="document.querySelectorAll('#modalBody input').forEach(i=>i.checked=true)">Selecionar todos</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.querySelectorAll('#modalBody input').forEach(i=>i.checked=false)">Limpar</button>
+    </div>`;
+  const ms=document.getElementById('modalSave');
+  ms.textContent='Exportar CSV';
+  ms.onclick=()=>{
+    const cols=COLS.filter(c=>document.getElementById(cid(c.k))?.checked);
+    if(!cols.length){toast('Seleciona pelo menos um campo','error');return;}
+    const esc=v=>{const s=String(v==null?'':v).replace(/"/g,'""');return s.search(/[,"\n]/g)>=0?`"${s}"`:s;};
+    const lines=[cols.map(c=>esc(c.k)).join(','),...filtered.map(r=>cols.map(c=>esc(r[c.k]??'')).join(','))];
+    const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:`clientes_${new Date().toISOString().slice(0,10)}.csv`});
+    a.click();URL.revokeObjectURL(a.href);
+    closeModal();toast(`${filtered.length} clientes exportados`,'success');
+  };
+  document.getElementById('modal').classList.add('show');
 }
 
 function _filterCliInput(val){
