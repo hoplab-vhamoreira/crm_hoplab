@@ -336,7 +336,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF1F8;background-i
 /* GREEN DOT on active pill */
 .gtab-active::before,.tab.active::before,.agenda-period-btn.active::before{content:"";display:inline-block;width:7px;height:7px;background:var(--green);border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0}
 /* RESPONSIVE — MOBILE & TABLET */
-.hamburger{display:none;position:fixed;top:12px;left:12px;z-index:200;background:#141720;border:1px solid #2a3050;color:#aaff00;padding:8px 11px;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.hamburger{display:none;position:fixed;top:12px;left:12px;z-index:200;background:var(--surface);border:1.5px solid var(--border);color:var(--navy);padding:8px 11px;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.1)}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99}
 .sidebar-overlay.show{display:block}
 @media(max-width:1024px){
@@ -1292,9 +1292,11 @@ async function renderDashboard(el){
   }
   const DB_TABS=[{k:'admin',l:'Geral'},{k:'comercial',l:'Comercial'},{k:'tecnico',l:'Técnico'},{k:'direccao',l:'Direcção'}];
   el.innerHTML=`
-    <div style="display:flex;gap:6px;padding:20px 24px 8px;border-bottom:1px solid var(--border)">
-      ${DB_TABS.map(t=>`<button class="gtab${_dbViewMode===t.k?' gtab-active':''}"
-        onclick="_dbViewMode='${t.k}';renderDashboard(document.getElementById('mainContent'))">${t.l}</button>`).join('')}
+    <div style="padding:16px 20px 8px;border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <div class="gtab-wrap">
+        ${DB_TABS.map(t=>`<button class="gtab${_dbViewMode===t.k?' gtab-active':''}"
+          onclick="_dbViewMode='${t.k}';renderDashboard(document.getElementById('mainContent'))">${t.l}</button>`).join('')}
+      </div>
     </div>
     <div id="db-view-content"><div style="padding:40px;color:var(--text-muted);text-align:center">A carregar...</div></div>`;
   const c=document.getElementById('db-view-content');
