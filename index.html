@@ -2152,18 +2152,22 @@ async function _importStep2(rawRows){
   // Find active CRM clients with active services missing from billing
   const servRes=await _SB.from('servicos').select('*');
   const servData=servRes.data||[];
-  // Map: normalizedName → earliest active service start YYYY-MM (null = no date = always active)
+  // Map: normalizedName → {startYM, mensal}
   const activeServMap=new Map();
-  servData.filter(s=>['Ativo','Em curso'].includes(s['Estado do serviço']||'')&&s['Repetição']==='Mensal').forEach(s=>{
+  servData.filter(s=>['Ativo','Em curso'].includes(s['Estado do serviço']||'')).forEach(s=>{
     const name=_norm(s['Cliente']||'');
-    // Try all possible key variants for "Data Conversão"
     const dc=s['Data Conversão']||s['Data Conversao']||s['Data conversão']||null;
     const startYM=dc?(dc+'').substring(0,7):null;
+    const mensal=s['Repetição']==='Mensal';
     if(!activeServMap.has(name)){
-      activeServMap.set(name,startYM);
+      activeServMap.set(name,{startYM,mensal});
     } else {
       const ex=activeServMap.get(name);
-      if(!ex||(startYM&&startYM<ex)) activeServMap.set(name,startYM);
+      const earlierStart=!ex.startYM||(startYM&&startYM<ex.startYM);
+      activeServMap.set(name,{
+        startYM: earlierStart?startYM:ex.startYM,
+        mensal: ex.mensal||mensal
+      });
     }
   });
   const groupedArr=[...grouped.values()];
@@ -2178,13 +2182,12 @@ async function _importStep2(rawRows){
     const nome=c['Nome']||'';
     const nomeN=_norm(nome);
     if(!activeServMap.has(nomeN)) return;
+    const {startYM:servStart,mensal}=activeServMap.get(nomeN);
     const nif=(c['NIF']||'').trim();
     const nifFat=(c['NIF Faturação']||'').trim();
     const faturarAN=_norm(c['Faturar a']||'');
     pdfMonths.forEach(mesKey=>{
       const mesYM=mesKeyToYM.get(mesKey);
-      const servStart=activeServMap.get(nomeN);
-      // Skip if the earliest active service hadn't started yet in this month
       if(servStart&&mesYM&&servStart>mesYM) return;
       const mes=groupedArr.filter(e=>e.mesKey===mesKey);
       const inBilling=
@@ -2196,7 +2199,11 @@ async function _importStep2(rawRows){
         const motivo=(!nif&&!nifFat&&!faturarAN)?'Sem NIF nem "Faturar a" no CRM'
           :(nif||nifFat)?`NIF ${nifFat||nif} não encontrado no PDF`
           :`Nome "${c['Faturar a']||nome}" não encontrado no PDF`;
-        errors.push({type:'missing', crmNome:nome, mesKey, msg:motivo});
+        if(mensal){
+          errors.push({type:'missing', crmNome:nome, mesKey, msg:motivo});
+        } else {
+          warnings.push({type:'missing_pontual', crmNome:nome, mesKey, msg:`Serviço pontual ativo mas ausente em ${mesKey}`});
+        }
       }
     });
   });
@@ -2225,7 +2232,7 @@ async function _importStep2(rawRows){
         <table class="tbl" style="font-size:12px"><thead><tr><th></th><th>Tipo</th><th>Cliente</th><th>Mês</th><th>Valor</th><th>Mensagem</th></tr></thead><tbody>
         ${warnings.map((e,i)=>`<tr>
           <td style="text-align:center">${e.type==='susp_canc'?`<input type="checkbox" class="susp-canc-cb" data-idx="${i}" title="Incluir na importação">`:'—'}</td>
-          <td><span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--warning-bg,#fff3cd);color:#856404">${e.type==='duplicate'?'Duplicado':e.type==='susp_canc'?'Suspenso/Cancelado':'Não encontrado'}</span></td>
+          <td><span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--warning-bg,#fff3cd);color:#856404">${e.type==='duplicate'?'Duplicado':e.type==='susp_canc'?'Suspenso/Cancelado':e.type==='missing_pontual'?'Serviço Pontual':'Não encontrado'}</span></td>
           <td>${e.crmNome||e.Nome||'—'}</td>
           <td>${e.mesKey||'—'}</td>
           <td>${e.total!=null?e.total.toFixed(2)+'€':'—'}</td>
