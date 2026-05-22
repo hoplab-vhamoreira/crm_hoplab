@@ -1156,7 +1156,7 @@ function buildSidebar(){
     }
     html+='</div>';
   }
-  html+=`<div class="nav-group"><div class="nav-group-title">Faturação</div><div class="nav-item" onclick="openImportFaturacao();closeSidebarMobile()">Importar Faturação</div></div>`;
+  html+=`<div class="nav-group"><div class="nav-group-title">Faturação</div><div class="nav-item" onclick="openImportFaturacao();closeSidebarMobile()">Importar Faturação</div><div class="nav-item" data-key="validacao_pagamentos" onclick="navigate('validacao_pagamentos');closeSidebarMobile()">Avisos de Pagamentos</div></div>`;
   html+=`<div class="nav-group"><div class="nav-group-title">Histórico</div><div class="nav-item" data-key="pag_clientes_2026" onclick="navigate('pag_clientes_2026');closeSidebarMobile()">Pagamentos 2026</div><div class="nav-item" data-key="pag_clientes_2025" onclick="navigate('pag_clientes_2025');closeSidebarMobile()">Pagamentos 2025</div></div>`;
   nav.innerHTML=html;
 }
@@ -1185,6 +1185,7 @@ async function navigate(section, opts={}){
   if(section==='historico_faturacao') return renderHistoricoFaturacao(main);
   if(section==='alertas')             return renderAlertas(main);
   if(section==='totais_pagamentos')   return renderTotaisPagamentos(main);
+  if(section==='validacao_pagamentos') return renderValidacaoPagamentos(main);
   await renderDataPage(main,section);
 }
 
@@ -2362,17 +2363,222 @@ async function _importStep3(validList){
       </div>
     </div>`;
 
-  mo.innerHTML=`<div class="modal" style="max-width:520px">
+  mo.innerHTML=`<div class="modal" style="max-width:720px;max-height:88vh;display:flex;flex-direction:column">
     <div class="modal-header"><h2>Importação Concluída</h2><button class="modal-close" onclick="closeImportModal()">×</button></div>
-    <div class="modal-body" style="padding:24px;text-align:center">
-      <div style="font-size:48px;margin-bottom:12px">${anomalias.length>0?'⚠️':'✅'}</div>
-      <div style="font-weight:700;font-size:18px;margin-bottom:8px">${toInsert.length} registo(s) importado(s)</div>
-      ${skipped.length>0?`<div style="color:var(--text-muted);font-size:13px">${skipped.length} já existiam com o mesmo valor — ignorados</div>`:''}
+    <div class="modal-body" style="padding:24px;overflow-y:auto;flex:1">
+      <div style="text-align:center">
+        <div style="font-size:48px;margin-bottom:12px">${anomalias.length>0?'⚠️':'✅'}</div>
+        <div style="font-weight:700;font-size:18px;margin-bottom:8px">${toInsert.length} registo(s) importado(s)</div>
+        ${skipped.length>0?`<div style="color:var(--text-muted);font-size:13px">${skipped.length} já existiam com o mesmo valor — ignorados</div>`:''}
+      </div>
       ${anomHtml}
+      <div id="trainerValidation" style="color:var(--text-muted);font-size:13px;margin-top:20px;text-align:center">A validar pagamentos dos treinadores...</div>
     </div>
     <div class="modal-footer"><button class="btn btn-primary" onclick="closeImportModal();navigate('pag_clientes_2026')">Ver Tabela</button></div>
   </div>`;
+  _renderTrainerValidation(months, document.getElementById('trainerValidation'));
 }
+
+async function _renderTrainerValidation(months, container){
+  const mesAbrev={'Janeiro':'Jan','Fevereiro':'Fev','Março':'Mar','Abril':'Abr',
+    'Maio':'Mai','Junho':'Jun','Julho':'Jul','Agosto':'Ago',
+    'Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
+
+  const [pagRes, servRes, totRes] = await Promise.all([
+    _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
+    _SB.from('servicos').select('Cliente,"Técnico Responsável","Estado do serviço","Repetição"'),
+    _SB.from('totais_pagamentos').select('*')
+  ]);
+
+  const pags  = pagRes.data  || [];
+  const servs = servRes.data || [];
+  const totais= totRes.data  || [];
+
+  // paid: mesKey → Set<clientName>
+  const paidByMonth = new Map();
+  pags.forEach(p => {
+    if(!paidByMonth.has(p['Mês'])) paidByMonth.set(p['Mês'], new Set());
+    paidByMonth.get(p['Mês']).add(p['Cliente']);
+  });
+
+  // trainerCli: trainerName → Set<clientName> (active monthly services only)
+  const trainerCli = new Map();
+  servs
+    .filter(s => ['Ativo','Em curso'].includes(s['Estado do serviço']||'') && s['Repetição']==='Mensal')
+    .forEach(s => {
+      const tr  = (s['Técnico Responsável']||'').trim();
+      const cli = (s['Cliente']||'').trim();
+      if(!tr || !cli) return;
+      if(!trainerCli.has(tr)) trainerCli.set(tr, new Set());
+      trainerCli.get(tr).add(cli);
+    });
+
+  let html = '';
+  months.forEach(mesKey => {
+    const [mesNome] = mesKey.split(' ');
+    const abrev   = mesAbrev[mesNome] || mesNome.substring(0,3);
+    const pagCol  = `${abrev} Pagamento`;
+    const paid    = paidByMonth.get(mesKey) || new Set();
+
+    const relevant = totais.filter(t => {
+      const val = parseFloat(t[pagCol]) || 0;
+      return val > 0 && ['Treinador','Coordenador','Nutricionista','Fisioterapeuta'].includes(t['Role']);
+    });
+    if(!relevant.length) return;
+
+    const rows = relevant.map(t => {
+      const nome      = t['Professor'];
+      const pagamento = parseFloat(t[pagCol]) || 0;
+      const cliArr    = [...(trainerCli.get(nome) || new Set())];
+      const pagos     = cliArr.filter(c => paid.has(c));
+      const semPag    = cliArr.filter(c => !paid.has(c));
+      const ok        = semPag.length === 0 && cliArr.length > 0;
+      return {nome, pagamento, pagos, semPag, ok};
+    });
+
+    html += `<div style="margin-top:16px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted)">${mesKey}</div>
+      <table class="tbl" style="font-size:12px">
+        <thead><tr><th>Treinador</th><th>Pagamento</th><th>Clientes pagaram</th><th>Sem pagamento</th><th></th></tr></thead>
+        <tbody>
+        ${rows.map(r=>`<tr>
+          <td style="font-weight:600">${r.nome}</td>
+          <td>${r.pagamento.toFixed(2)}€</td>
+          <td style="color:var(--success,#198754)">${r.pagos.length ? r.pagos.join(', ') : '—'}</td>
+          <td style="color:${r.semPag.length ? 'var(--danger)' : 'var(--text-muted)'}">${r.semPag.length ? r.semPag.join(', ') : '—'}</td>
+          <td style="text-align:center;font-weight:700;font-size:14px">${r.ok ? '<span style="color:var(--success,#198754)">✓</span>' : '<span style="color:var(--danger)">✗</span>'}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  });
+
+  if(!html) html = '<div style="color:var(--text-muted);font-size:13px">Sem treinadores com pagamento previsto nestes meses.</div>';
+  container.innerHTML = `<div style="border-top:1px solid var(--border);padding-top:16px;text-align:left">
+    <div style="font-weight:700;font-size:15px;margin-bottom:4px">Validação Pagamentos Treinadores</div>
+    ${html}
+  </div>`;
+}
+async function renderValidacaoPagamentos(el){
+  const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const now=new Date();
+  const year=now.getFullYear();
+  // Show current month and previous month
+  const curMes=MONTHS[now.getMonth()]+' '+year;
+  const prevMes=now.getMonth()>0?(MONTHS[now.getMonth()-1]+' '+year):null;
+  const months=[curMes,prevMes].filter(Boolean);
+
+  el.innerHTML=`
+    <div class="page-header" style="padding:20px 20px 0">
+      <div><h1>Avisos de Pagamentos</h1><p style="color:var(--text-muted);font-size:13px;margin-top:4px">Validação dos pagamentos dos treinadores face à faturação importada</p></div>
+    </div>
+    <div style="padding:20px" id="validacao-content">
+      <div style="color:var(--text-muted);text-align:center;padding:40px">A carregar...</div>
+    </div>`;
+
+  const container=document.getElementById('validacao-content');
+
+  const mesAbrev={'Janeiro':'Jan','Fevereiro':'Fev','Março':'Mar','Abril':'Abr',
+    'Maio':'Mai','Junho':'Jun','Julho':'Jul','Agosto':'Ago',
+    'Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
+
+  const [pagRes, servRes, totRes] = await Promise.all([
+    _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
+    _SB.from('servicos').select('Cliente,"Técnico Responsável","Estado do serviço","Repetição"'),
+    _SB.from('totais_pagamentos').select('*')
+  ]);
+
+  const pags  = pagRes.data  || [];
+  const servs = servRes.data || [];
+  const totais= totRes.data  || [];
+
+  const paidByMonth = new Map();
+  pags.forEach(p => {
+    if(!paidByMonth.has(p['Mês'])) paidByMonth.set(p['Mês'], new Set());
+    paidByMonth.get(p['Mês']).add(p['Cliente']);
+  });
+
+  const trainerCli = new Map();
+  servs
+    .filter(s => ['Ativo','Em curso'].includes(s['Estado do serviço']||'') && s['Repetição']==='Mensal')
+    .forEach(s => {
+      const tr  = (s['Técnico Responsável']||'').trim();
+      const cli = (s['Cliente']||'').trim();
+      if(!tr || !cli) return;
+      if(!trainerCli.has(tr)) trainerCli.set(tr, new Set());
+      trainerCli.get(tr).add(cli);
+    });
+
+  let anyPending=false;
+  let html='';
+
+  months.forEach(mesKey => {
+    const [mesNome] = mesKey.split(' ');
+    const abrev  = mesAbrev[mesNome] || mesNome.substring(0,3);
+    const pagCol = `${abrev} Pagamento`;
+    const paid   = paidByMonth.get(mesKey) || new Set();
+
+    const relevant = totais.filter(t => {
+      const val = parseFloat(t[pagCol]) || 0;
+      return val > 0 && ['Treinador','Coordenador','Nutricionista','Fisioterapeuta'].includes(t['Role']);
+    });
+    if(!relevant.length) return;
+
+    const rows = relevant.map(t => {
+      const nome      = t['Professor'];
+      const pagamento = parseFloat(t[pagCol]) || 0;
+      const cliArr    = [...(trainerCli.get(nome) || new Set())];
+      const pagos     = cliArr.filter(c => paid.has(c));
+      const semPag    = cliArr.filter(c => !paid.has(c));
+      const ok        = semPag.length === 0 && cliArr.length > 0;
+      if(!ok) anyPending=true;
+      return {nome, pagamento, pagos, semPag, ok};
+    });
+
+    const nPending = rows.filter(r=>!r.ok).length;
+    const badge = nPending>0
+      ? `<span style="background:rgba(220,38,38,.12);color:var(--danger);font-size:12px;font-weight:700;padding:2px 10px;border-radius:20px;margin-left:10px">${nPending} pendente${nPending>1?'s':''}</span>`
+      : `<span style="background:rgba(25,135,84,.12);color:var(--success,#198754);font-size:12px;font-weight:700;padding:2px 10px;border-radius:20px;margin-left:10px">✓ OK</span>`;
+
+    html+=`<div style="background:var(--surface2);border-radius:12px;padding:20px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:16px;margin-bottom:14px;display:flex;align-items:center">${mesKey}${badge}</div>
+      <table class="tbl" style="font-size:13px">
+        <thead><tr><th>Treinador</th><th>Pagamento</th><th>Clientes com pagamento</th><th>Sem pagamento</th><th style="text-align:center">Estado</th></tr></thead>
+        <tbody>
+        ${rows.map(r=>`<tr>
+          <td style="font-weight:600">${r.nome}</td>
+          <td>${r.pagamento.toFixed(2)}€</td>
+          <td style="color:var(--success,#198754);font-size:12px">${r.pagos.length ? r.pagos.join('<br>') : '<span style="color:var(--text-muted)">—</span>'}</td>
+          <td style="color:${r.semPag.length ? 'var(--danger)' : 'var(--text-muted)'};font-size:12px">${r.semPag.length ? r.semPag.join('<br>') : '—'}</td>
+          <td style="text-align:center">${r.ok
+            ? '<span style="color:var(--success,#198754);font-weight:700;font-size:16px">✓</span>'
+            : '<span style="color:var(--danger);font-weight:700;font-size:15px">✗ Pendente</span>'}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  });
+
+  if(!html){
+    container.innerHTML=`<div style="text-align:center;padding:60px;color:var(--text-muted)">Sem dados de faturação importados para ${months.join(' / ')}.</div>`;
+    return;
+  }
+
+  const summaryBanner = anyPending
+    ? `<div style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:22px">⚠️</span>
+        <div><div style="font-weight:700;color:var(--danger)">Existem pagamentos de clientes em falta</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:2px">Verifica os treinadores marcados como Pendente antes de processar os pagamentos.</div></div>
+      </div>`
+    : `<div style="background:rgba(25,135,84,.08);border:1px solid rgba(25,135,84,.25);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:22px">✅</span>
+        <div><div style="font-weight:700;color:var(--success,#198754)">Todos os clientes pagaram</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:2px">Os pagamentos aos treinadores podem ser processados.</div></div>
+      </div>`;
+
+  container.innerHTML = summaryBanner + html;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 
 // DATA PAGE
@@ -5132,10 +5338,59 @@ async function eliminarDesconto(id,nome){
 
 async function renderAlertas(el){
   el.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-muted)">A carregar...</div>`;
-  const dados = await api('/api/alertas');
+
+  const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const now=new Date(), year=now.getFullYear();
+  const curMes=MONTHS[now.getMonth()]+' '+year;
+  const prevMes=now.getMonth()>0?(MONTHS[now.getMonth()-1]+' '+year):null;
+  const months=[curMes,prevMes].filter(Boolean);
+
+  const [dados, pagRes, servRes, totRes] = await Promise.all([
+    api('/api/alertas'),
+    _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
+    _SB.from('servicos').select('Cliente,"Técnico Responsável","Estado do serviço","Repetição"'),
+    _SB.from('totais_pagamentos').select('*')
+  ]);
+
   if(!Array.isArray(dados)){ el.innerHTML=`<p style="color:var(--danger);padding:40px">${dados.error||'Erro'}</p>`; return; }
   _alertasTodosDados = dados;
   _renderAlertasView(el, dados);
+
+  // Payment validation banner
+  const mesAbrev={'Janeiro':'Jan','Fevereiro':'Fev','Março':'Mar','Abril':'Abr',
+    'Maio':'Mai','Junho':'Jun','Julho':'Jul','Agosto':'Ago',
+    'Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
+  const pags=pagRes.data||[], servs=servRes.data||[], totais=totRes.data||[];
+  const paidByMonth=new Map();
+  pags.forEach(p=>{
+    if(!paidByMonth.has(p['Mês'])) paidByMonth.set(p['Mês'],new Set());
+    paidByMonth.get(p['Mês']).add(p['Cliente']);
+  });
+  const trainerCli=new Map();
+  servs.filter(s=>['Ativo','Em curso'].includes(s['Estado do serviço']||'')&&s['Repetição']==='Mensal')
+    .forEach(s=>{
+      const tr=(s['Técnico Responsável']||'').trim(), cli=(s['Cliente']||'').trim();
+      if(!tr||!cli) return;
+      if(!trainerCli.has(tr)) trainerCli.set(tr,new Set());
+      trainerCli.get(tr).add(cli);
+    });
+  const pending=[];
+  months.forEach(mesKey=>{
+    const abrev=mesAbrev[mesKey.split(' ')[0]]||mesKey.substring(0,3);
+    const pagCol=`${abrev} Pagamento`;
+    const paid=paidByMonth.get(mesKey)||new Set();
+    totais.filter(t=>(parseFloat(t[pagCol])||0)>0&&['Treinador','Coordenador','Nutricionista','Fisioterapeuta'].includes(t['Role']))
+      .forEach(t=>{
+        const semPag=[...(trainerCli.get(t['Professor'])||new Set())].filter(c=>!paid.has(c));
+        if(semPag.length) pending.push({mes:mesKey, trainer:t['Professor'], n:semPag.length});
+      });
+  });
+  if(!pending.length) return;
+  const summary=pending.map(p=>`${p.trainer} — ${p.n} cliente${p.n>1?'s':''} (${p.mes})`).join(' · ');
+  const banner=document.createElement('div');
+  banner.style.cssText='padding:10px 20px;background:rgba(220,38,38,.08);border-bottom:1px solid rgba(220,38,38,.22);display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+  banner.innerHTML=`<span style="font-size:14px">⚠️</span><span style="font-size:13px;flex:1"><b>Pagamentos de clientes em falta:</b> ${summary}</span><a href="#" onclick="navigate('validacao_pagamentos');return false" style="font-size:12px;color:var(--danger);font-weight:600;white-space:nowrap;text-decoration:underline">Ver detalhes →</a>`;
+  el.insertBefore(banner, el.firstChild);
 }
 
 function _renderAlertasView(el, todos){
