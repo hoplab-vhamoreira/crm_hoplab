@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
@@ -1866,6 +1866,288 @@ async function _dbTecnico(el){
     </div>`;
 }
 
+
+// ── IMPORTAÇÃO DE FATURAÇÃO ──────────────────────────────────────────────────
+const _MESES_NUM = {'01':'Janeiro','02':'Fevereiro','03':'Março','04':'Abril','05':'Maio','06':'Junho','07':'Julho','08':'Agosto','09':'Setembro','10':'Outubro','11':'Novembro','12':'Dezembro'};
+const _MESES_ABBR = {'Jan':'01','Fev':'02','Mar':'03','Abr':'04','Mai':'05','Jun':'06','Jul':'07','Ago':'08','Set':'09','Out':'10','Nov':'11','Dez':'12'};
+
+function _parseFaturacaoCSV(text){
+  // Normalize line endings
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  // Find header row: contains NIF;Nome;Data
+  let headerIdx = -1;
+  for(let i=0;i<lines.length;i++){
+    if(lines[i].includes('NIF') && lines[i].includes('Nome') && lines[i].includes('Data')){
+      headerIdx=i; break;
+    }
+  }
+  if(headerIdx<0) throw new Error('Cabeçalho não encontrado no ficheiro CSV');
+  const headers = lines[headerIdx].split(';').map(h=>h.trim().replace(/^"|"$/g,''));
+  const rows=[];
+  for(let i=headerIdx+1;i<lines.length;i++){
+    const line=lines[i].trim();
+    if(!line) continue;
+    const parts=line.split(';').map(v=>v.trim().replace(/^"|"$/g,''));
+    if(parts.length<3) continue;
+    const row={};
+    headers.forEach((h,j)=>{ row[h]=parts[j]||''; });
+    rows.push(row);
+  }
+  return rows;
+}
+
+function _groupFaturacaoRows(rows){
+  // Returns Map: key=`${NIF}|${mesKey}` → {NIF, Nome, mesKey, mesNome, total, docs:[]}
+  const map = new Map();
+  rows.forEach(r=>{
+    const nif = (r['NIF']||'').trim();
+    if(!nif || nif==='999999990' || nif==='Consumidor Final') return;
+    const tipo = (r['Tipo']||r['Tip']||'').trim().toUpperCase();
+    // Only FR, FS, NC
+    if(!['FR','FS','NC'].includes(tipo)) return;
+    // Parse date dd/mm/yyyy or dd-mm-yyyy
+    const dataStr = r['Data']||'';
+    const dm = dataStr.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+    if(!dm) return;
+    const mesNum = dm[2]; // "05"
+    const ano = dm[3];
+    const mesKey = `${_MESES_NUM[mesNum]||mesNum} ${ano}`;
+    const mapKey = `${nif}|${mesKey}`;
+    // Parse value: comma decimal separator
+    const valorStr = (r['Valor liquido']||r['Valor líquido']||r['Valor Liquido']||r['Valor']||'0').replace(/\./g,'').replace(',','.');
+    let valor = parseFloat(valorStr)||0;
+    if(tipo==='NC') valor = -Math.abs(valor);
+    const nome = (r['Nome']||'').trim();
+    if(!map.has(mapKey)){
+      map.set(mapKey,{NIF:nif,Nome:nome,mesKey,mesNum,ano,total:0,docs:[]});
+    }
+    const entry = map.get(mapKey);
+    entry.total += valor;
+    entry.docs.push({tipo, num:r['Número']||r['Numero']||'', valor});
+  });
+  return map;
+}
+
+async function openImportFaturacao(){
+  // Step 1: file picker modal
+  document.getElementById('modalOverlay').style.display='flex';
+  document.getElementById('modalOverlay').innerHTML=`
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header"><h2>Importar Faturação</h2><button class="modal-close" onclick="closeModal()">×</button></div>
+      <div class="modal-body" style="padding:24px">
+        <p style="color:var(--text-muted);margin-bottom:16px">Selecione o ficheiro CSV exportado do software de faturação (separador ponto e vírgula).</p>
+        <div id="csv-drop-zone" style="border:2px dashed var(--border);border-radius:8px;padding:40px;text-align:center;cursor:pointer;transition:border-color .2s"
+          onclick="document.getElementById('csv-file-input').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--primary)'"
+          ondragleave="this.style.borderColor='var(--border)'"
+          ondrop="event.preventDefault();_handleCsvDrop(event)">
+          <div style="font-size:32px;margin-bottom:8px">📂</div>
+          <div style="font-weight:600">Clique ou arraste o ficheiro CSV aqui</div>
+          <div id="csv-file-name" style="margin-top:8px;color:var(--text-muted);font-size:13px">Nenhum ficheiro selecionado</div>
+        </div>
+        <input type="file" id="csv-file-input" accept=".csv,.txt" style="display:none" onchange="_handleCsvFile(this)">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" id="csv-next-btn" disabled onclick="_csvProceed()">Analisar →</button>
+      </div>
+    </div>`;
+}
+
+let _csvParsedRows=null;
+function _handleCsvDrop(ev){
+  const file=ev.dataTransfer.files[0];
+  if(file) _loadCsvFile(file);
+}
+function _handleCsvFile(inp){
+  const file=inp.files[0];
+  if(file) _loadCsvFile(file);
+}
+function _loadCsvFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      _csvParsedRows=_parseFaturacaoCSV(e.target.result);
+      document.getElementById('csv-file-name').textContent=`✓ ${file.name} — ${_csvParsedRows.length} linhas lidas`;
+      document.getElementById('csv-next-btn').disabled=false;
+    }catch(err){
+      document.getElementById('csv-file-name').textContent=`✗ Erro: ${err.message}`;
+      _csvParsedRows=null;
+      document.getElementById('csv-next-btn').disabled=true;
+    }
+  };
+  reader.readAsText(file,'UTF-8');
+}
+async function _csvProceed(){
+  if(!_csvParsedRows) return;
+  await _importStep2(_csvParsedRows);
+}
+
+async function _importStep2(rawRows){
+  // Show loading state
+  const mo=document.getElementById('modalOverlay');
+  mo.innerHTML=`<div class="modal" style="max-width:700px"><div class="modal-body" style="padding:40px;text-align:center;color:var(--text-muted)">A analisar...</div></div>`;
+
+  // Group CSV rows
+  const grouped=_groupFaturacaoRows(rawRows);
+
+  // Load CRM data
+  const [cliRes,pagRes]=await Promise.all([
+    _SB.from('clientes').select('Nome / Empresa,NIF,Estado'),
+    _SB.from('pag_clientes_2026').select('Cliente,Mês,Estado')
+  ]);
+  const clientes=cliRes.data||[];
+  const pagExist=pagRes.data||[];
+
+  // Build lookup maps
+  const cliByNIF=new Map();
+  const cliByNome=new Map();
+  clientes.forEach(c=>{
+    if(c['NIF']) cliByNIF.set(String(c['NIF']).trim(), c);
+    if(c['Nome / Empresa']) cliByNome.set(c['Nome / Empresa'].trim().toLowerCase(), c);
+  });
+
+  // Classify each billing group
+  const errors=[];
+  const warnings=[];
+  const valid=[];
+
+  grouped.forEach((entry,key)=>{
+    const crmCli = cliByNIF.get(entry.NIF) || cliByNome.get(entry.Nome.toLowerCase());
+    if(!crmCli){
+      warnings.push({type:'not_found', ...entry, msg:`NIF ${entry.NIF} / "${entry.Nome}" não encontrado no CRM`});
+      return;
+    }
+    const estado=crmCli['Estado']||'';
+    const isSuspCanc=['Suspenso','Cancelado'].includes(estado);
+    if(isSuspCanc){
+      errors.push({type:'susp_canc', ...entry, crmEstado:estado, crmNome:crmCli['Nome / Empresa'], msg:`Cliente ${isSuspCanc?estado:estado} mas aparece na faturação`});
+      return;
+    }
+    // Check duplicate: already exists in pag_clientes_2026 for this month
+    const alreadyExists=pagExist.some(p=>
+      (p['Cliente']||'').toLowerCase()===(crmCli['Nome / Empresa']||'').toLowerCase() && p['Mês']===entry.mesKey
+    );
+    if(alreadyExists){
+      warnings.push({type:'duplicate', ...entry, crmNome:crmCli['Nome / Empresa'], msg:`Já existe registo para ${crmCli['Nome / Empresa']} em ${entry.mesKey}`});
+      return;
+    }
+    valid.push({...entry, crmNome:crmCli['Nome / Empresa']});
+  });
+
+  // Find active clients missing from billing (active + has services → should be billed)
+  const servRes=await _SB.from('servicos').select('Cliente,Estado');
+  const servData=servRes.data||[];
+  const activeServClients=new Set(servData.filter(s=>s['Estado']==='Ativo'||s['Estado']==='Em curso').map(s=>(s['Cliente']||'').trim().toLowerCase()));
+  const billedNomes=new Set([...grouped.values()].map(e=>e.Nome.toLowerCase()));
+  // Get distinct months in billing file
+  const billingMonths=[...new Set([...grouped.values()].map(e=>e.mesKey))];
+
+  clientes.filter(c=>['Ativo','Híbrido ativo'].includes(c['Estado'])).forEach(c=>{
+    const nome=(c['Nome / Empresa']||'').trim();
+    const nomeL=nome.toLowerCase();
+    if(!activeServClients.has(nomeL)) return; // no active services, skip
+    // Check if billed in any of the months in the file
+    const inBilling=cliByNIF.has(c['NIF']?String(c['NIF']).trim():'__') ||
+      [...grouped.values()].some(e=>e.Nome.toLowerCase()===nomeL);
+    if(!inBilling){
+      errors.push({type:'missing', crmNome:nome, msg:`Cliente ativo com serviços mas ausente da faturação`});
+    }
+  });
+
+  // Render step 2
+  const errHtml = errors.length===0 ? '' : `
+    <div style="margin-bottom:16px">
+      <div style="font-weight:700;color:var(--danger);margin-bottom:8px">🚨 Erros (${errors.length}) — Requer atenção</div>
+      <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+        <table class="tbl" style="font-size:12px"><thead><tr><th>Tipo</th><th>Cliente</th><th>Mês</th><th>Valor</th><th>Mensagem</th></tr></thead><tbody>
+        ${errors.map(e=>`<tr>
+          <td><span style="font-size:11px;padding:2px 6px;border-radius:4px;background:${e.type==='missing'?'var(--warning-bg,#fff3cd);color:#856404':'var(--danger-light,#f8d7da);color:#721c24'}">${e.type==='missing'?'Ausente':'Suspenso/Cancelado'}</span></td>
+          <td>${e.crmNome||e.Nome||'—'}</td>
+          <td>${e.mesKey||'—'}</td>
+          <td>${e.total!=null?e.total.toFixed(2)+'€':'—'}</td>
+          <td style="color:var(--text-muted);font-size:11px">${e.msg}</td>
+        </tr>`).join('')}
+        </tbody></table>
+      </div>
+    </div>`;
+
+  const warnHtml = warnings.length===0 ? '' : `
+    <div style="margin-bottom:16px">
+      <div style="font-weight:700;color:var(--warning,#856404);margin-bottom:8px">⚠️ Avisos (${warnings.length})</div>
+      <div style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+        <table class="tbl" style="font-size:12px"><thead><tr><th>Tipo</th><th>Cliente</th><th>Mês</th><th>Valor</th><th>Mensagem</th></tr></thead><tbody>
+        ${warnings.map(e=>`<tr>
+          <td><span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--warning-bg,#fff3cd);color:#856404">${e.type==='duplicate'?'Duplicado':'Não encontrado'}</span></td>
+          <td>${e.crmNome||e.Nome||'—'}</td>
+          <td>${e.mesKey||'—'}</td>
+          <td>${e.total!=null?e.total.toFixed(2)+'€':'—'}</td>
+          <td style="color:var(--text-muted);font-size:11px">${e.msg}</td>
+        </tr>`).join('')}
+        </tbody></table>
+      </div>
+    </div>`;
+
+  const validSummary = valid.length===0
+    ? `<div style="color:var(--text-muted);font-style:italic">Nenhum registo válido para importar.</div>`
+    : `<div style="color:var(--success,green);font-weight:600;margin-bottom:4px">✓ ${valid.length} registo(s) válido(s) prontos a importar</div>
+       <div style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+         <table class="tbl" style="font-size:12px"><thead><tr><th>Cliente</th><th>Mês</th><th>Valor</th></tr></thead><tbody>
+         ${valid.map(v=>`<tr><td>${v.crmNome}</td><td>${v.mesKey}</td><td>${v.total.toFixed(2)}€</td></tr>`).join('')}
+         </tbody></table>
+       </div>`;
+
+  mo.innerHTML=`
+    <div class="modal" style="max-width:720px">
+      <div class="modal-header"><h2>Centro de Erros — Revisão</h2><button class="modal-close" onclick="closeModal()">×</button></div>
+      <div class="modal-body" style="padding:24px;max-height:70vh;overflow-y:auto">
+        ${errHtml}${warnHtml}
+        <div>
+          <div style="font-weight:700;margin-bottom:8px">Registos a importar</div>
+          ${validSummary}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-ghost" onclick="openImportFaturacao()">← Voltar</button>
+        ${valid.length>0?`<button class="btn btn-primary" onclick="_importStep3(${JSON.stringify(valid).replace(/</g,'\\u003c')})">Importar ${valid.length} registos →</button>`:''}
+      </div>
+    </div>`;
+}
+
+async function _importStep3(validList){
+  const mo=document.getElementById('modalOverlay');
+  mo.innerHTML=`<div class="modal" style="max-width:480px"><div class="modal-body" style="padding:40px;text-align:center;color:var(--text-muted)">A importar...</div></div>`;
+  const rows=validList.map(v=>({
+    'Cliente':v.crmNome,
+    'Mês':v.mesKey,
+    'Estado':'Ativo',
+    'Valor Pago':0,
+    'Valor a Pagar':v.total
+  }));
+  const {error}=await _SB.from('pag_clientes_2026').insert(rows);
+  if(error){
+    mo.innerHTML=`<div class="modal" style="max-width:480px">
+      <div class="modal-header"><h2>Erro na Importação</h2><button class="modal-close" onclick="closeModal()">×</button></div>
+      <div class="modal-body" style="padding:24px;color:var(--danger)">${error.message}</div>
+      <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal()">Fechar</button></div>
+    </div>`;
+    return;
+  }
+  // Invalidate cache and refresh
+  delete sectionData['pag_clientes_2026'];
+  mo.innerHTML=`<div class="modal" style="max-width:480px">
+    <div class="modal-header"><h2>Importação Concluída</h2><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-body" style="padding:24px;text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">✅</div>
+      <div style="font-weight:700;font-size:18px;margin-bottom:8px">${rows.length} registo(s) importado(s)</div>
+      <div style="color:var(--text-muted)">Os registos foram adicionados com Estado "Ativo" e Valor a Pagar preenchido.</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal();navigate('pag_clientes_2026')">Ver Tabela</button></div>
+  </div>`;
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 // DATA PAGE
 const PER_PAGE=50;
 async function renderDataPage(el,section){
@@ -1878,7 +2160,7 @@ async function renderDataPage(el,section){
     sectionData[section]=d;
   }
   const data=sectionData[section];
-  if(!data.length){el.innerHTML=`<div class="page-header"><div><h1>${sec.title}</h1></div><div>${(sec.fields&&!sec.noAdd)?`<button class="btn btn-primary" onclick="openAdd('${section}')">+ Adicionar</button>`:''}</div></div><div class="table-wrap" style="padding:40px;text-align:center;color:var(--text-muted)">Sem dados</div>`;return;}
+  if(!data.length){const _ib=section==='pag_clientes_2026'?`<button class="btn btn-ghost btn-sm" style="margin-right:8px" onclick="openImportFaturacao()">Importar Faturação</button>`:'';el.innerHTML=`<div class="page-header"><div><h1>${sec.title}</h1></div><div>${_ib}${(sec.fields&&!sec.noAdd)?`<button class="btn btn-primary" onclick="openAdd('${section}')">+ Adicionar</button>`:''}</div></div><div class="table-wrap" style="padding:40px;text-align:center;color:var(--text-muted)">Sem dados</div>`;return;}
   const allCols=sec.cols||Object.keys(data[0]).filter(c=>c!=='_id').slice(0,8);
   sectionPage[section]=sectionPage[section]||0;
   if(section==='pipeline'){
@@ -2118,9 +2400,10 @@ function renderTable(el,section,sec,data,allCols){
     ? `<span class="filter-active-badge">Filtros activos <button onclick="clearColumnFilters('${section}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px" title="Limpar filtros"></button></span>`
     : '';
 
+  const _importBtn = section==='pag_clientes_2026' ? `<button class="btn btn-ghost btn-sm" style="margin-right:8px" onclick="openImportFaturacao()">Importar Faturação</button>` : '';
   el.innerHTML=`
     <div class="page-header"><div><h1>${sec.title}</h1><div class="subtitle">${filtered.length} registos</div></div>
-    <div>${(sec.fields&&!sec.noAdd)?`<button class="btn btn-primary" onclick="openAdd('${section}')">+ Adicionar</button>`:''}</div></div>
+    <div>${_importBtn}${(sec.fields&&!sec.noAdd)?`<button class="btn btn-primary" onclick="openAdd('${section}')">+ Adicionar</button>`:''}</div></div>
     <div class="table-wrap">
       <div class="table-toolbar">
         <input type="text" id="search_${section}" placeholder="Pesquisar em tudo..." value="${search}" oninput="doSearch('${section}')">
