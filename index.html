@@ -2150,13 +2150,14 @@ async function _importStep2(rawRows){
   });
 
   // Find active CRM clients with active services missing from billing
-  const servRes=await _SB.from('servicos').select('Cliente,"Estado do serviço","Data Conversão"');
+  const servRes=await _SB.from('servicos').select('*');
   const servData=servRes.data||[];
   // Map: normalizedName → earliest active service start YYYY-MM (null = no date = always active)
   const activeServMap=new Map();
   servData.filter(s=>['Ativo','Em curso'].includes(s['Estado do serviço']||'')).forEach(s=>{
     const name=_norm(s['Cliente']||'');
-    const dc=s['Data Conversão'];
+    // Try all possible key variants for "Data Conversão"
+    const dc=s['Data Conversão']||s['Data Conversao']||s['Data conversão']||null;
     const startYM=dc?(dc+'').substring(0,7):null;
     if(!activeServMap.has(name)){
       activeServMap.set(name,startYM);
