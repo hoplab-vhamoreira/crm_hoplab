@@ -2115,7 +2115,7 @@ async function _importStep2(rawRows){
     const status=crmCli['Status']||'';
     const crmNome=crmCli['Nome']||'';
     if(['Suspenso','Cancelado'].includes(status)){
-      errors.push({type:'susp_canc', ...entry, crmEstado:status, crmNome, msg:`Cliente ${status} mas aparece na faturação`});
+      warnings.push({type:'susp_canc', ...entry, crmEstado:status, crmNome, msg:`Cliente ${status} mas aparece na faturação`});
       return;
     }
     const alreadyExists=pagExist.some(p=>
@@ -2135,15 +2135,22 @@ async function _importStep2(rawRows){
     servData.filter(s=>['Ativo','Em curso'].includes(s['Estado do serviço']||''))
             .map(s=>_norm(s['Cliente']||''))
   );
-  const billingMonths=[...new Set([...grouped.values()].map(e=>e.mesKey))];
+  const groupedArr=[...grouped.values()];
+  window._faturacaoValid=valid;
+  window._faturacaoSuspCanc=warnings.filter(w=>w.type==='susp_canc');
 
   clientes.filter(c=>['Ativo','Híbrido ativo'].includes(c['Status']||'')).forEach(c=>{
     const nome=c['Nome']||'';
     const nomeN=_norm(nome);
     if(!activeServClients.has(nomeN)) return;
-    const nif=c['NIF']?c['NIF'].trim():'';
-    const inBilling= (nif && cliByNIF.has(nif) && [...grouped.values()].some(e=>e.NIF===nif)) ||
-      [...grouped.values()].some(e=>_norm(e.Nome)===nomeN);
+    const nif=(c['NIF']||'').trim();
+    const nifFat=(c['NIF Faturação']||'').trim();
+    const faturarAN=_norm(c['Faturar a']||'');
+    const inBilling=
+      (nif    && groupedArr.some(e=>e.NIF===nif))    ||
+      (nifFat && groupedArr.some(e=>e.NIF===nifFat)) ||
+      groupedArr.some(e=>_norm(e.Nome)===nomeN)       ||
+      (faturarAN && groupedArr.some(e=>_norm(e.Nome)===faturarAN));
     if(!inBilling){
       errors.push({type:'missing', crmNome:nome, msg:`Cliente ativo com serviços mas ausente da faturação`});
     }
@@ -2172,7 +2179,7 @@ async function _importStep2(rawRows){
       <div style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
         <table class="tbl" style="font-size:12px"><thead><tr><th>Tipo</th><th>Cliente</th><th>Mês</th><th>Valor</th><th>Mensagem</th></tr></thead><tbody>
         ${warnings.map(e=>`<tr>
-          <td><span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--warning-bg,#fff3cd);color:#856404">${e.type==='duplicate'?'Duplicado':'Não encontrado'}</span></td>
+          <td><span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--warning-bg,#fff3cd);color:#856404">${e.type==='duplicate'?'Duplicado':e.type==='susp_canc'?'Suspenso/Cancelado':'Não encontrado'}</span></td>
           <td>${e.crmNome||e.Nome||'—'}</td>
           <td>${e.mesKey||'—'}</td>
           <td>${e.total!=null?e.total.toFixed(2)+'€':'—'}</td>
@@ -2180,6 +2187,7 @@ async function _importStep2(rawRows){
         </tr>`).join('')}
         </tbody></table>
       </div>
+      ${warnings.some(w=>w.type==='susp_canc')?`<label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="include-susp"> Incluir suspensos/cancelados (verificar período)</label>`:''}
     </div>`;
 
   const validSummary = valid.length===0
@@ -2204,9 +2212,15 @@ async function _importStep2(rawRows){
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-ghost" onclick="openImportFaturacao()">← Voltar</button>
-        ${valid.length>0?`<button class="btn btn-primary" onclick="_importStep3(${JSON.stringify(valid).replace(/</g,'\\u003c')})">Importar ${valid.length} registos →</button>`:''}
+        ${valid.length>0?`<button class="btn btn-primary" onclick="_importStep3Exec()">Importar ${valid.length} registos →</button>`:''}
       </div>
     </div>`;
+}
+
+function _importStep3Exec(){
+  const list=[...(window._faturacaoValid||[])];
+  if(document.getElementById('include-susp')?.checked) list.push(...(window._faturacaoSuspCanc||[]));
+  _importStep3(list);
 }
 
 async function _importStep3(validList){
