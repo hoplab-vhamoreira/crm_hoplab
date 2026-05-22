@@ -2068,72 +2068,82 @@ async function _csvProceed(){
 }
 
 async function _importStep2(rawRows){
-  // Show loading state
   const mo=document.getElementById('modalOverlay');
   mo.innerHTML=`<div class="modal" style="max-width:700px"><div class="modal-body" style="padding:40px;text-align:center;color:var(--text-muted)">A analisar...</div></div>`;
 
-  // Group CSV rows
   const grouped=_groupFaturacaoRows(rawRows);
 
-  // Load CRM data
+  // Normalize string: remove accents, lowercase, trim
+  const _norm=s=>( s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+
+  // Load CRM data — correct column names: Nome, NIF, Status, Faturar a, NIF Faturação
   const [cliRes,pagRes]=await Promise.all([
-    _SB.from('clientes').select('Nome / Empresa,NIF,Estado'),
+    _SB.from('clientes').select('Nome,NIF,Status,"Faturar a","NIF Faturação"'),
     _SB.from('pag_clientes_2026').select('Cliente,Mês,Estado')
   ]);
   const clientes=cliRes.data||[];
   const pagExist=pagRes.data||[];
 
-  // Build lookup maps
+  // Build lookup maps: by NIF, by name (normalized), by "Faturar a" name (normalized), by NIF Faturação
   const cliByNIF=new Map();
   const cliByNome=new Map();
+  const cliByFaturarA=new Map();
+  const cliByNIFFat=new Map();
   clientes.forEach(c=>{
-    if(c['NIF']) cliByNIF.set(String(c['NIF']).trim(), c);
-    if(c['Nome / Empresa']) cliByNome.set(c['Nome / Empresa'].trim().toLowerCase(), c);
+    if(c['NIF']&&c['NIF'].trim()) cliByNIF.set(c['NIF'].trim(), c);
+    if(c['Nome']) cliByNome.set(_norm(c['Nome']), c);
+    if(c['Faturar a']&&c['Faturar a'].trim()) cliByFaturarA.set(_norm(c['Faturar a']), c);
+    if(c['NIF Faturação']&&c['NIF Faturação'].trim()) cliByNIFFat.set(c['NIF Faturação'].trim(), c);
   });
 
-  // Classify each billing group
+  const _findCli=(nif,nome)=>
+    cliByNIF.get(nif) ||
+    cliByNIFFat.get(nif) ||
+    cliByNome.get(_norm(nome)) ||
+    cliByFaturarA.get(_norm(nome));
+
   const errors=[];
   const warnings=[];
   const valid=[];
 
   grouped.forEach((entry,key)=>{
-    const crmCli = cliByNIF.get(entry.NIF) || cliByNome.get(entry.Nome.toLowerCase());
+    const crmCli=_findCli(entry.NIF, entry.Nome);
     if(!crmCli){
       warnings.push({type:'not_found', ...entry, msg:`NIF ${entry.NIF} / "${entry.Nome}" não encontrado no CRM`});
       return;
     }
-    const estado=crmCli['Estado']||'';
-    const isSuspCanc=['Suspenso','Cancelado'].includes(estado);
-    if(isSuspCanc){
-      errors.push({type:'susp_canc', ...entry, crmEstado:estado, crmNome:crmCli['Nome / Empresa'], msg:`Cliente ${isSuspCanc?estado:estado} mas aparece na faturação`});
+    const status=crmCli['Status']||'';
+    const crmNome=crmCli['Nome']||'';
+    if(['Suspenso','Cancelado'].includes(status)){
+      errors.push({type:'susp_canc', ...entry, crmEstado:status, crmNome, msg:`Cliente ${status} mas aparece na faturação`});
       return;
     }
-    // Check duplicate: already exists in pag_clientes_2026 for this month
     const alreadyExists=pagExist.some(p=>
-      (p['Cliente']||'').toLowerCase()===(crmCli['Nome / Empresa']||'').toLowerCase() && p['Mês']===entry.mesKey
+      _norm(p['Cliente']||'')===_norm(crmNome) && p['Mês']===entry.mesKey
     );
     if(alreadyExists){
-      warnings.push({type:'duplicate', ...entry, crmNome:crmCli['Nome / Empresa'], msg:`Já existe registo para ${crmCli['Nome / Empresa']} em ${entry.mesKey}`});
+      warnings.push({type:'duplicate', ...entry, crmNome, msg:`Já existe registo para ${crmNome} em ${entry.mesKey}`});
       return;
     }
-    valid.push({...entry, crmNome:crmCli['Nome / Empresa']});
+    valid.push({...entry, crmNome});
   });
 
-  // Find active clients missing from billing (active + has services → should be billed)
-  const servRes=await _SB.from('servicos').select('Cliente,Estado');
+  // Find active CRM clients with active services missing from billing
+  const servRes=await _SB.from('servicos').select('Cliente,"Estado do serviço"');
   const servData=servRes.data||[];
-  const activeServClients=new Set(servData.filter(s=>s['Estado']==='Ativo'||s['Estado']==='Em curso').map(s=>(s['Cliente']||'').trim().toLowerCase()));
-  const billedNomes=new Set([...grouped.values()].map(e=>e.Nome.toLowerCase()));
-  // Get distinct months in billing file
+  const activeServClients=new Set(
+    servData.filter(s=>['Ativo','Em curso'].includes(s['Estado do serviço']||''))
+            .map(s=>_norm(s['Cliente']||''))
+  );
   const billingMonths=[...new Set([...grouped.values()].map(e=>e.mesKey))];
 
-  clientes.filter(c=>['Ativo','Híbrido ativo'].includes(c['Estado'])).forEach(c=>{
-    const nome=(c['Nome / Empresa']||'').trim();
-    const nomeL=nome.toLowerCase();
-    if(!activeServClients.has(nomeL)) return; // no active services, skip
-    // Check if billed in any of the months in the file
-    const inBilling=cliByNIF.has(c['NIF']?String(c['NIF']).trim():'__') ||
-      [...grouped.values()].some(e=>e.Nome.toLowerCase()===nomeL);
+  clientes.filter(c=>['Ativo','Híbrido ativo'].includes(c['Status']||'')).forEach(c=>{
+    const nome=c['Nome']||'';
+    const nomeN=_norm(nome);
+    if(!activeServClients.has(nomeN)) return;
+    const nif=c['NIF']?c['NIF'].trim():'';
+    const inBilling= (nif && cliByNIF.has(nif) && [...grouped.values()].some(e=>e.NIF===nif)) ||
+      [...grouped.values()].some(e=>_norm(e.Nome)===nomeN);
     if(!inBilling){
       errors.push({type:'missing', crmNome:nome, msg:`Cliente ativo com serviços mas ausente da faturação`});
     }
