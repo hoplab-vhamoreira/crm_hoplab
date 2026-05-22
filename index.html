@@ -1935,17 +1935,17 @@ async function openImportFaturacao(){
     <div class="modal" style="max-width:520px">
       <div class="modal-header"><h2>Importar Faturação</h2><button class="modal-close" onclick="closeModal()">×</button></div>
       <div class="modal-body" style="padding:24px">
-        <p style="color:var(--text-muted);margin-bottom:16px">Selecione o ficheiro CSV exportado do software de faturação (separador ponto e vírgula).</p>
+        <p style="color:var(--text-muted);margin-bottom:16px">Selecione o ficheiro CSV ou PDF exportado do software de faturação (TOConline).</p>
         <div id="csv-drop-zone" style="border:2px dashed var(--border);border-radius:8px;padding:40px;text-align:center;cursor:pointer;transition:border-color .2s"
           onclick="document.getElementById('csv-file-input').click()"
           ondragover="event.preventDefault();this.style.borderColor='var(--primary)'"
           ondragleave="this.style.borderColor='var(--border)'"
           ondrop="event.preventDefault();_handleCsvDrop(event)">
           <div style="font-size:32px;margin-bottom:8px">📂</div>
-          <div style="font-weight:600">Clique ou arraste o ficheiro CSV aqui</div>
+          <div style="font-weight:600">Clique ou arraste o ficheiro CSV ou PDF aqui</div>
           <div id="csv-file-name" style="margin-top:8px;color:var(--text-muted);font-size:13px">Nenhum ficheiro selecionado</div>
         </div>
-        <input type="file" id="csv-file-input" accept=".csv,.txt" style="display:none" onchange="_handleCsvFile(this)">
+        <input type="file" id="csv-file-input" accept=".csv,.txt,.pdf" style="display:none" onchange="_handleCsvFile(this)">
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
@@ -1957,26 +1957,110 @@ async function openImportFaturacao(){
 let _csvParsedRows=null;
 function _handleCsvDrop(ev){
   const file=ev.dataTransfer.files[0];
-  if(file) _loadCsvFile(file);
+  if(file) _loadFaturacaoFile(file);
 }
 function _handleCsvFile(inp){
   const file=inp.files[0];
-  if(file) _loadCsvFile(file);
+  if(file) _loadFaturacaoFile(file);
 }
-function _loadCsvFile(file){
-  const reader=new FileReader();
-  reader.onload=e=>{
-    try{
-      _csvParsedRows=_parseFaturacaoCSV(e.target.result);
-      document.getElementById('csv-file-name').textContent=`✓ ${file.name} — ${_csvParsedRows.length} linhas lidas`;
-      document.getElementById('csv-next-btn').disabled=false;
-    }catch(err){
-      document.getElementById('csv-file-name').textContent=`✗ Erro: ${err.message}`;
-      _csvParsedRows=null;
-      document.getElementById('csv-next-btn').disabled=true;
+async function _loadFaturacaoFile(file){
+  const nameEl=document.getElementById('csv-file-name');
+  const btn=document.getElementById('csv-next-btn');
+  nameEl.textContent='A processar...';
+  btn.disabled=true;
+  _csvParsedRows=null;
+  try{
+    const isPDF=file.name.toLowerCase().endsWith('.pdf');
+    if(isPDF){
+      _csvParsedRows=await _parseFaturacaoPDF(file);
+    } else {
+      const text=await file.text();
+      _csvParsedRows=_parseFaturacaoCSV(text);
     }
-  };
-  reader.readAsText(file,'UTF-8');
+    nameEl.textContent=`✓ ${file.name} — ${_csvParsedRows.length} linhas lidas`;
+    btn.disabled=false;
+  }catch(err){
+    nameEl.textContent=`✗ Erro: ${err.message}`;
+    _csvParsedRows=null;
+    btn.disabled=true;
+  }
+}
+
+async function _ensurePDFjs(){
+  if(window.pdfjsLib) return;
+  await new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=res; s.onerror=()=>rej(new Error('Falha ao carregar PDF.js'));
+    document.head.appendChild(s);
+  });
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+async function _parseFaturacaoPDF(file){
+  await _ensurePDFjs();
+  const buf=await file.arrayBuffer();
+  const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;
+  const rows=[];
+  let curNIF='', curNome='';
+
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const vp=page.getViewport({scale:1});
+    const tc=await page.getTextContent();
+
+    // Group text items by y (top-down, 3px tolerance)
+    const groups=new Map();
+    tc.items.forEach(item=>{
+      if(!item.str.trim()) return;
+      const y=Math.round((vp.height-item.transform[5])/3)*3;
+      if(!groups.has(y)) groups.set(y,[]);
+      groups.get(y).push({x:item.transform[4],str:item.str.trim()});
+    });
+
+    // Process lines top to bottom
+    [...groups.keys()].sort((a,b)=>a-b).forEach(y=>{
+      const items=groups.get(y).sort((a,b)=>a.x-b.x);
+      const texts=items.map(i=>i.str).filter(Boolean);
+      if(!texts.length) return;
+
+      // Client header: first token is 9-digit NIF
+      if(/^\d{9}$/.test(texts[0])){
+        curNIF=texts[0];
+        curNome=texts.slice(1).join(' ').trim();
+        return;
+      }
+
+      // Transaction line: first token is dd/mm/yyyy
+      if(!/^\d{2}\/\d{2}\/\d{4}$/.test(texts[0])||!curNIF) return;
+      const tipo=(texts[1]||'').toUpperCase();
+      if(!['FR','FS','NC'].includes(tipo)) return;
+
+      // From right, find consecutive numeric tokens: qty, valorLiq, valor, iva, pct
+      let numStart=texts.length;
+      for(let i=texts.length-1;i>=4;i--){
+        if(/^-?[\d]+[,.]?[\d]*$/.test(texts[i])) numStart=i;
+        else break;
+      }
+      const nums=texts.slice(numStart);
+      // nums[0]=qty, nums[1]=valorLiq, nums[2]=valor, nums[3]=iva
+      const valorLiq=nums.length>=2?nums[1]:(nums[0]||'0');
+
+      rows.push({
+        NIF:curNIF, Nome:curNome,
+        Data:texts[0], Tipo:tipo,
+        Número:texts[2]||'',
+        'Cod.':texts[3]||'',
+        Descrição:texts.slice(4,numStart).join(' '),
+        Quantidade:nums[0]||'1',
+        'Valor líquido':valorLiq,
+        Valor:nums[2]||'',
+        IVA:nums[3]||''
+      });
+    });
+  }
+  if(!rows.length) throw new Error('Nenhuma linha de transação encontrada no PDF');
+  return rows;
 }
 async function _csvProceed(){
   if(!_csvParsedRows) return;
