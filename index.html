@@ -2158,7 +2158,7 @@ async function _importStep2(rawRows){
   );
   const groupedArr=[...grouped.values()];
   window._faturacaoValid=valid;
-  window._faturacaoSuspCanc=warnings.filter(w=>w.type==='susp_canc');
+  window._faturacaoWarnings=warnings;
 
   clientes.filter(c=>['Ativo','Híbrido ativo'].includes(c['Status']||'')).forEach(c=>{
     const nome=c['Nome']||'';
@@ -2197,9 +2197,10 @@ async function _importStep2(rawRows){
   const warnHtml = warnings.length===0 ? '' : `
     <div style="margin-bottom:16px">
       <div style="font-weight:700;color:var(--warning,#856404);margin-bottom:8px">⚠️ Avisos (${warnings.length})</div>
-      <div style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
-        <table class="tbl" style="font-size:12px"><thead><tr><th>Tipo</th><th>Cliente</th><th>Mês</th><th>Valor</th><th>Mensagem</th></tr></thead><tbody>
-        ${warnings.map(e=>`<tr>
+      <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+        <table class="tbl" style="font-size:12px"><thead><tr><th></th><th>Tipo</th><th>Cliente</th><th>Mês</th><th>Valor</th><th>Mensagem</th></tr></thead><tbody>
+        ${warnings.map((e,i)=>`<tr>
+          <td style="text-align:center">${e.type==='susp_canc'?`<input type="checkbox" class="susp-canc-cb" data-idx="${i}" title="Incluir na importação">`:'—'}</td>
           <td><span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--warning-bg,#fff3cd);color:#856404">${e.type==='duplicate'?'Duplicado':e.type==='susp_canc'?'Suspenso/Cancelado':'Não encontrado'}</span></td>
           <td>${e.crmNome||e.Nome||'—'}</td>
           <td>${e.mesKey||'—'}</td>
@@ -2208,7 +2209,7 @@ async function _importStep2(rawRows){
         </tr>`).join('')}
         </tbody></table>
       </div>
-      ${warnings.some(w=>w.type==='susp_canc')?`<label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="include-susp"> Incluir suspensos/cancelados (verificar período)</label>`:''}
+      ${warnings.some(w=>w.type==='susp_canc')?`<div style="font-size:11px;color:var(--text-muted);margin-top:6px">Marcar a checkbox para incluir na importação</div>`:''}
     </div>`;
 
   const validSummary = valid.length===0
@@ -2240,7 +2241,11 @@ async function _importStep2(rawRows){
 
 function _importStep3Exec(){
   const list=[...(window._faturacaoValid||[])];
-  if(document.getElementById('include-susp')?.checked) list.push(...(window._faturacaoSuspCanc||[]));
+  const allWarnings=window._faturacaoWarnings||[];
+  document.querySelectorAll('.susp-canc-cb:checked').forEach(cb=>{
+    const entry=allWarnings[parseInt(cb.dataset.idx)];
+    if(entry) list.push(entry);
+  });
   _importStep3(list);
 }
 
