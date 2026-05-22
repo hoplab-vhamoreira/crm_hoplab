@@ -1111,7 +1111,7 @@ function showApp(){
   document.getElementById('userName').textContent=currentUser.name;
   document.getElementById('userRole').textContent=currentUser.role;
   buildSidebar();
-  const _savedSection = sessionStorage.getItem('crm_section')||'dashboard';
+  const _savedSection = (location.hash.replace('#','')||sessionStorage.getItem('crm_section')||'dashboard');
   const _savedCli = sessionStorage.getItem('crm_cli');
   if(_savedSection==='clientes' && _savedCli){
     _cliSelected=_savedCli;
@@ -1120,6 +1120,11 @@ function showApp(){
     navigate(_savedSection);
   }
 }
+
+window.addEventListener('popstate', e=>{
+  const section=(e.state&&e.state.section)||location.hash.replace('#','')||'dashboard';
+  if(document.getElementById('app').style.display!=='none') navigate(section,{fromPopState:true});
+});
 
 // MOBILE SIDEBAR
 function toggleSidebar(){
@@ -1157,9 +1162,12 @@ function buildSidebar(){
 }
 
 // NAVIGATION
-async function navigate(section){
+async function navigate(section, opts={}){
   currentSection=section;
   sessionStorage.setItem('crm_section',section);
+  if(!opts.fromPopState){
+    history.pushState({section}, '', `#${section}`);
+  }
   if(section!=='clientes') sessionStorage.removeItem('crm_cli');
   if(section!=='pipeline') sessionStorage.removeItem('crm_pip');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.key===section));
