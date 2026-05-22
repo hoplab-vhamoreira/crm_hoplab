@@ -1147,9 +1147,9 @@ function buildSidebar(){
     for(const it of items){
       html+=`<div class="nav-item" data-key="${it.key}" onclick="navigate('${it.key}');closeSidebarMobile()">${it.title}</div>`;
     }
-    if(g==='Financeiro') html+=`<div class="nav-item" onclick="openImportFaturacao();closeSidebarMobile()">Importar Faturação</div>`;
     html+='</div>';
   }
+  html+=`<div class="nav-group"><div class="nav-group-title">Faturação</div><div class="nav-item" onclick="openImportFaturacao();closeSidebarMobile()">Importar Faturação</div></div>`;
   nav.innerHTML=html;
 }
 
