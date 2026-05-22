@@ -1920,7 +1920,7 @@ function _groupFaturacaoRows(rows){
     const mesKey = `${_MESES_NUM[mesNum]||mesNum} ${ano}`;
     const mapKey = `${nif}|${mesKey}`;
     // Parse value: comma decimal separator
-    const valorStr = (r['Valor liquido']||r['Valor líquido']||r['Valor Liquido']||r['Valor']||'0').replace(/\./g,'').replace(',','.');
+    const valorStr = (r['Valor']||r['Valor liquido']||r['Valor líquido']||'0').replace(/\./g,'').replace(',','.');
     let valor = parseFloat(valorStr)||0;
     if(tipo==='NC') valor = -Math.abs(valor);
     const nome = (r['Nome']||'').trim();
@@ -2160,6 +2160,7 @@ async function _importStep2(rawRows){
   window._faturacaoValid=valid;
   window._faturacaoWarnings=warnings;
 
+  const pdfMonths=[...new Set(groupedArr.map(e=>e.mesKey))];
   clientes.filter(c=>['Ativo','Híbrido ativo'].includes(c['Status']||'')).forEach(c=>{
     const nome=c['Nome']||'';
     const nomeN=_norm(nome);
@@ -2167,14 +2168,17 @@ async function _importStep2(rawRows){
     const nif=(c['NIF']||'').trim();
     const nifFat=(c['NIF Faturação']||'').trim();
     const faturarAN=_norm(c['Faturar a']||'');
-    const inBilling=
-      (nif    && groupedArr.some(e=>e.NIF===nif))    ||
-      (nifFat && groupedArr.some(e=>e.NIF===nifFat)) ||
-      groupedArr.some(e=>_norm(e.Nome)===nomeN)       ||
-      (faturarAN && groupedArr.some(e=>_norm(e.Nome)===faturarAN));
-    if(!inBilling){
-      errors.push({type:'missing', crmNome:nome, msg:`Cliente ativo com serviços mas ausente da faturação`});
-    }
+    pdfMonths.forEach(mesKey=>{
+      const mes=groupedArr.filter(e=>e.mesKey===mesKey);
+      const inBilling=
+        (nif    && mes.some(e=>e.NIF===nif))    ||
+        (nifFat && mes.some(e=>e.NIF===nifFat)) ||
+        mes.some(e=>_norm(e.Nome)===nomeN)       ||
+        (faturarAN && mes.some(e=>_norm(e.Nome)===faturarAN));
+      if(!inBilling){
+        errors.push({type:'missing', crmNome:nome, mesKey, msg:`Cliente ativo com serviços mas ausente em ${mesKey}`});
+      }
+    });
   });
 
   // Render step 2
