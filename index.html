@@ -1152,6 +1152,7 @@ function buildSidebar(){
     html+='</div>';
   }
   html+=`<div class="nav-group"><div class="nav-group-title">Faturação</div><div class="nav-item" onclick="openImportFaturacao();closeSidebarMobile()">Importar Faturação</div></div>`;
+  html+=`<div class="nav-group"><div class="nav-group-title">Histórico</div><div class="nav-item" data-key="pag_clientes_2026" onclick="navigate('pag_clientes_2026');closeSidebarMobile()">Pagamentos 2026</div><div class="nav-item" data-key="pag_clientes_2025" onclick="navigate('pag_clientes_2025');closeSidebarMobile()">Pagamentos 2025</div></div>`;
   nav.innerHTML=html;
 }
 
@@ -1929,7 +1930,9 @@ function _groupFaturacaoRows(rows){
     }
     const entry = map.get(mapKey);
     entry.total += valor;
-    entry.docs.push({tipo, num:r['Número']||r['Numero']||'', valor});
+    const cod=(r['Cod.']||r['Cod']||r['Código']||'').trim();
+    const desc=(r['Descrição']||r['Descricao']||r['Descrição']||'').trim();
+    entry.docs.push({tipo, num:r['Número']||r['Numero']||'', valor, cod, desc});
   });
   return map;
 }
@@ -2283,13 +2286,21 @@ function _importStep3Exec(){
 async function _importStep3(validList){
   const mo=document.getElementById('importModal');
   mo.innerHTML=`<div class="modal" style="max-width:480px"><div class="modal-body" style="padding:40px;text-align:center;color:var(--text-muted)">A importar...</div></div>`;
-  const rows=validList.map(v=>({
-    'Cliente':v.crmNome,
-    'Mês':v.mesKey,
-    'Estado':'Ativo',
-    'Valor Pago':0,
-    'Valor a Pagar':v.total
-  }));
+  const rows=validList.map(v=>{
+    // Pick the most representative cod/desc: first FR/FS doc (ignore NC)
+    const mainDoc=v.docs.find(d=>d.tipo!=='NC')||v.docs[0]||{};
+    const modalidade=mainDoc.desc||mainDoc.cod||'';
+    const numDocs=[...new Set(v.docs.filter(d=>d.num).map(d=>d.num))].join(', ');
+    return {
+      'Cliente':v.crmNome,
+      'Mês':v.mesKey,
+      'Modalidade':modalidade,
+      'Estado':'Ativo',
+      'Valor Pago':0,
+      'Valor a Pagar':v.total,
+      'Nº Doc':numDocs
+    };
+  });
   const {error}=await _SB.from('pag_clientes_2026').insert(rows);
   if(error){
     mo.innerHTML=`<div class="modal" style="max-width:480px">
