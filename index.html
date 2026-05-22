@@ -960,7 +960,7 @@ const SECTIONS = {
     ]},
   vendas_bonus: {title:'Vendas e Bónus',icon:'&#x1f4b0;',group:'Financeiro',hidden:true,noAdd:true,
     cols:['Professor','Cargo','Clean','Vendas','Train','Elegível','Bónus']},
-  pag_clientes_2026: {title:'Pagamentos 2026',icon:'&#x1f4b3;',group:'Financeiro',
+  pag_clientes_2026: {title:'Pagamentos 2026',icon:'&#x1f4b3;',group:'Financeiro',hidden:true,
     cols:['Nº','Cliente','Mês','Modalidade','Valor a Pagar','Valor Pago','_Estado_Pag','Forma Pagamento','Faturar a','Nº Doc'],
     fields:[
       {k:'Cliente',t:'lookup',src:'clientes',sf:'Nome',
@@ -1144,6 +1144,7 @@ function buildSidebar(){
     for(const it of items){
       html+=`<div class="nav-item" data-key="${it.key}" onclick="navigate('${it.key}');closeSidebarMobile()">${it.title}</div>`;
     }
+    if(g==='Financeiro') html+=`<div class="nav-item" onclick="openImportFaturacao();closeSidebarMobile()">&#x1f4e5; Importar Faturação</div>`;
     html+='</div>';
   }
   nav.innerHTML=html;
