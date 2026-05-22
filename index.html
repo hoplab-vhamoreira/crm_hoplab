@@ -2285,39 +2285,77 @@ function _importStep3Exec(){
 
 async function _importStep3(validList){
   const mo=document.getElementById('importModal');
-  mo.innerHTML=`<div class="modal" style="max-width:480px"><div class="modal-body" style="padding:40px;text-align:center;color:var(--text-muted)">A importar...</div></div>`;
-  const rows=validList.map(v=>{
-    // Pick the most representative cod/desc: first FR/FS doc (ignore NC)
+  mo.innerHTML=`<div class="modal" style="max-width:480px"><div class="modal-body" style="padding:40px;text-align:center;color:var(--text-muted)">A verificar registos existentes...</div></div>`;
+
+  // Fetch existing records for the months being imported
+  const months=[...new Set(validList.map(v=>v.mesKey))];
+  const {data:existing=[]}=await _SB.from('pag_clientes_2026').select('Cliente,Mês,"Valor a Pagar"').in('Mês',months);
+  const existMap=new Map();
+  (existing||[]).forEach(r=>existMap.set(`${r['Cliente']}|${r['Mês']}`,parseFloat(r['Valor a Pagar'])||0));
+
+  const toInsert=[];
+  const anomalias=[];
+  const skipped=[];
+
+  validList.forEach(v=>{
     const mainDoc=v.docs.find(d=>d.tipo!=='NC')||v.docs[0]||{};
     const modalidade=mainDoc.desc||mainDoc.cod||'';
     const numDocs=[...new Set(v.docs.filter(d=>d.num).map(d=>d.num))].join(', ');
-    return {
-      'Cliente':v.crmNome,
-      'Mês':v.mesKey,
-      'Modalidade':modalidade,
-      'Estado':'Ativo',
-      'Valor Pago':0,
-      'Valor a Pagar':v.total,
-      'Nº Doc':numDocs
-    };
+    const key=`${v.crmNome}|${v.mesKey}`;
+    if(existMap.has(key)){
+      const existVal=existMap.get(key);
+      const pdfVal=Math.round(v.total*100)/100;
+      if(Math.abs(existVal-pdfVal)>0.01){
+        anomalias.push({cliente:v.crmNome, mes:v.mesKey, sistema:existVal, pdf:pdfVal});
+      } else {
+        skipped.push(key);
+      }
+    } else {
+      toInsert.push({
+        'Cliente':v.crmNome,
+        'Mês':v.mesKey,
+        'Modalidade':modalidade,
+        'Estado':'Ativo',
+        'Valor Pago':0,
+        'Valor a Pagar':v.total,
+        'Nº Doc':numDocs
+      });
+    }
   });
-  const {error}=await _SB.from('pag_clientes_2026').insert(rows);
-  if(error){
-    mo.innerHTML=`<div class="modal" style="max-width:480px">
+
+  let insertError=null;
+  if(toInsert.length>0){
+    const {error}=await _SB.from('pag_clientes_2026').insert(toInsert);
+    insertError=error;
+  }
+
+  if(insertError){
+    mo.innerHTML=`<div class="modal" style="max-width:520px">
       <div class="modal-header"><h2>Erro na Importação</h2><button class="modal-close" onclick="closeImportModal()">×</button></div>
-      <div class="modal-body" style="padding:24px;color:var(--danger)">${error.message}</div>
+      <div class="modal-body" style="padding:24px;color:var(--danger)">${insertError.message}</div>
       <div class="modal-footer"><button class="btn btn-primary" onclick="closeImportModal()">Fechar</button></div>
     </div>`;
     return;
   }
-  // Invalidate cache and refresh
+
   delete sectionData['pag_clientes_2026'];
-  mo.innerHTML=`<div class="modal" style="max-width:480px">
+  const anomHtml=anomalias.length===0?'':`
+    <div style="margin-top:16px;text-align:left">
+      <div style="font-weight:700;color:var(--warning,#856404);margin-bottom:6px">⚠️ Anomalias (${anomalias.length}) — registo do sistema prevalece</div>
+      <div style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+        <table class="tbl" style="font-size:12px"><thead><tr><th>Cliente</th><th>Mês</th><th>Sistema</th><th>PDF</th></tr></thead><tbody>
+        ${anomalias.map(a=>`<tr><td>${a.cliente}</td><td>${a.mes}</td><td>${a.sistema.toFixed(2)}€</td><td style="color:var(--warning)">${a.pdf.toFixed(2)}€</td></tr>`).join('')}
+        </tbody></table>
+      </div>
+    </div>`;
+
+  mo.innerHTML=`<div class="modal" style="max-width:520px">
     <div class="modal-header"><h2>Importação Concluída</h2><button class="modal-close" onclick="closeImportModal()">×</button></div>
     <div class="modal-body" style="padding:24px;text-align:center">
-      <div style="font-size:48px;margin-bottom:12px">✅</div>
-      <div style="font-weight:700;font-size:18px;margin-bottom:8px">${rows.length} registo(s) importado(s)</div>
-      <div style="color:var(--text-muted)">Os registos foram adicionados com Estado "Ativo" e Valor a Pagar preenchido.</div>
+      <div style="font-size:48px;margin-bottom:12px">${anomalias.length>0?'⚠️':'✅'}</div>
+      <div style="font-weight:700;font-size:18px;margin-bottom:8px">${toInsert.length} registo(s) importado(s)</div>
+      ${skipped.length>0?`<div style="color:var(--text-muted);font-size:13px">${skipped.length} já existiam com o mesmo valor — ignorados</div>`:''}
+      ${anomHtml}
     </div>
     <div class="modal-footer"><button class="btn btn-primary" onclick="closeImportModal();navigate('pag_clientes_2026')">Ver Tabela</button></div>
   </div>`;
