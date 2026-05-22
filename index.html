@@ -829,6 +829,8 @@ const SECTIONS = {
       {k:'Faturar a',t:'lookup',src:'entidades_faturacao',sf:'Nome Empresa',
         fills:[{src:'entidades_faturacao',mf:'Nome Empresa',rf:'NIF',tf:'NIF Faturação'}]},
       {k:'NIF Faturação',t:'text'},
+      {k:'Suspenso desde',t:'date'},
+      {k:'Suspenso até',t:'date'},
       {k:'Comentários',t:'textarea'}
     ]},
   parceiros: {title:'Parceiros',icon:'&#x1f91d;',group:'Clientes',
@@ -2091,7 +2093,7 @@ async function _importStep2(rawRows){
 
   // Load CRM data — correct column names: Nome, NIF, Status, Faturar a, NIF Faturação
   const [cliRes,pagRes]=await Promise.all([
-    _SB.from('clientes').select('Nome,NIF,Status,"Faturar a","NIF Faturação"'),
+    _SB.from('clientes').select('Nome,NIF,Status,"Faturar a","NIF Faturação","Suspenso desde","Suspenso até"'),
     _SB.from('pag_clientes_2026').select('Cliente,Mês,Estado')
   ]);
   const clientes=cliRes.data||[];
@@ -2128,11 +2130,12 @@ async function _importStep2(rawRows){
     const status=crmCli['Status']||'';
     const crmNome=crmCli['Nome']||'';
     if(['Suspenso','Cancelado'].includes(status)){
-      const now=new Date();
-      const ey=parseInt(entry.ano), em=parseInt(entry.mesNum);
-      const isPast=ey<now.getFullYear()||(ey===now.getFullYear()&&em<now.getMonth()+1);
-      if(!isPast){
-        warnings.push({type:'susp_canc', ...entry, crmEstado:status, crmNome, msg:`Cliente ${status} mas aparece na faturação`});
+      const desde=crmCli['Suspenso desde']?new Date(crmCli['Suspenso desde']):null;
+      const ate=crmCli['Suspenso até']?new Date(crmCli['Suspenso até']):null;
+      const entryDate=new Date(parseInt(entry.ano), parseInt(entry.mesNum)-1, 1);
+      const inSuspension=desde && entryDate>=desde && (!ate || entryDate<=ate);
+      if(inSuspension){
+        warnings.push({type:'susp_canc', ...entry, crmEstado:status, crmNome, msg:`Cliente ${status} neste período (desde ${crmCli['Suspenso desde']}${ate?` até ${crmCli['Suspenso até']}`:''})`});
         return;
       }
     }
