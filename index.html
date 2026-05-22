@@ -1144,7 +1144,7 @@ function buildSidebar(){
     for(const it of items){
       html+=`<div class="nav-item" data-key="${it.key}" onclick="navigate('${it.key}');closeSidebarMobile()">${it.title}</div>`;
     }
-    if(g==='Financeiro') html+=`<div class="nav-item" onclick="openImportFaturacao();closeSidebarMobile()">&#x1f4e5; Importar Faturação</div>`;
+    if(g==='Financeiro') html+=`<div class="nav-item" onclick="openImportFaturacao();closeSidebarMobile()">Importar Faturação</div>`;
     html+='</div>';
   }
   nav.innerHTML=html;
@@ -2065,7 +2065,16 @@ async function _parseFaturacaoPDF(file){
 }
 async function _csvProceed(){
   if(!_csvParsedRows) return;
-  await _importStep2(_csvParsedRows);
+  try{
+    await _importStep2(_csvParsedRows);
+  }catch(err){
+    const mo=document.getElementById('modalOverlay');
+    mo.innerHTML=`<div class="modal" style="max-width:500px"><div class="modal-body" style="padding:32px">
+      <div style="color:var(--danger);font-weight:700;margin-bottom:12px">Erro na análise</div>
+      <pre style="font-size:12px;white-space:pre-wrap;color:var(--text-muted)">${err.message}\n${err.stack||''}</pre>
+      <div style="margin-top:16px"><button class="btn btn-ghost" onclick="closeModal()">Fechar</button></div>
+    </div></div>`;
+  }
 }
 
 async function _importStep2(rawRows){
@@ -2075,7 +2084,7 @@ async function _importStep2(rawRows){
   const grouped=_groupFaturacaoRows(rawRows);
 
   // Normalize string: remove accents, lowercase, trim
-  const _norm=s=>( s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  const _norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
 
   // Load CRM data — correct column names: Nome, NIF, Status, Faturar a, NIF Faturação
   const [cliRes,pagRes]=await Promise.all([
