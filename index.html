@@ -2128,8 +2128,13 @@ async function _importStep2(rawRows){
     const status=crmCli['Status']||'';
     const crmNome=crmCli['Nome']||'';
     if(['Suspenso','Cancelado'].includes(status)){
-      warnings.push({type:'susp_canc', ...entry, crmEstado:status, crmNome, msg:`Cliente ${status} mas aparece na faturação`});
-      return;
+      const now=new Date();
+      const ey=parseInt(entry.ano), em=parseInt(entry.mesNum);
+      const isPast=ey<now.getFullYear()||(ey===now.getFullYear()&&em<now.getMonth()+1);
+      if(!isPast){
+        warnings.push({type:'susp_canc', ...entry, crmEstado:status, crmNome, msg:`Cliente ${status} mas aparece na faturação`});
+        return;
+      }
     }
     const alreadyExists=pagExist.some(p=>
       _norm(p['Cliente']||'')===_norm(crmNome) && p['Mês']===entry.mesKey
