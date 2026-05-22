@@ -2154,7 +2154,7 @@ async function _importStep2(rawRows){
   const servData=servRes.data||[];
   // Map: normalizedName → earliest active service start YYYY-MM (null = no date = always active)
   const activeServMap=new Map();
-  servData.filter(s=>['Ativo','Em curso'].includes(s['Estado do serviço']||'')).forEach(s=>{
+  servData.filter(s=>['Ativo','Em curso'].includes(s['Estado do serviço']||'')&&s['Repetição']==='Mensal').forEach(s=>{
     const name=_norm(s['Cliente']||'');
     // Try all possible key variants for "Data Conversão"
     const dc=s['Data Conversão']||s['Data Conversao']||s['Data conversão']||null;
