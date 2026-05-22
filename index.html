@@ -2087,7 +2087,7 @@ async function _importStep2(rawRows){
   const grouped=_groupFaturacaoRows(rawRows);
 
   // Normalize string: remove accents, lowercase, trim
-  const _norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  const _norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[,.\-]/g,' ').replace(/\s+/g,' ').trim();
 
   // Load CRM data — correct column names: Nome, NIF, Status, Faturar a, NIF Faturação
   const [cliRes,pagRes]=await Promise.all([
