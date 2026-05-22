@@ -2130,12 +2130,12 @@ async function _importStep2(rawRows){
     const status=crmCli['Status']||'';
     const crmNome=crmCli['Nome']||'';
     if(['Suspenso','Cancelado'].includes(status)){
-      const desde=crmCli['Suspenso desde']?new Date(crmCli['Suspenso desde']):null;
-      const ate=crmCli['Suspenso até']?new Date(crmCli['Suspenso até']):null;
-      const entryDate=new Date(parseInt(entry.ano), parseInt(entry.mesNum)-1, 1);
-      const inSuspension=desde && entryDate>=desde && (!ate || entryDate<=ate);
+      const desdeStr=crmCli['Suspenso desde']?(crmCli['Suspenso desde']+'').substring(0,7):null;
+      const ateStr=crmCli['Suspenso até']?(crmCli['Suspenso até']+'').substring(0,7):null;
+      const entryStr=`${entry.ano}-${entry.mesNum.padStart(2,'0')}`;
+      const inSuspension=desdeStr && entryStr>=desdeStr && (!ateStr||entryStr<=ateStr);
       if(inSuspension){
-        warnings.push({type:'susp_canc', ...entry, crmEstado:status, crmNome, msg:`Cliente ${status} neste período (desde ${crmCli['Suspenso desde']}${ate?` até ${crmCli['Suspenso até']}`:''})`});
+        warnings.push({type:'susp_canc', ...entry, crmEstado:status, crmNome, msg:`Cliente ${status} neste período (desde ${desdeStr}${ateStr?` até ${ateStr}`:''})`});
         return;
       }
     }
