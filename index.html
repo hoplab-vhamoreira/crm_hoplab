@@ -2150,13 +2150,25 @@ async function _importStep2(rawRows){
   });
 
   // Find active CRM clients with active services missing from billing
-  const servRes=await _SB.from('servicos').select('Cliente,"Estado do serviço"');
+  const servRes=await _SB.from('servicos').select('Cliente,"Estado do serviço","Data Conversão"');
   const servData=servRes.data||[];
-  const activeServClients=new Set(
-    servData.filter(s=>['Ativo','Em curso'].includes(s['Estado do serviço']||''))
-            .map(s=>_norm(s['Cliente']||''))
-  );
+  // Map: normalizedName → earliest active service start YYYY-MM (null = no date = always active)
+  const activeServMap=new Map();
+  servData.filter(s=>['Ativo','Em curso'].includes(s['Estado do serviço']||'')).forEach(s=>{
+    const name=_norm(s['Cliente']||'');
+    const dc=s['Data Conversão'];
+    const startYM=dc?(dc+'').substring(0,7):null;
+    if(!activeServMap.has(name)){
+      activeServMap.set(name,startYM);
+    } else {
+      const ex=activeServMap.get(name);
+      if(!ex||(startYM&&startYM<ex)) activeServMap.set(name,startYM);
+    }
+  });
   const groupedArr=[...grouped.values()];
+  // Build mesKey → YYYY-MM lookup from parsed entries
+  const mesKeyToYM=new Map();
+  groupedArr.forEach(e=>{if(!mesKeyToYM.has(e.mesKey))mesKeyToYM.set(e.mesKey,`${e.ano}-${e.mesNum.padStart(2,'0')}`);});
   window._faturacaoValid=valid;
   window._faturacaoWarnings=warnings;
 
@@ -2164,11 +2176,15 @@ async function _importStep2(rawRows){
   clientes.filter(c=>['Ativo','Híbrido ativo'].includes(c['Status']||'')).forEach(c=>{
     const nome=c['Nome']||'';
     const nomeN=_norm(nome);
-    if(!activeServClients.has(nomeN)) return;
+    if(!activeServMap.has(nomeN)) return;
     const nif=(c['NIF']||'').trim();
     const nifFat=(c['NIF Faturação']||'').trim();
     const faturarAN=_norm(c['Faturar a']||'');
     pdfMonths.forEach(mesKey=>{
+      const mesYM=mesKeyToYM.get(mesKey);
+      const servStart=activeServMap.get(nomeN);
+      // Skip if the earliest active service hadn't started yet in this month
+      if(servStart&&mesYM&&servStart>mesYM) return;
       const mes=groupedArr.filter(e=>e.mesKey===mesKey);
       const inBilling=
         (nif    && mes.some(e=>e.NIF===nif))    ||
@@ -2176,7 +2192,10 @@ async function _importStep2(rawRows){
         mes.some(e=>_norm(e.Nome)===nomeN)       ||
         (faturarAN && mes.some(e=>_norm(e.Nome)===faturarAN));
       if(!inBilling){
-        errors.push({type:'missing', crmNome:nome, mesKey, msg:`Cliente ativo com serviços mas ausente em ${mesKey}`});
+        const motivo=(!nif&&!nifFat&&!faturarAN)?'Sem NIF nem "Faturar a" no CRM'
+          :(nif||nifFat)?`NIF ${nifFat||nif} não encontrado no PDF`
+          :`Nome "${c['Faturar a']||nome}" não encontrado no PDF`;
+        errors.push({type:'missing', crmNome:nome, mesKey, msg:motivo});
       }
     });
   });
