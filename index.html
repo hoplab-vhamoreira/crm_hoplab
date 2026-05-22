@@ -2287,9 +2287,13 @@ async function _importStep3(validList){
   const mo=document.getElementById('importModal');
   mo.innerHTML=`<div class="modal" style="max-width:480px"><div class="modal-body" style="padding:40px;text-align:center;color:var(--text-muted)">A verificar registos existentes...</div></div>`;
 
-  // Fetch existing records for the months being imported
+  // Fetch existing records for the months being imported + max Nº
   const months=[...new Set(validList.map(v=>v.mesKey))];
-  const {data:existing=[]}=await _SB.from('pag_clientes_2026').select('Cliente,Mês,"Valor a Pagar"').in('Mês',months);
+  const [{data:existing=[]},{data:maxRow=[]}]=await Promise.all([
+    _SB.from('pag_clientes_2026').select('Cliente,Mês,"Valor a Pagar"').in('Mês',months),
+    _SB.from('pag_clientes_2026').select('Nº').order('Nº',{ascending:false}).limit(1)
+  ]);
+  let nextNum=(maxRow&&maxRow[0]&&maxRow[0]['Nº']?maxRow[0]['Nº']:0)+1;
   const existMap=new Map();
   (existing||[]).forEach(r=>existMap.set(`${r['Cliente']}|${r['Mês']}`,parseFloat(r['Valor a Pagar'])||0));
 
@@ -2312,6 +2316,7 @@ async function _importStep3(validList){
       }
     } else {
       toInsert.push({
+        'Nº':nextNum++,
         'Cliente':v.crmNome,
         'Mês':v.mesKey,
         'Modalidade':modalidade,
