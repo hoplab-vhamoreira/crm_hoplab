@@ -2568,13 +2568,12 @@ async function _renderTrainerValidation(months, container){
     const rows = relevant.map(t => {
       const nome      = t['Professor'];
       const pagamento = parseFloat(t[pagCol]) || 0;
-      // Only include clients with an active monthly service that started by this month
-      const cliArr    = [...(trainerCli.get(nome) || new Set())].filter(c => {
+      const allCli    = [...(trainerCli.get(nome) || new Set())];
+      const pagos     = allCli.filter(c => paid.has(c));
+      const semPag    = allCli.filter(c => {
         const startYM = clientStartMap.get(c);
-        return startYM && mesYM >= startYM;
+        return startYM && mesYM >= startYM && !paid.has(c);
       });
-      const pagos     = cliArr.filter(c => paid.has(c));
-      const semPag    = cliArr.filter(c => !paid.has(c));
       const ok        = semPag.length === 0;
       return {nome, pagamento, pagos, semPag, ok};
     });
@@ -2681,12 +2680,12 @@ async function renderValidacaoPagamentos(el){
     const rows = relevant.map(t => {
       const nome      = t['Professor'];
       const pagamento = parseFloat(t[pagCol]) || 0;
-      const cliArr    = [...(trainerCli.get(nome) || new Set())].filter(c => {
+      const allCli    = [...(trainerCli.get(nome) || new Set())];
+      const pagos     = allCli.filter(c => paid.has(c));
+      const semPag    = allCli.filter(c => {
         const startYM = clientStartMap.get(c);
-        return startYM && mesYM >= startYM;
+        return startYM && mesYM >= startYM && !paid.has(c);
       });
-      const pagos     = cliArr.filter(c => paid.has(c));
-      const semPag    = cliArr.filter(c => !paid.has(c));
       const ok        = semPag.length === 0;
       if(!ok) anyPending=true;
       return {nome, pagamento, pagos, semPag, ok};
