@@ -2512,9 +2512,9 @@ async function _renderTrainerValidation(months, container){
     'Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
 
   const [pagRes, cliRes, servRes, totRes] = await Promise.all([
-    _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
-    _SB.from('clientes').select('Nome,PT,Nutricionista,Fisioterapeuta,Status'),
-    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição"'),
+    _SB.from('pag_clientes_2026').select('cliente_id,Cliente,Mês').in('Mês', months),
+    _SB.from('clientes').select('id,Nome,PT,Nutricionista,Fisioterapeuta,Status'),
+    _SB.from('servicos').select('cliente_id,Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
   ]);
 
@@ -2523,31 +2523,32 @@ async function _renderTrainerValidation(months, container){
   const servs = servRes.data || [];
   const totais= totRes.data  || [];
 
-  // paid: mesKey → Set<clientName>
+  // paid: mesKey → Set<cliente_id>
   const paidByMonth = new Map();
   pags.forEach(p => {
     if(!paidByMonth.has(p['Mês'])) paidByMonth.set(p['Mês'], new Set());
-    paidByMonth.get(p['Mês']).add(p['Cliente']);
+    paidByMonth.get(p['Mês']).add(p.cliente_id ?? p['Cliente']);
   });
 
-  // clientStartMap: clientName → earliest YYYY-MM of monthly service (excludes Concluído)
+  // clientStartMap: cliente_id → earliest YYYY-MM of monthly service
   const mesNum={'Janeiro':'01','Fevereiro':'02','Março':'03','Abril':'04','Maio':'05','Junho':'06','Julho':'07','Agosto':'08','Setembro':'09','Outubro':'10','Novembro':'11','Dezembro':'12'};
+  const clientIdToName = new Map(clis.map(c => [c.id, c['Nome']]));
   const clientStartMap = new Map();
   servs.filter(s => s['Repetição']==='Mensal' && s['Data Conversão'])
     .forEach(s => {
-      const cli = (s['Cliente']||'').trim();
+      const key = s.cliente_id ?? (s['Cliente']||'').trim();
       const ym  = (s['Data Conversão']+'').substring(0,7);
-      if(!clientStartMap.has(cli) || ym < clientStartMap.get(cli)) clientStartMap.set(cli, ym);
+      if(!clientStartMap.has(key) || ym < clientStartMap.get(key)) clientStartMap.set(key, ym);
     });
 
-  // trainerCli: trainerName → Set<clientName> (via clientes.PT/Nutricionista/Fisioterapeuta)
+  // trainerCli: trainerName → Set<cliente_id> (via clientes.PT/Nutricionista/Fisioterapeuta)
   const trainerCli = new Map();
   clis.filter(c => /^Ativo/i.test(c['Status']||'')).forEach(c => {
     [c['PT'], c['Nutricionista'], c['Fisioterapeuta']].forEach(tr => {
       tr = (tr||'').trim();
       if(!tr) return;
       if(!trainerCli.has(tr)) trainerCli.set(tr, new Set());
-      trainerCli.get(tr).add(c['Nome']);
+      trainerCli.get(tr).add(c.id);
     });
   });
 
@@ -2569,11 +2570,11 @@ async function _renderTrainerValidation(months, container){
       const nome      = t['Professor'];
       const pagamento = parseFloat(t[pagCol]) || 0;
       const allCli    = [...(trainerCli.get(nome) || new Set())];
-      const pagos     = allCli.filter(c => paid.has(c));
-      const semPag    = allCli.filter(c => {
-        const startYM = clientStartMap.get(c);
-        return startYM && mesYM >= startYM && !paid.has(c);
-      });
+      const pagos     = allCli.filter(id => paid.has(id)).map(id => clientIdToName.get(id) || String(id));
+      const semPag    = allCli.filter(id => {
+        const startYM = clientStartMap.get(id);
+        return startYM && mesYM >= startYM && !paid.has(id);
+      }).map(id => clientIdToName.get(id) || String(id));
       const ok        = semPag.length === 0;
       return {nome, pagamento, pagos, semPag, ok};
     });
@@ -2625,9 +2626,9 @@ async function renderValidacaoPagamentos(el){
     'Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
 
   const [pagRes, cliRes, servRes, totRes] = await Promise.all([
-    _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
-    _SB.from('clientes').select('Nome,PT,Nutricionista,Fisioterapeuta,Status'),
-    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição"'),
+    _SB.from('pag_clientes_2026').select('cliente_id,Cliente,Mês').in('Mês', months),
+    _SB.from('clientes').select('id,Nome,PT,Nutricionista,Fisioterapeuta,Status'),
+    _SB.from('servicos').select('cliente_id,Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
   ]);
 
@@ -2639,16 +2640,17 @@ async function renderValidacaoPagamentos(el){
   const paidByMonth = new Map();
   pags.forEach(p => {
     if(!paidByMonth.has(p['Mês'])) paidByMonth.set(p['Mês'], new Set());
-    paidByMonth.get(p['Mês']).add(p['Cliente']);
+    paidByMonth.get(p['Mês']).add(p.cliente_id ?? p['Cliente']);
   });
 
   const mesNum={'Janeiro':'01','Fevereiro':'02','Março':'03','Abril':'04','Maio':'05','Junho':'06','Julho':'07','Agosto':'08','Setembro':'09','Outubro':'10','Novembro':'11','Dezembro':'12'};
+  const clientIdToName = new Map(clis.map(c => [c.id, c['Nome']]));
   const clientStartMap = new Map();
   servs.filter(s => s['Repetição']==='Mensal' && s['Data Conversão'])
     .forEach(s => {
-      const cli = (s['Cliente']||'').trim();
+      const key = s.cliente_id ?? (s['Cliente']||'').trim();
       const ym  = (s['Data Conversão']+'').substring(0,7);
-      if(!clientStartMap.has(cli) || ym < clientStartMap.get(cli)) clientStartMap.set(cli, ym);
+      if(!clientStartMap.has(key) || ym < clientStartMap.get(key)) clientStartMap.set(key, ym);
     });
 
   const trainerCli = new Map();
@@ -2657,7 +2659,7 @@ async function renderValidacaoPagamentos(el){
       tr = (tr||'').trim();
       if(!tr) return;
       if(!trainerCli.has(tr)) trainerCli.set(tr, new Set());
-      trainerCli.get(tr).add(c['Nome']);
+      trainerCli.get(tr).add(c.id);
     });
   });
 
@@ -2681,11 +2683,11 @@ async function renderValidacaoPagamentos(el){
       const nome      = t['Professor'];
       const pagamento = parseFloat(t[pagCol]) || 0;
       const allCli    = [...(trainerCli.get(nome) || new Set())];
-      const pagos     = allCli.filter(c => paid.has(c));
-      const semPag    = allCli.filter(c => {
-        const startYM = clientStartMap.get(c);
-        return startYM && mesYM >= startYM && !paid.has(c);
-      });
+      const pagos     = allCli.filter(id => paid.has(id)).map(id => clientIdToName.get(id) || String(id));
+      const semPag    = allCli.filter(id => {
+        const startYM = clientStartMap.get(id);
+        return startYM && mesYM >= startYM && !paid.has(id);
+      }).map(id => clientIdToName.get(id) || String(id));
       const ok        = semPag.length === 0;
       if(!ok) anyPending=true;
       return {nome, pagamento, pagos, semPag, ok};
@@ -5505,9 +5507,9 @@ async function renderAlertas(el){
 
   const [dados, pagRes, cliRes, servRes, totRes] = await Promise.all([
     api('/api/alertas'),
-    _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
-    _SB.from('clientes').select('Nome,PT,Nutricionista,Fisioterapeuta,Status'),
-    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição"'),
+    _SB.from('pag_clientes_2026').select('cliente_id,Cliente,Mês').in('Mês', months),
+    _SB.from('clientes').select('id,Nome,PT,Nutricionista,Fisioterapeuta,Status'),
+    _SB.from('servicos').select('cliente_id,Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
   ]);
 
@@ -5524,12 +5526,12 @@ async function renderAlertas(el){
   const paidByMonth=new Map();
   pags.forEach(p=>{
     if(!paidByMonth.has(p['Mês'])) paidByMonth.set(p['Mês'],new Set());
-    paidByMonth.get(p['Mês']).add(p['Cliente']);
+    paidByMonth.get(p['Mês']).add(p.cliente_id??p['Cliente']);
   });
   const clientStartMap=new Map();
   servs.filter(s=>s['Repetição']==='Mensal'&&s['Data Conversão']).forEach(s=>{
-    const cli=(s['Cliente']||'').trim(), ym=(s['Data Conversão']+'').substring(0,7);
-    if(!clientStartMap.has(cli)||ym<clientStartMap.get(cli)) clientStartMap.set(cli,ym);
+    const key=s.cliente_id??((s['Cliente']||'').trim()), ym=(s['Data Conversão']+'').substring(0,7);
+    if(!clientStartMap.has(key)||ym<clientStartMap.get(key)) clientStartMap.set(key,ym);
   });
   const trainerCli=new Map();
   clis.filter(c=>/^Ativo/i.test(c['Status']||'')).forEach(c=>{
@@ -5537,7 +5539,7 @@ async function renderAlertas(el){
       tr=(tr||'').trim();
       if(!tr) return;
       if(!trainerCli.has(tr)) trainerCli.set(tr,new Set());
-      trainerCli.get(tr).add(c['Nome']);
+      trainerCli.get(tr).add(c.id);
     });
   });
   const pending=[];
@@ -5550,7 +5552,7 @@ async function renderAlertas(el){
     totais.filter(t=>(parseFloat(t[pagCol])||0)>0&&['Treinador','Coordenador','Nutricionista','Fisioterapeuta'].includes(t['Role']))
       .forEach(t=>{
         const semPag=[...(trainerCli.get(t['Professor'])||new Set())]
-          .filter(c=>{ const s=clientStartMap.get(c); return (s&&mesYM>=s)&&!paid.has(c); });
+          .filter(id=>{ const s=clientStartMap.get(id); return (s&&mesYM>=s)&&!paid.has(id); });
         if(semPag.length) pending.push({mes:mesKey, trainer:t['Professor'], n:semPag.length});
       });
   });
