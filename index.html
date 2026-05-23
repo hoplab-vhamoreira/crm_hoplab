@@ -1928,19 +1928,43 @@ function _groupFaturacaoRows(rows){
     const mesNum = dm[2]; // "05"
     const ano = dm[3];
     const mesKey = `${_MESES_NUM[mesNum]||mesNum} ${ano}`;
-    const mapKey = `${nif}|${mesKey}`;
     // Parse value: comma decimal separator
     const valorStr = (r['Valor']||r['Valor liquido']||r['Valor líquido']||'0').replace(/\./g,'').replace(',','.');
     let valor = parseFloat(valorStr)||0;
     if(tipo==='NC') valor = -Math.abs(valor);
     const nome = (r['Nome']||'').trim();
+    const cod=(r['Cod.']||r['Cod']||r['Código']||'').trim();
+    const desc=(r['Descrição']||r['Descricao']||r['Descrição']||'').trim();
+
+    // Multi-month invoice: Qtd > 1 on a mensalidade service → split into one entry per month
+    const qtdStr = (r['Quantidade']||r['Qtd']||'1').replace(/\./g,'').replace(',','.');
+    const qtd = Math.round(Math.abs(parseFloat(qtdStr)||1));
+    const isMensalidade = /^St[^.]*\./i.test(cod); // St.01, StD.01, StL.02, StM.01…
+    if(qtd > 1 && isMensalidade){
+      const valorPorMes = valor / qtd;
+      const mesNumInt = parseInt(mesNum, 10);
+      const anoInt = parseInt(ano, 10);
+      for(let i = 1; i <= qtd; i++){
+        let m = mesNumInt - i;
+        let a = anoInt;
+        if(m <= 0){ m += 12; a -= 1; }
+        const mStr = String(m).padStart(2,'0');
+        const splitMesKey = `${_MESES_NUM[mStr]||mStr} ${a}`;
+        const splitMapKey = `${nif}|${splitMesKey}`;
+        if(!map.has(splitMapKey)) map.set(splitMapKey,{NIF:nif,Nome:nome,mesKey:splitMesKey,mesNum:mStr,ano:String(a),total:0,docs:[]});
+        const e = map.get(splitMapKey);
+        e.total += valorPorMes;
+        e.docs.push({tipo, num:r['Número']||r['Numero']||'', valor:valorPorMes, cod, desc});
+      }
+      return; // handled as multi-month
+    }
+
+    const mapKey = `${nif}|${mesKey}`;
     if(!map.has(mapKey)){
       map.set(mapKey,{NIF:nif,Nome:nome,mesKey,mesNum,ano,total:0,docs:[]});
     }
     const entry = map.get(mapKey);
     entry.total += valor;
-    const cod=(r['Cod.']||r['Cod']||r['Código']||'').trim();
-    const desc=(r['Descrição']||r['Descricao']||r['Descrição']||'').trim();
     entry.docs.push({tipo, num:r['Número']||r['Numero']||'', valor, cod, desc});
   });
   return map;
