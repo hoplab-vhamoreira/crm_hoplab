@@ -2514,7 +2514,7 @@ async function _renderTrainerValidation(months, container){
   const [pagRes, cliRes, servRes, totRes] = await Promise.all([
     _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
     _SB.from('clientes').select('Nome,PT,Nutricionista,Fisioterapeuta,Status'),
-    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição","Estado do serviço"'),
+    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
   ]);
 
@@ -2533,7 +2533,7 @@ async function _renderTrainerValidation(months, container){
   // clientStartMap: clientName → earliest YYYY-MM of monthly service (excludes Concluído)
   const mesNum={'Janeiro':'01','Fevereiro':'02','Março':'03','Abril':'04','Maio':'05','Junho':'06','Julho':'07','Agosto':'08','Setembro':'09','Outubro':'10','Novembro':'11','Dezembro':'12'};
   const clientStartMap = new Map();
-  servs.filter(s => s['Repetição']==='Mensal' && s['Data Conversão'] && s['Estado do serviço']!=='Concluído')
+  servs.filter(s => s['Repetição']==='Mensal' && s['Data Conversão'])
     .forEach(s => {
       const cli = (s['Cliente']||'').trim();
       const ym  = (s['Data Conversão']+'').substring(0,7);
@@ -2628,7 +2628,7 @@ async function renderValidacaoPagamentos(el){
   const [pagRes, cliRes, servRes, totRes] = await Promise.all([
     _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
     _SB.from('clientes').select('Nome,PT,Nutricionista,Fisioterapeuta,Status'),
-    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição","Estado do serviço"'),
+    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
   ]);
 
@@ -2645,7 +2645,7 @@ async function renderValidacaoPagamentos(el){
 
   const mesNum={'Janeiro':'01','Fevereiro':'02','Março':'03','Abril':'04','Maio':'05','Junho':'06','Julho':'07','Agosto':'08','Setembro':'09','Outubro':'10','Novembro':'11','Dezembro':'12'};
   const clientStartMap = new Map();
-  servs.filter(s => s['Repetição']==='Mensal' && s['Data Conversão'] && s['Estado do serviço']!=='Concluído')
+  servs.filter(s => s['Repetição']==='Mensal' && s['Data Conversão'])
     .forEach(s => {
       const cli = (s['Cliente']||'').trim();
       const ym  = (s['Data Conversão']+'').substring(0,7);
@@ -5506,7 +5506,7 @@ async function renderAlertas(el){
     api('/api/alertas'),
     _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
     _SB.from('clientes').select('Nome,PT,Nutricionista,Fisioterapeuta,Status'),
-    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição","Estado do serviço"'),
+    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
   ]);
 
@@ -5526,7 +5526,7 @@ async function renderAlertas(el){
     paidByMonth.get(p['Mês']).add(p['Cliente']);
   });
   const clientStartMap=new Map();
-  servs.filter(s=>s['Repetição']==='Mensal'&&s['Data Conversão']&&s['Estado do serviço']!=='Concluído').forEach(s=>{
+  servs.filter(s=>s['Repetição']==='Mensal'&&s['Data Conversão']).forEach(s=>{
     const cli=(s['Cliente']||'').trim(), ym=(s['Data Conversão']+'').substring(0,7);
     if(!clientStartMap.has(cli)||ym<clientStartMap.get(cli)) clientStartMap.set(cli,ym);
   });
