@@ -2452,6 +2452,7 @@ async function _importStep3(validList){
       }
     } else {
       toInsert.push({
+        'ano':2026,
         'Nº':nextNum++,
         'Cliente':v.crmNome,
         'Mês':v.mesKey,
@@ -5917,7 +5918,7 @@ async function fatAdd(){
   document.getElementById('modalBody').innerHTML = html;
   runFieldSetups(setups);
   document.getElementById('modalSave').onclick = async()=>{
-    const rec={};
+    const rec={ano:2026};
     for(const f of sec.fields) rec[f.k]=getFieldValue(f);
     const res = await api('/api/data/pag_clientes_2026',{method:'POST',body:rec});
     if(!res.error){ sectionData['pag_clientes_2026']=null; closeModal(); toast('Registo adicionado'); await renderHistoricoFaturacao(document.getElementById('mainContent')); }
