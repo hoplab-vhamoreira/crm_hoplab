@@ -2384,14 +2384,16 @@ async function _renderTrainerValidation(months, container){
     'Maio':'Mai','Junho':'Jun','Julho':'Jul','Agosto':'Ago',
     'Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
 
-  const [pagRes, cliRes, totRes] = await Promise.all([
+  const [pagRes, cliRes, servRes, totRes] = await Promise.all([
     _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
     _SB.from('clientes').select('Nome,PT,Nutricionista,Fisioterapeuta,Status'),
+    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
   ]);
 
   const pags  = pagRes.data  || [];
   const clis  = cliRes.data  || [];
+  const servs = servRes.data || [];
   const totais= totRes.data  || [];
 
   // paid: mesKey → Set<clientName>
@@ -2400,6 +2402,16 @@ async function _renderTrainerValidation(months, container){
     if(!paidByMonth.has(p['Mês'])) paidByMonth.set(p['Mês'], new Set());
     paidByMonth.get(p['Mês']).add(p['Cliente']);
   });
+
+  // clientStartMap: clientName → earliest YYYY-MM of monthly service
+  const mesNum={'Janeiro':'01','Fevereiro':'02','Março':'03','Abril':'04','Maio':'05','Junho':'06','Julho':'07','Agosto':'08','Setembro':'09','Outubro':'10','Novembro':'11','Dezembro':'12'};
+  const clientStartMap = new Map();
+  servs.filter(s => s['Repetição']==='Mensal' && s['Data Conversão'])
+    .forEach(s => {
+      const cli = (s['Cliente']||'').trim();
+      const ym  = (s['Data Conversão']+'').substring(0,7);
+      if(!clientStartMap.has(cli) || ym < clientStartMap.get(cli)) clientStartMap.set(cli, ym);
+    });
 
   // trainerCli: trainerName → Set<clientName> (via clientes.PT/Nutricionista/Fisioterapeuta)
   const trainerCli = new Map();
@@ -2414,10 +2426,11 @@ async function _renderTrainerValidation(months, container){
 
   let html = '';
   months.forEach(mesKey => {
-    const [mesNome] = mesKey.split(' ');
+    const [mesNome, ano] = mesKey.split(' ');
     const abrev   = mesAbrev[mesNome] || mesNome.substring(0,3);
     const pagCol  = `${abrev} Pagamento`;
     const paid    = paidByMonth.get(mesKey) || new Set();
+    const mesYM   = `${ano}-${mesNum[mesNome]||'01'}`;
 
     const relevant = totais.filter(t => {
       const val = parseFloat(t[pagCol]) || 0;
@@ -2428,7 +2441,11 @@ async function _renderTrainerValidation(months, container){
     const rows = relevant.map(t => {
       const nome      = t['Professor'];
       const pagamento = parseFloat(t[pagCol]) || 0;
-      const cliArr    = [...(trainerCli.get(nome) || new Set())];
+      // Only include clients whose monthly service had started by this month
+      const cliArr    = [...(trainerCli.get(nome) || new Set())].filter(c => {
+        const startYM = clientStartMap.get(c);
+        return !startYM || mesYM >= startYM;
+      });
       const pagos     = cliArr.filter(c => paid.has(c));
       const semPag    = cliArr.filter(c => !paid.has(c));
       const ok        = semPag.length === 0 && cliArr.length > 0;
@@ -2481,14 +2498,16 @@ async function renderValidacaoPagamentos(el){
     'Maio':'Mai','Junho':'Jun','Julho':'Jul','Agosto':'Ago',
     'Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
 
-  const [pagRes, cliRes, totRes] = await Promise.all([
+  const [pagRes, cliRes, servRes, totRes] = await Promise.all([
     _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
     _SB.from('clientes').select('Nome,PT,Nutricionista,Fisioterapeuta,Status'),
+    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
   ]);
 
   const pags  = pagRes.data  || [];
   const clis  = cliRes.data  || [];
+  const servs = servRes.data || [];
   const totais= totRes.data  || [];
 
   const paidByMonth = new Map();
@@ -2496,6 +2515,15 @@ async function renderValidacaoPagamentos(el){
     if(!paidByMonth.has(p['Mês'])) paidByMonth.set(p['Mês'], new Set());
     paidByMonth.get(p['Mês']).add(p['Cliente']);
   });
+
+  const mesNum={'Janeiro':'01','Fevereiro':'02','Março':'03','Abril':'04','Maio':'05','Junho':'06','Julho':'07','Agosto':'08','Setembro':'09','Outubro':'10','Novembro':'11','Dezembro':'12'};
+  const clientStartMap = new Map();
+  servs.filter(s => s['Repetição']==='Mensal' && s['Data Conversão'])
+    .forEach(s => {
+      const cli = (s['Cliente']||'').trim();
+      const ym  = (s['Data Conversão']+'').substring(0,7);
+      if(!clientStartMap.has(cli) || ym < clientStartMap.get(cli)) clientStartMap.set(cli, ym);
+    });
 
   const trainerCli = new Map();
   clis.filter(c => /^Ativo/i.test(c['Status']||'')).forEach(c => {
@@ -2511,10 +2539,11 @@ async function renderValidacaoPagamentos(el){
   let html='';
 
   months.forEach(mesKey => {
-    const [mesNome] = mesKey.split(' ');
+    const [mesNome, ano] = mesKey.split(' ');
     const abrev  = mesAbrev[mesNome] || mesNome.substring(0,3);
     const pagCol = `${abrev} Pagamento`;
     const paid   = paidByMonth.get(mesKey) || new Set();
+    const mesYM  = `${ano}-${mesNum[mesNome]||'01'}`;
 
     const relevant = totais.filter(t => {
       const val = parseFloat(t[pagCol]) || 0;
@@ -2525,7 +2554,10 @@ async function renderValidacaoPagamentos(el){
     const rows = relevant.map(t => {
       const nome      = t['Professor'];
       const pagamento = parseFloat(t[pagCol]) || 0;
-      const cliArr    = [...(trainerCli.get(nome) || new Set())];
+      const cliArr    = [...(trainerCli.get(nome) || new Set())].filter(c => {
+        const startYM = clientStartMap.get(c);
+        return !startYM || mesYM >= startYM;
+      });
       const pagos     = cliArr.filter(c => paid.has(c));
       const semPag    = cliArr.filter(c => !paid.has(c));
       const ok        = semPag.length === 0 && cliArr.length > 0;
@@ -5343,10 +5375,11 @@ async function renderAlertas(el){
   const prevMes=now.getMonth()>0?(MONTHS[now.getMonth()-1]+' '+year):null;
   const months=[curMes,prevMes].filter(Boolean);
 
-  const [dados, pagRes, cliRes, totRes] = await Promise.all([
+  const [dados, pagRes, cliRes, servRes, totRes] = await Promise.all([
     api('/api/alertas'),
     _SB.from('pag_clientes_2026').select('Cliente,Mês').in('Mês', months),
     _SB.from('clientes').select('Nome,PT,Nutricionista,Fisioterapeuta,Status'),
+    _SB.from('servicos').select('Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
   ]);
 
@@ -5358,11 +5391,17 @@ async function renderAlertas(el){
   const mesAbrev={'Janeiro':'Jan','Fevereiro':'Fev','Março':'Mar','Abril':'Abr',
     'Maio':'Mai','Junho':'Jun','Julho':'Jul','Agosto':'Ago',
     'Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
-  const pags=pagRes.data||[], clis=cliRes.data||[], totais=totRes.data||[];
+  const mesNum={'Janeiro':'01','Fevereiro':'02','Março':'03','Abril':'04','Maio':'05','Junho':'06','Julho':'07','Agosto':'08','Setembro':'09','Outubro':'10','Novembro':'11','Dezembro':'12'};
+  const pags=pagRes.data||[], clis=cliRes.data||[], servs=servRes.data||[], totais=totRes.data||[];
   const paidByMonth=new Map();
   pags.forEach(p=>{
     if(!paidByMonth.has(p['Mês'])) paidByMonth.set(p['Mês'],new Set());
     paidByMonth.get(p['Mês']).add(p['Cliente']);
+  });
+  const clientStartMap=new Map();
+  servs.filter(s=>s['Repetição']==='Mensal'&&s['Data Conversão']).forEach(s=>{
+    const cli=(s['Cliente']||'').trim(), ym=(s['Data Conversão']+'').substring(0,7);
+    if(!clientStartMap.has(cli)||ym<clientStartMap.get(cli)) clientStartMap.set(cli,ym);
   });
   const trainerCli=new Map();
   clis.filter(c=>/^Ativo/i.test(c['Status']||'')).forEach(c=>{
@@ -5375,12 +5414,15 @@ async function renderAlertas(el){
   });
   const pending=[];
   months.forEach(mesKey=>{
-    const abrev=mesAbrev[mesKey.split(' ')[0]]||mesKey.substring(0,3);
+    const [mesNome,ano]=mesKey.split(' ');
+    const abrev=mesAbrev[mesNome]||mesNome.substring(0,3);
     const pagCol=`${abrev} Pagamento`;
     const paid=paidByMonth.get(mesKey)||new Set();
+    const mesYM=`${ano}-${mesNum[mesNome]||'01'}`;
     totais.filter(t=>(parseFloat(t[pagCol])||0)>0&&['Treinador','Coordenador','Nutricionista','Fisioterapeuta'].includes(t['Role']))
       .forEach(t=>{
-        const semPag=[...(trainerCli.get(t['Professor'])||new Set())].filter(c=>!paid.has(c));
+        const semPag=[...(trainerCli.get(t['Professor'])||new Set())]
+          .filter(c=>{ const s=clientStartMap.get(c); return (!s||mesYM>=s)&&!paid.has(c); });
         if(semPag.length) pending.push({mes:mesKey, trainer:t['Professor'], n:semPag.length});
       });
   });
