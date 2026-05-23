@@ -2575,7 +2575,7 @@ async function _renderTrainerValidation(months, container){
       });
       const pagos     = cliArr.filter(c => paid.has(c));
       const semPag    = cliArr.filter(c => !paid.has(c));
-      const ok        = semPag.length === 0 && cliArr.length > 0;
+      const ok        = semPag.length === 0;
       return {nome, pagamento, pagos, semPag, ok};
     });
 
@@ -2687,7 +2687,7 @@ async function renderValidacaoPagamentos(el){
       });
       const pagos     = cliArr.filter(c => paid.has(c));
       const semPag    = cliArr.filter(c => !paid.has(c));
-      const ok        = semPag.length === 0 && cliArr.length > 0;
+      const ok        = semPag.length === 0;
       if(!ok) anyPending=true;
       return {nome, pagamento, pagos, semPag, ok};
     });
