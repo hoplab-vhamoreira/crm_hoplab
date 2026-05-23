@@ -3538,6 +3538,8 @@ async function openAdd(section){
       const maxON=existing.reduce((m,r)=>Math.max(m,parseInt(r['Nº ON'])||0),0);
       rec['Nº ON']=maxON+1;
     }
+    if(section==='servicos' && !rec['Repetição'])
+      rec['Repetição'] = /x\/semana/i.test(rec['Serviço']||'') ? 'Mensal' : 'Pontual';
     const res=await api(`/api/data/${section}`,{method:'POST',body:rec});
     if(res?.error){ toast('Erro ao adicionar: '+res.error,'error'); return; }
     _lookupCache[`${section}.`+'x']=null;
@@ -7176,6 +7178,8 @@ async function openAddParaCliente(section, clienteNome){
           rec['Código'] = baseCode;
         }
       }
+      // Auto-inferir Repetição: x/semana = Mensal, resto = Pontual
+      if(!rec['Repetição']) rec['Repetição'] = /x\/semana/i.test(rec['Serviço']||'') ? 'Mensal' : 'Pontual';
     }
 
     const res = await api(`/api/data/${section}`,{method:'POST',body:rec});
