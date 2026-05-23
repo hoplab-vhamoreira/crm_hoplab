@@ -442,7 +442,7 @@ const _SB = supabase.createClient(
   'https://bocwqacwalzshjkhjzwi.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvY3dxYWN3YWx6c2hqa2hqendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjYyNTYsImV4cCI6MjA5NDAwMjI1Nn0.0FSXkO69PG4na6XLAOSoJ-r2wNQYwyLoOSMIyDH7AvY'
 );
-const _TABLE_MAP = {'clientes':'clientes','pipeline':'pipeline','log_comercial':'log_comercial','conversoes':'conversoes','avaliacoes':'avaliacoes','servicos':'servicos','log_operacional':'log_operacional','log_contratos':'log_contratos','parceiros':'parceiros','entidades_faturacao':'entidades_faturacao','falhas_sancoes':'falhas_sancoes','catalogo_faltas':'catalogo_faltas','niveis_sancao':'niveis_sancao','pag_clientes_2025':'pag_clientes_2025','pag_clientes_2026':'pag_clientes_2026','totais_pagamentos':'totais_pagamentos','motor2026':'motor2026','dados_colaboradores':'dados_colaboradores','log_colaboradores':'log_colaboradores','ciclos':'ciclos','adesoes_validar':'adesoes_validar','alertas':'alertas','historico':'historico','vendas_log':'vendas_log','vendas_bonus':'vendas_bonus','precario_publico':'precario_publico','calculadora':'calculadora','responsabilidades':'responsabilidades','matriz_partilhas':'matriz_partilhas','substituicoes_treino':'substituicoes_treino','users':'profiles'};
+const _TABLE_MAP = {'clientes':'clientes','pipeline':'pipeline','log_comercial':'log_comercial','conversoes':'conversoes','avaliacoes':'avaliacoes','servicos':'servicos','log_operacional':'log_operacional','log_contratos':'log_contratos','parceiros':'parceiros','entidades_faturacao':'entidades_faturacao','falhas_sancoes':'falhas_sancoes','catalogo_faltas':'catalogo_faltas','niveis_sancao':'niveis_sancao','pag_clientes':'pag_clientes','totais_pagamentos':'totais_pagamentos','motor2026':'motor2026','dados_colaboradores':'dados_colaboradores','log_colaboradores':'log_colaboradores','ciclos':'ciclos','adesoes_validar':'adesoes_validar','alertas':'alertas','historico':'historico','vendas_log':'vendas_log','vendas_bonus':'vendas_bonus','precario_publico':'precario_publico','calculadora':'calculadora','responsabilidades':'responsabilidades','matriz_partilhas':'matriz_partilhas','substituicoes_treino':'substituicoes_treino','users':'profiles'};
 const _idCache = {};
 function _recomputeClienteContacto(r){
   if(!r) return r;
@@ -535,7 +535,7 @@ async function api(url,opts={}){
     _idCache['alertas']=rows.map(r=>r._source==='manual'?r._manual_id:null);
     return rows;
   }
-  if(url==='/api/historico_faturacao'){const[r25,r26]=await Promise.all([_SB.from('pag_clientes_2025').select('*'),_SB.from('pag_clientes_2026').select('*')]);return{pag2025:r25.data||[],pag2026:r26.data||[]};}
+  if(url==='/api/historico_faturacao'){const{data:rAll}=await _SB.from('pag_clientes').select('*');const all=rAll||[];return{pag2025:all.filter(r=>r.ano===2025),pag2026:all.filter(r=>r.ano===2026)};}
   if(url==='/api/avaliacoes/lista'){const{data}=await _SB.from('avaliacoes').select('*').order('Data',{ascending:false});return(data||[]).map(r=>({...r,_idx:r.id}));}
   if(url==='/api/vendas/angariacoes'){
     const[sv,dc]=await Promise.all([_SB.from('servicos').select('*'),_SB.from('dados_colaboradores').select('*')]);
@@ -613,13 +613,12 @@ async function api(url,opts={}){
   const cM=url.match(/^\/api\/cliente\/(.+)$/);
   if(cM){
     const nome=decodeURIComponent(cM[1]);
-    const[cli,serv,aval,log,pag26,pag25,mot,lc,logcom,conv]=await Promise.all([
+    const[cli,serv,aval,log,pagAll,mot,lc,logcom,conv]=await Promise.all([
       _SB.from('clientes').select('*').eq('Nome',nome).single(),
       _SB.from('servicos').select('*').eq('Cliente',nome),
       _SB.from('avaliacoes').select('*').eq('Nome',nome),
       _SB.from('historico').select('*').eq('cliente',nome).order('timestamp',{ascending:false}),
-      _SB.from('pag_clientes_2026').select('*').eq('Cliente',nome),
-      _SB.from('pag_clientes_2025').select('*').eq('Cliente',nome),
+      _SB.from('pag_clientes').select('*').eq('Cliente',nome),
       _SB.from('motor2026').select('*').eq('Cliente',nome).order('id',{ascending:false}).limit(1).maybeSingle(),
       _SB.from('log_contratos').select('*').eq('Cliente',nome),
       _SB.from('log_comercial').select('*').eq('Contacto',nome).order('Data A\xe7\xe3o',{ascending:false}),
@@ -628,7 +627,7 @@ async function api(url,opts={}){
     const mIdx=arr=>(arr||[]).map(r=>({...r,_idx:r.id}));
     const logComData=(logcom.data||[]).map(l=>({...l,'Dias Atrás':l['Data Ação']?Math.floor((new Date()-new Date(String(l['Data Ação']).slice(0,10)))/86400000):null}));
     return{info:_recomputeClienteContacto(cli.data),servicos:mIdx(serv.data),avaliacoes:mIdx(aval.data),
-      historico:log.data||[],pag_2026:mIdx(pag26.data),pag_2025:mIdx(pag25.data),
+      historico:log.data||[],pag_2026:mIdx((pagAll.data||[]).filter(r=>r.ano===2026)),pag_2025:mIdx((pagAll.data||[]).filter(r=>r.ano===2025)),
       motor:mot.data||null,log_contratos:mIdx(lc.data),log_comercial:logComData,conversoes:mIdx(conv.data)};
   }
   const oM=url.match(/^\/api\/on\/(\d+)$/);
@@ -965,9 +964,10 @@ const SECTIONS = {
     ]},
   vendas_bonus: {title:'Vendas e Bónus',icon:'&#x1f4b0;',group:'Financeiro',hidden:true,noAdd:true,
     cols:['Professor','Cargo','Clean','Vendas','Train','Elegível','Bónus']},
-  pag_clientes_2026: {title:'Pagamentos 2026',icon:'&#x1f4b3;',group:'Financeiro',hidden:true,
-    cols:['Nº','Cliente','Mês','Modalidade','Valor a Pagar','Valor Pago','_Estado_Pag','Forma Pagamento','Faturar a','Nº Doc'],
+  pag_clientes: {title:'Pagamentos',icon:'&#x1f4b3;',group:'Financeiro',hidden:true,
+    cols:['ano','Nº','Cliente','Mês','Modalidade','Valor a Pagar','Valor Pago','_Estado_Pag','Forma Pagamento','Faturar a','Nº Doc'],
     fields:[
+      {k:'ano',t:'number'},
       {k:'Cliente',t:'lookup',src:'clientes',sf:'Nome',
         fills:[
           {src:'clientes',mf:'Nome',rf:'Faturar a',       tf:'Faturar a'},
@@ -990,8 +990,6 @@ const SECTIONS = {
       {k:'Nº Doc',t:'text'},
       {k:'Nota HopLab',t:'textarea'}
     ]},
-  pag_clientes_2025: {title:'Pagamentos 2025',icon:'&#x1f4b3;',group:'Financeiro',hidden:true,
-    cols:['Nº','Cliente','Mês','Modalidade','Valor a Pagar','Valor Pago','_Estado_Pag','Forma Pagamento']},
   historico_faturacao: {title:'Histórico de Faturação',icon:'&#x1f9fe;',group:'Financeiro',noAdd:false},
   totais_pagamentos: {title:'Totais Pagamentos',icon:'&#x1f4b5;',group:'Financeiro',hidden:true,
     cols:['Professor','Role','Jan Pagamento','Jan Cedência','Jan Saldo NET','Fev Pagamento','Fev Cedência','Fev Saldo NET']},
@@ -1157,7 +1155,7 @@ function buildSidebar(){
     html+='</div>';
   }
   html+=`<div class="nav-group"><div class="nav-group-title">Faturação</div><div class="nav-item" onclick="openImportFaturacao();closeSidebarMobile()">Importar Faturação</div><div class="nav-item" data-key="validacao_pagamentos" onclick="navigate('validacao_pagamentos');closeSidebarMobile()">Avisos de Pagamentos</div></div>`;
-  html+=`<div class="nav-group"><div class="nav-group-title">Histórico</div><div class="nav-item" data-key="pag_clientes_2026" onclick="navigate('pag_clientes_2026');closeSidebarMobile()">Pagamentos 2026</div><div class="nav-item" data-key="pag_clientes_2025" onclick="navigate('pag_clientes_2025');closeSidebarMobile()">Pagamentos 2025</div></div>`;
+  html+=`<div class="nav-group"><div class="nav-group-title">Histórico</div><div class="nav-item" data-key="pag_clientes" onclick="navigate('pag_clientes');closeSidebarMobile()">Pagamentos</div></div>`;
   nav.innerHTML=html;
 }
 
@@ -1308,10 +1306,10 @@ async function _dbRegularizarSelecionados(){
     let ok=0,erros=0;
     for(const row of toUpdate){
       const valor=valorRaw?parseFloat(valorRaw):(parseFloat(row['Valor a Pagar'])||null);
-      const{error}=await _SB.from('pag_clientes_2026').update({'Estado':estado,'Valor Pago':valor,'Forma Pagamento':forma,'Nº Doc':doc}).eq('id',row.id);
+      const{error}=await _SB.from('pag_clientes').update({'Estado':estado,'Valor Pago':valor,'Forma Pagamento':forma,'Nº Doc':doc}).eq('id',row.id);
       if(error) erros++; else ok++;
     }
-    sectionData['pag_clientes_2026']=null;
+    sectionData['pag_clientes']=null;
     closeModal(); _dbCloseDetail();
     if(erros) toast(`${ok} atualizados · ${erros} erros`,'error');
     else toast(`${ok} pagamentos regularizados `);
@@ -1358,7 +1356,7 @@ async function _dbAdmin(el){
     _SB.from('v_alertas').select('*').order('DiasAtraso',{ascending:false}).limit(5),
     _SB.from('clientes').select('*'),
     _SB.from('servicos').select('*'),
-    _SB.from('pag_clientes_2026').select('*'),
+    _SB.from('pag_clientes').select('*').eq('ano',new Date().getFullYear()),
     _SB.from('pipeline').select('*'),
     _SB.from('v_alertas').select('*',{count:'exact',head:true}),
     _SB.from('avaliacoes').select('Nome,Data'),
@@ -1725,7 +1723,7 @@ async function _dbDireccao(el){
   const ytdMonths=MONTHS.slice(0,mi+1);
   const curQ=`Q${Math.ceil((mi+1)/3)} ${now.getFullYear()}`;
   const[pag,vl,vb,pipe,conv,alrt]=await Promise.all([
-    _SB.from('pag_clientes_2026').select('*'),
+    _SB.from('pag_clientes').select('*').eq('ano',new Date().getFullYear()),
     _SB.from('vendas_log').select('*'),
     _SB.from('vendas_bonus').select('*'),
     _SB.from('pipeline').select('*'),
@@ -1751,7 +1749,7 @@ async function _dbDireccao(el){
   const perfRows=Object.values(perfMap).sort((a,b)=>b.n-a.n).slice(0,8)
     .map(r=>[r.nome,r.n,r.bonus>0?`${r.bonus.toFixed(0)}€`:'—']);
   const cards=[
-    _dbKpiCard(`Receita ${curMonth}`,`${receitaMes.toFixed(0)}€`,'pag_clientes_2026','green'),
+    _dbKpiCard(`Receita ${curMonth}`,`${receitaMes.toFixed(0)}€`,'pag_clientes','green'),
     _dbKpiCard('Receita YTD',`${receitaYTD.toFixed(0)}€`,`Jan – ${curMonth}`,'purple'),
     _dbKpiCard('Pipeline Aberto',pipeAberto,'oportunidades','blue',"navigate('pipeline')"),
     _dbKpiCard('Alertas Ativos',alrt.count||0,'','amber',"navigate('alertas')"),
@@ -2233,7 +2231,7 @@ async function _importStep2(rawRows, monthOverrides){
   // Load CRM data — correct column names: Nome, NIF, Status, Faturar a, NIF Faturação
   const [cliRes,pagRes]=await Promise.all([
     _SB.from('clientes').select('Nome,NIF,Status,"Faturar a","NIF Faturação","Suspenso desde","Suspenso até"'),
-    _SB.from('pag_clientes_2026').select('Cliente,Mês,Estado')
+    _SB.from('pag_clientes').select('Cliente,Mês,Estado')
   ]);
   const clientes=cliRes.data||[];
   const pagExist=pagRes.data||[];
@@ -2426,8 +2424,8 @@ async function _importStep3(validList){
   // Fetch existing records for the months being imported + max Nº
   const months=[...new Set(validList.map(v=>v.mesKey))];
   const [{data:existing=[]},{data:maxRow=[]}]=await Promise.all([
-    _SB.from('pag_clientes_2026').select('Cliente,Mês,"Valor a Pagar"').in('Mês',months),
-    _SB.from('pag_clientes_2026').select('Nº').order('Nº',{ascending:false}).limit(1)
+    _SB.from('pag_clientes').select('Cliente,Mês,"Valor a Pagar"').in('Mês',months),
+    _SB.from('pag_clientes').select('Nº').eq('ano',new Date().getFullYear()).order('Nº',{ascending:false}).limit(1)
   ]);
   let nextNum=(maxRow&&maxRow[0]&&maxRow[0]['Nº']?maxRow[0]['Nº']:0)+1;
   const existMap=new Map();
@@ -2452,7 +2450,7 @@ async function _importStep3(validList){
       }
     } else {
       toInsert.push({
-        'ano':2026,
+        'ano':new Date().getFullYear(),
         'Nº':nextNum++,
         'Cliente':v.crmNome,
         'Mês':v.mesKey,
@@ -2467,7 +2465,7 @@ async function _importStep3(validList){
 
   let insertError=null;
   if(toInsert.length>0){
-    const {error}=await _SB.from('pag_clientes_2026').insert(toInsert);
+    const {error}=await _SB.from('pag_clientes').insert(toInsert);
     insertError=error;
   }
 
@@ -2480,7 +2478,7 @@ async function _importStep3(validList){
     return;
   }
 
-  delete sectionData['pag_clientes_2026'];
+  delete sectionData['pag_clientes'];
   const anomHtml=anomalias.length===0?'':`
     <div style="margin-top:16px;text-align:left">
       <div style="font-weight:700;color:var(--warning,#856404);margin-bottom:6px">⚠️ Anomalias (${anomalias.length}) — registo do sistema prevalece</div>
@@ -2502,7 +2500,7 @@ async function _importStep3(validList){
       ${anomHtml}
       <div id="trainerValidation" style="color:var(--text-muted);font-size:13px;margin-top:20px;text-align:center">A validar pagamentos dos treinadores...</div>
     </div>
-    <div class="modal-footer"><button class="btn btn-primary" onclick="closeImportModal();navigate('pag_clientes_2026')">Ver Tabela</button></div>
+    <div class="modal-footer"><button class="btn btn-primary" onclick="closeImportModal();navigate('pag_clientes')">Ver Tabela</button></div>
   </div>`;
   _renderTrainerValidation(months, document.getElementById('trainerValidation'));
 }
@@ -2513,7 +2511,7 @@ async function _renderTrainerValidation(months, container){
     'Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
 
   const [pagRes, cliRes, servRes, totRes] = await Promise.all([
-    _SB.from('pag_clientes_2026').select('cliente_id,Cliente,Mês').in('Mês', months),
+    _SB.from('pag_clientes').select('cliente_id,Cliente,Mês').in('Mês', months),
     _SB.from('clientes').select('id,Nome,PT,Nutricionista,Fisioterapeuta,Status'),
     _SB.from('servicos').select('cliente_id,Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
@@ -2627,7 +2625,7 @@ async function renderValidacaoPagamentos(el){
     'Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
 
   const [pagRes, cliRes, servRes, totRes] = await Promise.all([
-    _SB.from('pag_clientes_2026').select('cliente_id,Cliente,Mês').in('Mês', months),
+    _SB.from('pag_clientes').select('cliente_id,Cliente,Mês').in('Mês', months),
     _SB.from('clientes').select('id,Nome,PT,Nutricionista,Fisioterapeuta,Status'),
     _SB.from('servicos').select('cliente_id,Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
@@ -2752,7 +2750,7 @@ async function renderDataPage(el,section){
     sectionData[section]=d;
   }
   const data=sectionData[section];
-  if(!data.length){const _ib=section==='pag_clientes_2026'?`<button class="btn btn-ghost btn-sm" style="margin-right:8px" onclick="openImportFaturacao()">Importar Faturação</button>`:'';el.innerHTML=`<div class="page-header"><div><h1>${sec.title}</h1></div><div>${_ib}${(sec.fields&&!sec.noAdd)?`<button class="btn btn-primary" onclick="openAdd('${section}')">+ Adicionar</button>`:''}</div></div><div class="table-wrap" style="padding:40px;text-align:center;color:var(--text-muted)">Sem dados</div>`;return;}
+  if(!data.length){const _ib=section==='pag_clientes'?`<button class="btn btn-ghost btn-sm" style="margin-right:8px" onclick="openImportFaturacao()">Importar Faturação</button>`:'';el.innerHTML=`<div class="page-header"><div><h1>${sec.title}</h1></div><div>${_ib}${(sec.fields&&!sec.noAdd)?`<button class="btn btn-primary" onclick="openAdd('${section}')">+ Adicionar</button>`:''}</div></div><div class="table-wrap" style="padding:40px;text-align:center;color:var(--text-muted)">Sem dados</div>`;return;}
   const allCols=sec.cols||Object.keys(data[0]).filter(c=>c!=='_id').slice(0,8);
   sectionPage[section]=sectionPage[section]||0;
   if(section==='pipeline'){
@@ -2992,7 +2990,7 @@ function renderTable(el,section,sec,data,allCols){
     ? `<span class="filter-active-badge">Filtros activos <button onclick="clearColumnFilters('${section}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px" title="Limpar filtros"></button></span>`
     : '';
 
-  const _importBtn = section==='pag_clientes_2026' ? `<button class="btn btn-ghost btn-sm" style="margin-right:8px" onclick="openImportFaturacao()">Importar Faturação</button>` : '';
+  const _importBtn = section==='pag_clientes' ? `<button class="btn btn-ghost btn-sm" style="margin-right:8px" onclick="openImportFaturacao()">Importar Faturação</button>` : '';
   el.innerHTML=`
     <div class="page-header"><div><h1>${sec.title}</h1><div class="subtitle">${filtered.length} registos</div></div>
     <div>${_importBtn}${(sec.fields&&!sec.noAdd)?`<button class="btn btn-primary" onclick="openAdd('${section}')">+ Adicionar</button>`:''}</div></div>
@@ -5508,7 +5506,7 @@ async function renderAlertas(el){
 
   const [dados, pagRes, cliRes, servRes, totRes] = await Promise.all([
     api('/api/alertas'),
-    _SB.from('pag_clientes_2026').select('cliente_id,Cliente,Mês').in('Mês', months),
+    _SB.from('pag_clientes').select('cliente_id,Cliente,Mês').in('Mês', months),
     _SB.from('clientes').select('id,Nome,PT,Nutricionista,Fisioterapeuta,Status'),
     _SB.from('servicos').select('cliente_id,Cliente,"Data Conversão","Repetição"'),
     _SB.from('totais_pagamentos').select('*')
@@ -5908,7 +5906,7 @@ function _renderFaturacaoTable(el, dados){
 
 async function fatAdd(){
   // Novo registo sempre em 2026
-  const sec = SECTIONS['pag_clientes_2026'];
+  const sec = SECTIONS['pag_clientes'];
   if(!sec||!sec.fields) return;
   document.getElementById('modalTitle').textContent = '+ Novo registo de faturação';
   document.getElementById('modalBody').innerHTML = '<div style="color:var(--text-muted);padding:20px 0">A carregar...</div>';
@@ -5918,19 +5916,21 @@ async function fatAdd(){
   document.getElementById('modalBody').innerHTML = html;
   runFieldSetups(setups);
   document.getElementById('modalSave').onclick = async()=>{
-    const rec={ano:2026};
+    const curAno=new Date().getFullYear();
+    const rec={ano:curAno};
     for(const f of sec.fields) rec[f.k]=getFieldValue(f);
-    const res = await api('/api/data/pag_clientes_2026',{method:'POST',body:rec});
-    if(!res.error){ sectionData['pag_clientes_2026']=null; closeModal(); toast('Registo adicionado'); await renderHistoricoFaturacao(document.getElementById('mainContent')); }
+    if(rec['Mês']&&!rec['Mês'].includes(' ')) rec['Mês']=rec['Mês']+' '+curAno;
+    const res = await api('/api/data/pag_clientes',{method:'POST',body:rec});
+    if(!res.error){ sectionData['pag_clientes']=null; closeModal(); toast('Registo adicionado'); await renderHistoricoFaturacao(document.getElementById('mainContent')); }
     else toast(res.error||'Erro','error');
   };
 }
 
 async function fatEdit(idx){
-  const sec = SECTIONS['pag_clientes_2026'];
+  const sec = SECTIONS['pag_clientes'];
   if(!sec||!sec.fields) return;
-  let data = sectionData['pag_clientes_2026'];
-  if(!data){ const r=await api('/api/data/pag_clientes_2026'); data=Array.isArray(r)?r:[]; sectionData['pag_clientes_2026']=data; }
+  let data = sectionData['pag_clientes'];
+  if(!data){ const r=await api('/api/data/pag_clientes'); data=Array.isArray(r)?r:[]; sectionData['pag_clientes']=data; }
   if(!data[idx]) return toast('Registo não encontrado','error');
   const rec = data[idx];
   document.getElementById('modalTitle').textContent = ' Editar faturação 2026';
@@ -5943,14 +5943,14 @@ async function fatEdit(idx){
   document.getElementById('modalSave').onclick = async()=>{
     const updates={};
     for(const f of sec.fields) updates[f.k]=getFieldValue(f);
-    await api(`/api/data/pag_clientes_2026/${idx}`,{method:'PUT',body:updates});
-    sectionData['pag_clientes_2026']=null; closeModal(); toast('Atualizado');
+    await api(`/api/data/pag_clientes/${idx}`,{method:'PUT',body:updates});
+    sectionData['pag_clientes']=null; closeModal(); toast('Atualizado');
     await renderHistoricoFaturacao(document.getElementById('mainContent'));
   };
 }
 
 async function confirmarPagamento(rowId, nomeEsc){
-  const{data:rec,error}=await _SB.from('pag_clientes_2026').select('*').eq('id',rowId).single();
+  const{data:rec,error}=await _SB.from('pag_clientes').select('*').eq('id',rowId).single();
   if(error||!rec) return toast('Registo não encontrado','error');
   const formas=['Transferência Multibanco','Débito Direto','Pagamento Mbway','Numerário'];
   const estados=['Pago','Ativo','Suspendeu','Cancelou'];
@@ -5973,42 +5973,20 @@ async function confirmarPagamento(rowId, nomeEsc){
       'Forma Pagamento':document.getElementById('cp_forma').value||null,
       'Nº Doc':document.getElementById('cp_doc').value||null,
     };
-    const{error:e}=await _SB.from('pag_clientes_2026').update(updates).eq('id',rowId);
+    const{error:e}=await _SB.from('pag_clientes').update(updates).eq('id',rowId);
     if(e) return toast('Erro ao guardar: '+e.message,'error');
-    sectionData['pag_clientes_2026']=null;
+    sectionData['pag_clientes']=null;
     closeModal(); toast('Pagamento confirmado ');
     await openClienteDetalhe(nomeEsc);
   };
 }
 
-async function fatEdit2025(idx){
-  const sec = SECTIONS['pag_clientes_2025'];
-  const fields = sec?.fields || [{k:'Mês',t:'select',opts:['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']},{k:'Modalidade',t:'text'},{k:'Valor a Pagar',t:'number'},{k:'Valor Pago',t:'number'},{k:'Forma Pagamento',t:'select',opts:['Transferência Multibanco','Débito Direto','Pagamento Mbway','Numerário']},{k:'Nº Doc',t:'text'}];
-  let data = sectionData['pag_clientes_2025'];
-  if(!data){ const r=await api('/api/data/pag_clientes_2025'); data=Array.isArray(r)?r:[]; sectionData['pag_clientes_2025']=data; }
-  if(!data[idx]) return toast('Registo não encontrado','error');
-  const rec = data[idx];
-  document.getElementById('modalTitle').textContent = ' Editar faturação 2025';
-  document.getElementById('modalBody').innerHTML = '<div style="color:var(--text-muted);padding:20px 0">A carregar...</div>';
-  document.getElementById('modal').classList.add('show');
-  let html=''; const setups=[];
-  for(const f of fields){ const r=await buildFieldHtml(f,rec[f.k]??''); html+=r.html; if(r.setup) setups.push(r.setup); }
-  document.getElementById('modalBody').innerHTML = html;
-  runFieldSetups(setups);
-  document.getElementById('modalSave').onclick = async()=>{
-    const updates={};
-    for(const f of fields) updates[f.k]=getFieldValue(f);
-    await api(`/api/data/pag_clientes_2025/${idx}`,{method:'PUT',body:updates});
-    sectionData['pag_clientes_2025']=null; closeModal(); toast('Atualizado');
-    await renderHistoricoFaturacao(document.getElementById('mainContent'));
-  };
-}
+async function fatEdit2025(idx){ return fatEdit(idx); }
 
 async function fatDelete(idx, cliente, ano){
   if(!confirm(`Eliminar este registo de ${cliente}?`)) return;
-  const col = ano===2026 ? 'pag_clientes_2026' : 'pag_clientes_2025';
-  await api(`/api/data/${col}/${idx}`,{method:'DELETE'});
-  sectionData[col]=null; toast('Eliminado');
+  await api(`/api/data/pag_clientes/${idx}`,{method:'DELETE'});
+  sectionData['pag_clientes']=null; toast('Eliminado');
   await renderHistoricoFaturacao(document.getElementById('mainContent'));
 }
 
@@ -6931,7 +6909,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
     </tr>`).join('');
   }
 
-  const fatAddBtn = `<button class="btn btn-ghost btn-sm" onclick="openAddParaCliente('pag_clientes_2026','${nomeEsc}')">+ Adicionar 2026</button>`;
+  const fatAddBtn = `<button class="btn btn-ghost btn-sm" onclick="openAddParaCliente('pag_clientes','${nomeEsc}')">+ Adicionar Pagamento</button>`;
   const fatHtml = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px">${fatAddBtn}</div>
     ${fatRows
@@ -7092,7 +7070,7 @@ async function openClienteEdit(nome){
 // Campo de cliente por secção
 const CLIENT_FIELD_JS={
   conversoes:'Cliente', servicos:'Cliente', avaliacoes:'Nome',
-  pag_clientes_2026:'Cliente', pag_clientes_2025:'Cliente',
+  pag_clientes:'Cliente',
   log_contratos:'Cliente', log_comercial:'Contacto',
 };
 
