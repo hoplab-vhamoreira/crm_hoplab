@@ -7186,6 +7186,15 @@ async function openAddParaCliente(section, clienteNome){
     sectionData[section]=null;
     closeModal();
 
+    // Auto-sync: when saving a Mensal service, update clientes.PT/Nutricionista/Fisioterapeuta
+    if(section==='servicos' && rec['Repetição']==='Mensal' && rec['Técnico Responsável']){
+      const colabs = sectionData['dados_colaboradores'] || (await api('/api/data/dados_colaboradores'));
+      const colab  = (Array.isArray(colabs)?colabs:[]).find(c=>c['Nome Oficial']===rec['Técnico Responsável']);
+      const area   = colab?.['Área']||'';
+      const campo  = /Nutrição/i.test(area) ? 'Nutricionista' : /Fisioterapia/i.test(area) ? 'Fisioterapeuta' : /Studio/i.test(area) ? 'PT' : null;
+      if(campo) await _SB.from('clientes').update({[campo]: rec['Técnico Responsável']}).eq('Nome', clienteNome);
+    }
+
     // Serviço de gestão → criar ciclo automaticamente
     if(section==='servicos'){
       const precData = sectionData['precario_publico'] || (await api('/api/data/precario_publico'));
