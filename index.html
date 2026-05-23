@@ -3432,7 +3432,7 @@ async function openAddPipeline(){
         'Nome':contacto,'ID':novoID,'Status':'Ativo',
         'Segmento':rec['Tipo']||null,'Data Cria\xe7\xe3o':hoje
       }});
-      sectionData['clientes']=null;
+      sectionData['clientes']=null;_cliById=null;
       closeModal();
       toast(cr.error?`ON ${nextON} criado \xb7 Erro cliente: ${cr.error}`:`ON ${nextON} criado \xb7 Cliente "${contacto}" ID ${novoID} `,cr.error?'error':'success');
     } else if(status==='Ganho'&&converter==='parceiro'){
@@ -3568,7 +3568,7 @@ async function openEditPipeline(idx){
         'Nome':contacto,'ID':novoID,'Status':'Ativo',
         'Segmento':updates['Tipo']||null,'Data Criação':hoje
       }});
-      sectionData['clientes']=null;
+      sectionData['clientes']=null;_cliById=null;
       closeModal();
       toast(cr.error?`ON atualizado · Erro cliente: ${cr.error}`:`ON atualizado · Cliente "${contacto}" ID ${novoID} criado `,cr.error?'error':'success');
     } else if(status==='Ganho'&&converter==='parceiro'){
@@ -7265,7 +7265,7 @@ async function openAddParaCliente(section, clienteNome){
       if(!rec['Repetição']) rec['Repetição'] = /x\/semana/i.test(rec['Serviço']||'') ? 'Mensal' : 'Pontual';
     }
     // Auto-gerar Código Serviço para conversões de subscrição (PT/DUO/CED) e avaliação (AMR/AM/etc.)
-    const _CONV_EVAL_RE = /^(AMR|AMP?|CF30|CF60|CFT|CM|CN1|CN2|PE$|PEP|PP$|PV$|PTA|INSC)$/i;
+    const _CONV_EVAL_RE = /^(AMR|AMP?|CF30|CF60|CFT|CM|CN1|CN2|PE|PEP|PP|PV|PTA|INSC)$/i;
     let _autoIsEval = false;
     if(section==='conversoes' && rec['Serviço']){
       const precData = sectionData['precario_publico'] || (await api('/api/data/precario_publico'));
