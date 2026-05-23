@@ -1912,8 +1912,9 @@ function _parseFaturacaoCSV(text){
   return rows;
 }
 
-function _groupFaturacaoRows(rows){
+function _groupFaturacaoRows(rows, monthOverrides){
   // Returns Map: key=`${NIF}|${mesKey}` → {NIF, Nome, mesKey, mesNome, total, docs:[]}
+  // monthOverrides: Map of `${nif}|${invoiceNum}` → [mesKey1, mesKey2, ...]
   const map = new Map();
   rows.forEach(r=>{
     const nif = (r['NIF']||'').trim();
@@ -1940,22 +1941,29 @@ function _groupFaturacaoRows(rows){
     const qtdStr = (r['Quantidade']||r['Qtd']||'1').replace(/\./g,'').replace(',','.');
     const qtd = Math.round(Math.abs(parseFloat(qtdStr)||1));
     const isMensalidade = /^St[^.]*\./i.test(cod); // St.01, StD.01, StL.02, StM.01…
+    const invoiceNum = r['Número']||r['Numero']||'';
     if(qtd > 1 && isMensalidade){
       const valorPorMes = valor / qtd;
-      const mesNumInt = parseInt(mesNum, 10);
-      const anoInt = parseInt(ano, 10);
-      for(let i = 1; i <= qtd; i++){
-        let m = mesNumInt - i;
-        let a = anoInt;
-        if(m <= 0){ m += 12; a -= 1; }
-        const mStr = String(m).padStart(2,'0');
-        const splitMesKey = `${_MESES_NUM[mStr]||mStr} ${a}`;
-        const splitMapKey = `${nif}|${splitMesKey}`;
-        if(!map.has(splitMapKey)) map.set(splitMapKey,{NIF:nif,Nome:nome,mesKey:splitMesKey,mesNum:mStr,ano:String(a),total:0,docs:[]});
-        const e = map.get(splitMapKey);
-        e.total += valorPorMes;
-        e.docs.push({tipo, num:r['Número']||r['Numero']||'', valor:valorPorMes, cod, desc});
-      }
+      // Use user-confirmed months if available, otherwise fall back to going backwards
+      const overrideKey = `${nif}|${invoiceNum}`;
+      const overrideMeses = monthOverrides && monthOverrides.get(overrideKey);
+      const splitMeses = overrideMeses || Array.from({length:qtd},(_,i)=>{
+        const mesNumInt = parseInt(mesNum,10);
+        const anoInt = parseInt(ano,10);
+        let m = mesNumInt-(i+1), a = anoInt;
+        if(m<=0){m+=12;a-=1;}
+        const ms=String(m).padStart(2,'0');
+        return `${_MESES_NUM[ms]||ms} ${a}`;
+      });
+      splitMeses.forEach(mk=>{
+        const mParts=mk.split(' ');
+        const mStr=Object.keys(_MESES_NUM).find(k=>_MESES_NUM[k]===mParts[0])||'01';
+        const splitMapKey=`${nif}|${mk}`;
+        if(!map.has(splitMapKey)) map.set(splitMapKey,{NIF:nif,Nome:nome,mesKey:mk,mesNum:mStr,ano:mParts[1]||ano,total:0,docs:[]});
+        const e=map.get(splitMapKey);
+        e.total+=valorPorMes;
+        e.docs.push({tipo, num:invoiceNum, valor:valorPorMes, cod, desc});
+      });
       return; // handled as multi-month
     }
 
@@ -2104,10 +2112,105 @@ async function _parseFaturacaoPDF(file){
   if(!rows.length) throw new Error('Nenhuma linha de transação encontrada no PDF');
   return rows;
 }
+function _detectMultiMonthRows(rows){
+  const seen = new Map();
+  rows.forEach(r=>{
+    const tipo=(r['Tipo']||'').trim().toUpperCase();
+    if(!['FR','FS'].includes(tipo)) return;
+    const nif=(r['NIF']||'').trim();
+    if(!nif||nif==='999999990') return;
+    const cod=(r['Cod.']||r['Cod']||r['Código']||'').trim();
+    if(!/^St[^.]*\./i.test(cod)) return;
+    const qtdStr=(r['Quantidade']||r['Qtd']||'1').replace(/\./g,'').replace(',','.');
+    const qtd=Math.round(Math.abs(parseFloat(qtdStr)||1));
+    if(qtd<=1) return;
+    const invoiceNum=r['Número']||r['Numero']||'';
+    const key=`${nif}|${invoiceNum}`;
+    if(seen.has(key)) return;
+    const dataStr=r['Data']||'';
+    const dm=dataStr.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+    if(!dm) return;
+    seen.set(key,{nif, nome:(r['Nome']||'').trim(), invoiceNum, cod,
+      desc:(r['Descrição']||r['Descricao']||'').trim(),
+      qtd, invoiceMesNum:dm[2], invoiceAno:dm[3]});
+  });
+  return [...seen.values()];
+}
+
+async function _importConfirmMeses(rawRows, multiItems){
+  window._rawRowsForImport=rawRows;
+  window._multiItemsForImport=multiItems;
+  const mo=document.getElementById('importModal');
+
+  function monthOpts(invMesNum, invAno, defaultVal){
+    let html='';
+    for(let d=-6;d<=3;d++){
+      let m=parseInt(invMesNum,10)+d, a=parseInt(invAno,10);
+      while(m<=0){m+=12;a--;} while(m>12){m-=12;a++;}
+      const ms=String(m).padStart(2,'0');
+      const val=`${_MESES_NUM[ms]||ms} ${a}`;
+      html+=`<option value="${val}"${val===defaultVal?' selected':''}>${val}</option>`;
+    }
+    return html;
+  }
+
+  const rowsHtml=multiItems.map((item,idx)=>{
+    const sels=Array.from({length:item.qtd},(_,i)=>{
+      let m=parseInt(item.invoiceMesNum,10)-(i+1), a=parseInt(item.invoiceAno,10);
+      while(m<=0){m+=12;a--;}
+      const ms=String(m).padStart(2,'0');
+      const def=`${_MESES_NUM[ms]||ms} ${a}`;
+      return `<select id="mm_${idx}_${i}" style="font-size:12px;padding:3px 6px;border-radius:4px;border:1px solid var(--border);margin-right:4px">
+        ${monthOpts(item.invoiceMesNum,item.invoiceAno,def)}</select>`;
+    }).join('');
+    return `<tr>
+      <td style="font-weight:600">${item.nome}</td>
+      <td style="color:var(--text-muted)">${item.invoiceNum}</td>
+      <td style="color:var(--text-muted)">${item.cod}</td>
+      <td style="text-align:center">×${item.qtd}</td>
+      <td>${sels}</td>
+    </tr>`;
+  }).join('');
+
+  mo.innerHTML=`<div class="modal" style="max-width:740px">
+    <div class="modal-header"><h2>Confirmar Meses</h2><button class="modal-close" onclick="closeImportModal()">×</button></div>
+    <div class="modal-body" style="padding:24px;max-height:70vh;overflow-y:auto">
+      <p style="color:var(--text-muted);margin-bottom:16px;font-size:13px">Foram detetadas <b>${multiItems.length}</b> fatura(s) com mais de uma mensalidade. Confirma a que meses se referem:</p>
+      <table class="tbl" style="font-size:13px">
+        <thead><tr><th>Cliente</th><th>Fatura</th><th>Cód.</th><th style="text-align:center">Qtd</th><th>Meses</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="openImportFaturacao()">← Voltar</button>
+      <button class="btn btn-primary" onclick="_confirmMesesAndProceed()">Continuar →</button>
+    </div>
+  </div>`;
+}
+
+function _confirmMesesAndProceed(){
+  const items=window._multiItemsForImport||[];
+  const overrides=new Map();
+  items.forEach((item,idx)=>{
+    const months=[];
+    for(let i=0;i<item.qtd;i++){
+      const sel=document.getElementById(`mm_${idx}_${i}`);
+      if(sel) months.push(sel.value);
+    }
+    overrides.set(`${item.nif}|${item.invoiceNum}`,months);
+  });
+  _importStep2(window._rawRowsForImport, overrides);
+}
+
 async function _csvProceed(){
   if(!_csvParsedRows) return;
   try{
-    await _importStep2(_csvParsedRows);
+    const multiItems = _detectMultiMonthRows(_csvParsedRows);
+    if(multiItems.length > 0){
+      await _importConfirmMeses(_csvParsedRows, multiItems);
+    } else {
+      await _importStep2(_csvParsedRows);
+    }
   }catch(err){
     const mo=document.getElementById('importModal');
     mo.innerHTML=`<div class="modal" style="max-width:500px"><div class="modal-body" style="padding:32px">
@@ -2118,11 +2221,11 @@ async function _csvProceed(){
   }
 }
 
-async function _importStep2(rawRows){
+async function _importStep2(rawRows, monthOverrides){
   const mo=document.getElementById('importModal');
   mo.innerHTML=`<div class="modal" style="max-width:700px"><div class="modal-body" style="padding:40px;text-align:center;color:var(--text-muted)">A analisar...</div></div>`;
 
-  const grouped=_groupFaturacaoRows(rawRows);
+  const grouped=_groupFaturacaoRows(rawRows, monthOverrides);
 
   // Normalize string: remove accents, lowercase, trim
   const _norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[,.\-]/g,' ').replace(/\s+/g,' ').trim();
