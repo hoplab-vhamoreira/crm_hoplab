@@ -502,8 +502,48 @@ async function _sbGetAll(t){
   }
   return data;
 }
-async function _sbInsert(t,b){const{data,error}=await _SB.from(t).insert(b).select().single();if(error)return{error:error.message};return data;}
-async function _sbUpdate(t,i,b){const ids=_idCache[t];if(!ids||ids[i]===undefined)return{error:'ID nao encontrado - recarrega'};const{data,error}=await _SB.from(t).update(b).eq('id',ids[i]).select().single();if(error)return{error:error.message};return data;}
+let _colabsById=null;
+async function _getColabsByName(){
+  if(!_colabsById){
+    const{data}=await _SB.from('dados_colaboradores').select('id,"Nome Oficial"');
+    _colabsById=new Map((data||[]).map(d=>[d['Nome Oficial'],d.id]));
+  }
+  return _colabsById;
+}
+let _cliById=null;
+async function _getCliByName(){
+  if(!_cliById){
+    const{data}=await _SB.from('clientes').select('id,"Nome"');
+    _cliById=new Map((data||[]).map(d=>[d['Nome'],d.id]));
+  }
+  return _cliById;
+}
+async function _enrichIds(table,body){
+  const b={...body};
+  if(['servicos','conversoes','avaliacoes'].includes(table)){
+    const tr=b['Técnico Responsável'];
+    if(tr&&b.colaborador_id===undefined){
+      const m=await _getColabsByName();
+      const cid=m.get(tr);
+      if(cid!=null) b.colaborador_id=cid;
+    }
+    const cliNome=b['Cliente']||b['Nome'];
+    if(cliNome&&b.cliente_id===undefined){
+      const m=await _getCliByName();
+      const cid=m.get(cliNome);
+      if(cid!=null) b.cliente_id=cid;
+    }
+  }
+  if(table==='clientes'){
+    const m=await _getColabsByName();
+    if(b['PT']!==undefined&&b.pt_id===undefined){const id=m.get(b['PT']);if(id!=null)b.pt_id=id;}
+    if(b['Nutricionista']!==undefined&&b.nutricionista_id===undefined){const id=m.get(b['Nutricionista']);if(id!=null)b.nutricionista_id=id;}
+    if(b['Fisioterapeuta']!==undefined&&b.fisioterapeuta_id===undefined){const id=m.get(b['Fisioterapeuta']);if(id!=null)b.fisioterapeuta_id=id;}
+  }
+  return b;
+}
+async function _sbInsert(t,b){const eb=await _enrichIds(t,b);const{data,error}=await _SB.from(t).insert(eb).select().single();if(error)return{error:error.message};return data;}
+async function _sbUpdate(t,i,b){const ids=_idCache[t];if(!ids||ids[i]===undefined)return{error:'ID nao encontrado - recarrega'};const eb=await _enrichIds(t,b);const{data,error}=await _SB.from(t).update(eb).eq('id',ids[i]).select().single();if(error)return{error:error.message};return data;}
 async function _sbDelete(t,i){const ids=_idCache[t];if(!ids||ids[i]===undefined)return{error:'ID nao encontrado'};const{error}=await _SB.from(t).delete().eq('id',ids[i]);if(error)return{error:error.message};return{ok:true};}
 async function api(url,opts={}){
   const method=(opts.method||'GET').toUpperCase();
@@ -666,7 +706,28 @@ async function api(url,opts={}){
     return data?[...new Set(data.map(r=>r[rf]).filter(Boolean))].sort():[];
   }
   const eM=url.match(/^\/api\/clientes\/(.+)\/estado$/);
-  if(eM&&method==='POST'){const nome=decodeURIComponent(eM[1]);const{error}=await _SB.from('clientes').update({'Status':body.status}).eq('Nome',nome);if(error)return{error:error.message};return{ok:true};}
+  if(eM&&method==='POST'){
+    const nome=decodeURIComponent(eM[1]);
+    const novoStatus=body.status||body.estado;
+    if(!novoStatus)return{error:'status em falta'};
+    const{error}=await _SB.from('clientes').update({'Status':novoStatus}).eq('Nome',nome);
+    if(error)return{error:error.message};
+    // Sync motor2026.Estado Hoje
+    const motorStatus=['Ativo','Suspenso','Cancelado'].includes(novoStatus)?novoStatus:null;
+    if(motorStatus){
+      const{data:cliRow}=await _SB.from('clientes').select('id').eq('Nome',nome).single();
+      if(cliRow?.id) await _SB.from('motor2026').update({'Estado Hoje':motorStatus}).eq('cliente_id',cliRow.id);
+    }
+    // Log to log_contratos when called from modal (has full data)
+    if(body.estado&&['Suspenso','Cancelado','Ativo','Férias','Desconto'].includes(body.estado)){
+      await _SB.from('log_contratos').insert({
+        Cliente:nome, Estado:body.estado, Motivo:body.motivo||null,
+        Data_Inicio:body.data_inicio||new Date().toISOString().slice(0,10),
+        Data_Fim:body.data_fim||null, Notas:body.notas||null, Desconto_pct:body.desconto_pct||null
+      });
+    }
+    return{ok:true};
+  }
   // Rota direta por database id: /api/data/{table}/dbid/{id}
   const dbidM=url.match(/^\/api\/data\/([^\/]+)\/dbid\/(\d+)$/);
   if(dbidM){
@@ -936,7 +997,6 @@ const SECTIONS = {
     fields:[
       {k:'Plano Actual',t:'text'},
       {k:'Data Início',t:'date'},
-      {k:'Estado Hoje',t:'select',opts:['Ativo','Suspenso','Cancelado']},
       {k:'Mês Inscrição (override)',t:'text'},
     ]},
   log_contratos: {hidden:true,title:'Log Contratos',icon:'&#x1f4d1;',group:'Operacional',
@@ -1309,6 +1369,12 @@ async function _dbRegularizarSelecionados(){
       const{error}=await _SB.from('pag_clientes').update({'Estado':estado,'Valor Pago':valor,'Forma Pagamento':forma,'Nº Doc':doc}).eq('id',row.id);
       if(error) erros++; else ok++;
     }
+    if(ok>0) _syncComissoes(toUpdate.map(r=>({
+      cliente_id:r.cliente_id,
+      'Mês':r['Mês'],
+      'Valor Pago':valorRaw?parseFloat(valorRaw):(parseFloat(r['Valor a Pagar'])||0),
+      'Estado':estado
+    })));
     sectionData['pag_clientes']=null;
     closeModal(); _dbCloseDetail();
     if(erros) toast(`${ok} atualizados · ${erros} erros`,'error');
@@ -2467,6 +2533,7 @@ async function _importStep3(validList){
   if(toInsert.length>0){
     const {error}=await _SB.from('pag_clientes').insert(toInsert);
     insertError=error;
+    if(!error) _syncComissoes(toInsert);
   }
 
   if(insertError){
@@ -5235,17 +5302,41 @@ async function _calcConfirmarAplicar(nome,origem){
       const clAll=await api('/api/data/clientes');
       const maxID=(Array.isArray(clAll)?clAll:[]).reduce((m,c)=>Math.max(m,parseInt(c['ID'])||0),0);
       await api('/api/data/clientes',{method:'POST',body:{'Nome':nome,'Status':'Ativo','ID':maxID+1}});
-      sectionData['clientes']=null;sectionData['pipeline']=null;_calcDestinatarios=null;
+      sectionData['clientes']=null;sectionData['pipeline']=null;_calcDestinatarios=null;_cliById=null;
     }
 
-    // Criar registo em servicos para cada serviço da proposta
+    // Criar registo em servicos (+ conversao para PT/DUO/CED) para cada serviço da proposta
+    const _allServsProp=await api('/api/data/servicos');
+    const _allConvsProp=await api('/api/data/conversoes');
     for(const x of servicos){
-      await api('/api/data/servicos',{method:'POST',body:{
-        'Cliente':nome,'Serviço':x.nome,
-        'Data Conversão':hoje,'Estado do serviço':'Em curso'
+      let codServ=null;
+      if(/^(PT|DUO|CED)/i.test(x.codigo||'')){
+        const prefix=x.codigo+'-';
+        const maxS=(Array.isArray(_allServsProp)?_allServsProp:[])
+          .map(s=>s['Código']||'').filter(c=>c.startsWith(prefix))
+          .reduce((m,c)=>{const n=parseInt(c.split('-').pop());return isNaN(n)?m:Math.max(m,n);},0);
+        const maxC=(Array.isArray(_allConvsProp)?_allConvsProp:[])
+          .map(c=>c['Código Serviço']||'').filter(c=>c.startsWith(prefix))
+          .reduce((m,c)=>{const n=parseInt(c.split('-').pop());return isNaN(n)?m:Math.max(m,n);},0);
+        codServ=prefix+String(Math.max(maxS,maxC)+1).padStart(3,'0');
+      }
+      const sr=await api('/api/data/servicos',{method:'POST',body:{
+        'Cliente':nome,'Serviço':x.nome,'Código':codServ||null,
+        'Data Conversão':hoje,'Estado do serviço':'Em curso',
+        'Repetição':/x\/semana/i.test(x.nome||'')?'Mensal':'Pontual'
       }});
+      if(codServ){
+        const cr=await api('/api/data/conversoes',{method:'POST',body:{
+          'Cliente':nome,'Serviço':x.nome,'Código Serviço':codServ,
+          'Data da Marcação/Início':hoje,
+          'Valor total a Cobrar Serviço':x.pvpPromo||null,
+          'Tipo Cliente':'B2C',
+        }});
+        if(sr?.id&&cr?.id) await _SB.from('servicos').update({conversao_id:cr.id}).eq('id',sr.id);
+      }
     }
     sectionData['servicos']=null;
+    sectionData['conversoes']=null;
 
     // Registar em log_comercial
     const resumo=servicos.map(x=>x.nome).join(' + ');
@@ -6603,24 +6694,31 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
     const e=(s['Estado do serviço']||'').trim();
     return e!=='Concluído' && e!=='Concluido';
   });
+  // Códigos já cobertos por um servico ou avaliação → não duplicar nas conversões "outros"
+  const _servCods = new Set((d.servicos||[]).map(s=>s['Código']).filter(Boolean));
+  const _avalCods = new Set((d.avaliacoes||[]).map(a=>a['_CodServ']).filter(Boolean));
 
   // Auto-calcular status — nunca depender do valor manual para estes casos
-  const _temServicoAtivo = servicosAtivos.length > 0 || !!d.motor;
+  const _motorEstadoHoje = d.motor ? (d.motor['Estado Hoje']||'Ativo') : null;
+  const _motorSuspCancelado = _motorEstadoHoje==='Suspenso'||_motorEstadoHoje==='Cancelado';
+  const _temServicoAtivo = servicosAtivos.length > 0 || (d.motor && !_motorSuspCancelado);
   const _temAval = (d.avaliacoes||[]).length > 0 || (d.conversoes||[]).some(c=>{
     const sv=(c['Serviço']||'').toLowerCase();
     const cd=(c['Código Serviço']||'').toUpperCase();
     return sv.includes('avalia')||sv.includes('pack')||cd.startsWith('PV-')||cd.startsWith('AVAL');
   });
-  const _canceladoPorContrato = !_temServicoAtivo && (d.log_contratos||[]).some(c=>c['Estado']==='Cancelado'&&!c['Data_Fim']);
+  const _canceladoPorContrato = _motorEstadoHoje==='Cancelado' ||
+    (!_temServicoAtivo && (d.log_contratos||[]).some(c=>c['Estado']==='Cancelado'&&!c['Data_Fim']));
   const _statusManual = info.Status||'';
   const _STATUS_SIMPLES = ['Ativo','Avaliação expirada','Sem Serviço','Suspenso','Cancelado'];
   const _statusProtegido = !_STATUS_SIMPLES.includes(_statusManual);
   let _statusCalculado = _statusManual;
   if(!_statusProtegido){
-    if(_canceladoPorContrato)    _statusCalculado = 'Cancelado';
-    else if(_temServicoAtivo)    _statusCalculado = 'Ativo';
-    else if(_temAval)            _statusCalculado = 'Avaliação expirada';
-    else                         _statusCalculado = 'Sem Serviço';
+    if(_canceladoPorContrato)                        _statusCalculado = 'Cancelado';
+    else if(_motorEstadoHoje==='Suspenso' && servicosAtivos.length===0) _statusCalculado = 'Suspenso';
+    else if(_temServicoAtivo)                        _statusCalculado = 'Ativo';
+    else if(_temAval)                                _statusCalculado = 'Avaliação expirada';
+    else                                             _statusCalculado = 'Sem Serviço';
   }
   // Corrigir na DB silenciosamente se divergir e atualizar cache + lista
   if(_statusCalculado !== _statusManual){
@@ -6655,7 +6753,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
   const motorCodeForCount = temMotor ? (d.motor['Plano Actual']||'') : '';
   const motorEstadoForCount = temMotor ? (d.motor['Estado Hoje']||'Ativo') : '';
   const motorJaContado = motorCodeForCount && motorEstadoForCount==='Ativo' && servicosAtivos.some(s=>(s['Código']||'')=== motorCodeForCount);
-  const nConvsOutros = (d.conversoes||[]).filter(c=>!/^(PT|DUO)/i.test(c['Código Serviço']||'')).length;
+  const nConvsOutros = (d.conversoes||[]).filter(c=>{const cod=c['Código Serviço']||'';return !/^(PT|DUO)/i.test(cod)&&!_servCods.has(cod)&&!_avalCods.has(cod);}).length;
   const nServicos = servicosAtivos.length + (temMotor && !motorJaContado ? 1 : 0) + nConvsOutros;
   const nAvals    = (d.avaliacoes||[]).length;
   const nPag26    = temPag26 ? d.pag_2026.length
@@ -6783,7 +6881,7 @@ function renderClienteDetalhe(el, nome, d, inPane=false){
 
   // Conversoes — excluir PT/DUO (já no motor/servicos)
   const _isPTDUO = cod => /^(PT|DUO)/i.test(cod||'');
-  const convsOutros = (d.conversoes||[]).filter(c=>!_isPTDUO(c['Código Serviço']));
+  const convsOutros = (d.conversoes||[]).filter(c=>!_isPTDUO(c['Código Serviço'])&&!_servCods.has(c['Código Serviço']||'')&&!_avalCods.has(c['Código Serviço']||''));
   function _convCard(c){
     const btnDel = c['_idx']!=null
       ? `<button onclick="deleteDetalhe('conversoes',${c['_idx']},'${nomeEsc}')" class="serv-action-btn danger" title="Eliminar">🗑</button>` : '';
@@ -7137,6 +7235,7 @@ async function openAddParaCliente(section, clienteNome){
 
     // Auto-preencher Código a partir do precário antes de guardar
     let _isPrimeiroPT = false;
+    let _autoSubCode = null; // código de subscrição auto-gerado para ligar conversao↔servico
     if(section==='servicos' && rec['Serviço']){
       const precData = sectionData['precario_publico'] || (await api('/api/data/precario_publico'));
       sectionData['precario_publico'] = Array.isArray(precData)?precData:[];
@@ -7145,12 +7244,16 @@ async function openAddParaCliente(section, clienteNome){
       if(baseCode){
         if(/^(PT|DUO)/i.test(baseCode)){
           const allServs = await api('/api/data/servicos');
+          const allConvs = await api('/api/data/conversoes');
           const prefix = baseCode+'-';
-          const maxN = (Array.isArray(allServs)?allServs:[])
+          const maxS = (Array.isArray(allServs)?allServs:[])
             .map(s=>s['Código']||'').filter(c=>c.startsWith(prefix))
             .reduce((m,c)=>{const n=parseInt(c.split('-').pop());return isNaN(n)?m:Math.max(m,n);},0);
-          rec['Código'] = prefix+String(maxN+1).padStart(3,'0');
-          // Verificar se é o 1º serviço PT/DUO do cliente
+          const maxC = (Array.isArray(allConvs)?allConvs:[])
+            .map(c=>c['Código Serviço']||'').filter(c=>c.startsWith(prefix))
+            .reduce((m,c)=>{const n=parseInt(c.split('-').pop());return isNaN(n)?m:Math.max(m,n);},0);
+          rec['Código'] = prefix+String(Math.max(maxS,maxC)+1).padStart(3,'0');
+          _autoSubCode = rec['Código'];
           const clientePTServs=(Array.isArray(allServs)?allServs:[]).filter(s=>
             s['Cliente']===clienteNome && /^(PT|DUO)/i.test(s['Código']||''));
           _isPrimeiroPT = clientePTServs.length===0;
@@ -7161,11 +7264,93 @@ async function openAddParaCliente(section, clienteNome){
       // Auto-inferir Repetição: x/semana = Mensal, resto = Pontual
       if(!rec['Repetição']) rec['Repetição'] = /x\/semana/i.test(rec['Serviço']||'') ? 'Mensal' : 'Pontual';
     }
+    // Auto-gerar Código Serviço para conversões de subscrição (PT/DUO/CED) e avaliação (AMR/AM/etc.)
+    const _CONV_EVAL_RE = /^(AMR|AMP?|CF30|CF60|CFT|CM|CN1|CN2|PE$|PEP|PP$|PV$|PTA|INSC)$/i;
+    let _autoIsEval = false;
+    if(section==='conversoes' && rec['Serviço']){
+      const precData = sectionData['precario_publico'] || (await api('/api/data/precario_publico'));
+      sectionData['precario_publico'] = Array.isArray(precData)?precData:[];
+      const precItem = sectionData['precario_publico'].find(p=>p['Serviço']===rec['Serviço']);
+      const baseCode = precItem?.['Código']||'';
+      const isSub = /^(PT|DUO|CED)/i.test(baseCode);
+      const isEval = _CONV_EVAL_RE.test(baseCode);
+      if(baseCode && (isSub||isEval)){
+        const allServs = await api('/api/data/servicos');
+        const allConvs = await api('/api/data/conversoes');
+        const allAvals = isEval ? (await api('/api/data/avaliacoes')) : [];
+        const prefix = baseCode+'-';
+        const maxS = (Array.isArray(allServs)?allServs:[])
+          .map(s=>s['Código']||'').filter(c=>c.startsWith(prefix))
+          .reduce((m,c)=>{const n=parseInt(c.split('-').pop());return isNaN(n)?m:Math.max(m,n);},0);
+        const maxC = (Array.isArray(allConvs)?allConvs:[])
+          .map(c=>c['Código Serviço']||'').filter(c=>c.startsWith(prefix))
+          .reduce((m,c)=>{const n=parseInt(c.split('-').pop());return isNaN(n)?m:Math.max(m,n);},0);
+        const maxA = (Array.isArray(allAvals)?allAvals:[])
+          .map(a=>a['_CodServ']||'').filter(c=>c.startsWith(prefix))
+          .reduce((m,c)=>{const n=parseInt(c.split('-').pop());return isNaN(n)?m:Math.max(m,n);},0);
+        rec['Código Serviço'] = prefix+String(Math.max(maxS,maxC,maxA)+1).padStart(3,'0');
+        _autoSubCode = rec['Código Serviço'];
+        _autoIsEval = isEval;
+      }
+    }
 
     const res = await api(`/api/data/${section}`,{method:'POST',body:rec});
     if(res?.error){ toast('Erro ao adicionar: '+res.error,'error'); return; }
     sectionData[section]=null;
     closeModal();
+
+    // Conversão de subscrição → auto-criar Serviço operacional
+    if(section==='conversoes' && _autoSubCode && !_autoIsEval && res?.id){
+      const sBody={
+        'Cliente':clienteNome,'Serviço':rec['Serviço'],'Código':_autoSubCode,
+        'Técnico Responsável':rec['Técnico Responsável']||null,'Venda de':rec['Venda de']||null,
+        'Data Conversão':rec['Data da Marcação/Início']||new Date().toISOString().slice(0,10),
+        'Data Marcação/Início':rec['Data da Marcação/Início']||null,
+        'Estado do serviço':'Em curso',
+        'Repetição':/x\/semana/i.test(rec['Serviço']||'')?'Mensal':'Pontual',
+      };
+      const sr=await api('/api/data/servicos',{method:'POST',body:sBody});
+      if(sr?.id) await _SB.from('servicos').update({conversao_id:res.id}).eq('id',sr.id);
+      sectionData['servicos']=null;
+      toast(`Conversão registada · Serviço ${_autoSubCode} criado automaticamente`,'success');
+      await openClienteDetalhe(clienteNome);
+      return;
+    }
+    // Conversão de avaliação/pack → auto-criar Avaliação operacional
+    if(section==='conversoes' && _autoSubCode && _autoIsEval && res?.id){
+      const aBody={
+        'Nome':clienteNome,'Serviço':rec['Serviço'],'_CodServ':_autoSubCode,
+        'Técnico Responsável':rec['Técnico Responsável']||null,
+        'Data':rec['Data da Marcação/Início']||null,
+        'Nível':rec['Nível']||'N1 - Avaliar',
+        'Cobrança':rec['Cobrança']||null,
+      };
+      const ar=await api('/api/data/avaliacoes',{method:'POST',body:aBody});
+      if(ar?.id) await _SB.from('conversoes').update({avaliacao_id:ar.id}).eq('id',res.id);
+      sectionData['avaliacoes']=null;
+      toast(`Conversão registada · Avaliação ${_autoSubCode} criada automaticamente`,'success');
+      await openClienteDetalhe(clienteNome);
+      return;
+    }
+    // Serviço PT/DUO → ligar ou criar conversão correspondente
+    if(section==='servicos' && _autoSubCode && res?.id){
+      const allConvs=await api('/api/data/conversoes');
+      const convExist=(Array.isArray(allConvs)?allConvs:[]).find(c=>
+        c['Código Serviço']===_autoSubCode&&c['Cliente']===clienteNome);
+      if(!convExist){
+        const cBody={
+          'Cliente':clienteNome,'Serviço':rec['Serviço'],'Código Serviço':_autoSubCode,
+          'Técnico Responsável':rec['Técnico Responsável']||null,'Venda de':rec['Venda de']||null,
+          'Data da Marcação/Início':rec['Data Conversão']||rec['Data Marcação/Início']||null,
+          'Tipo Cliente':'B2C',
+        };
+        const cr=await api('/api/data/conversoes',{method:'POST',body:cBody});
+        if(cr?.id) await _SB.from('servicos').update({conversao_id:cr.id}).eq('id',res.id);
+        sectionData['conversoes']=null;
+      } else if(convExist?.id){
+        await _SB.from('servicos').update({conversao_id:convExist.id}).eq('id',res.id);
+      }
+    }
 
     // Auto-sync: when saving a Mensal service, update clientes.PT/Nutricionista/Fisioterapeuta
     if(section==='servicos' && rec['Repetição']==='Mensal' && rec['Técnico Responsável']){
@@ -7217,7 +7402,12 @@ async function openAddParaCliente(section, clienteNome){
         const maxAMR = (Array.isArray(allAvals)?allAvals:[])
           .map(a=>a['_CodServ']||'').filter(c=>/^AMR-\d+$/.test(c))
           .reduce((m,c)=>{const n=parseInt(c.split('-')[1]);return isNaN(n)?m:Math.max(m,n);},0);
-        const novoCod='AMR-'+String(maxAMR+1).padStart(3,'0');
+        // Também verificar max nas conversoes para garantir código único
+        const allConvsAMR = await api('/api/data/conversoes');
+        const maxAMRconv = (Array.isArray(allConvsAMR)?allConvsAMR:[])
+          .map(c=>c['Código Serviço']||'').filter(c=>/^AMR-\d+$/.test(c))
+          .reduce((m,c)=>{const n=parseInt(c.split('-')[1]);return isNaN(n)?m:Math.max(m,n);},0);
+        const novoCod='AMR-'+String(Math.max(maxAMR,maxAMRconv)+1).padStart(3,'0');
         const ar=await api('/api/data/avaliacoes',{method:'POST',body:{
           'Nome':clienteNome,
           'Serviço':'AMR (Aval. Metab. Repouso)',
@@ -7227,6 +7417,16 @@ async function openAddParaCliente(section, clienteNome){
           'Cobrança':'Já pago (incluído no serviço)',
         }});
         sectionData['avaliacoes']=null;
+        // Criar conversao correspondente (registo comercial da AMR incluída)
+        if(ar?.id){
+          const cr=await api('/api/data/conversoes',{method:'POST',body:{
+            'Cliente':clienteNome,'Serviço':'AMR (Aval. Metab. Repouso)',
+            'Código Serviço':novoCod,'Cobrança':'Já pago (incluído no serviço)',
+            'Pago?':'Sim','Tipo Cliente':'B2C',
+          }});
+          if(cr?.id) await _SB.from('conversoes').update({avaliacao_id:ar.id}).eq('id',cr.id);
+          sectionData['conversoes']=null;
+        }
         if(!ar.error) toast(`Serviço adicionado · Inscrição ${novoCod} criada`,'success');
         else toast(`Serviço adicionado · Erro na inscrição: ${ar.error}`,'error');
         await openClienteDetalhe(clienteNome);
@@ -8232,6 +8432,7 @@ async function openEditColaborador(nome){
     const res=await api(`/api/data/dados_colaboradores/${idx}`,{method:'PUT',body:updates});
     if(res?.error){ toast('Erro ao guardar: '+res.error,'error'); return; }
     sectionData['dados_colaboradores']=null;
+    _colabsById=null;
     closeModal();
     toast('Ficha atualizada');
     await openColaboradorDetalhe(updates['Nome Oficial']||nome);
@@ -8440,6 +8641,42 @@ let _tpData    = null;
 
 const _TP_MESES      = _TP_MESES_SHORT;
 const _TP_MESES_FULL = ['Janeiro','Fevereiro','Mar\xe7o','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+// Auto-sync pagamentos_treinadores J_* when pag_clientes payment is recorded
+const _PAG_J_MAP = {
+  'Janeiro':'J_Janeiro','Fevereiro':'J_Fevereiro','Março':'J_Março',
+  'Abril':'J_Abril','Maio':'J_Maio','Junho':'J_Junho','Julho':'J_Julho',
+  'Agosto':'J_Agosto','Setembro':'J_Setembro','Outubro':'J_Outubro',
+  'Novembro':'J_Novembro','Dezembro':'J_Dezembro'
+};
+async function _syncComissoes(pagRows){
+  if(!Array.isArray(pagRows)||!pagRows.length) return;
+  const byClient=new Map();
+  for(const r of pagRows){
+    if(!r.cliente_id) continue;
+    const mesNome=(r['Mês']||'').split(' ')[0];
+    const jCol=_PAG_J_MAP[mesNome];
+    if(!jCol) continue;
+    const pago=parseFloat(r['Valor Pago'])||0;
+    const ativo=pago>0&&!['Suspendeu','Cancelou'].includes(r['Estado']||'');
+    if(!byClient.has(r.cliente_id)) byClient.set(r.cliente_id,[]);
+    byClient.get(r.cliente_id).push({jCol,ativo});
+  }
+  if(!byClient.size) return;
+  const{data:ptRows}=await _SB.from('pagamentos_treinadores')
+    .select('id,cliente_id,"Valor mensal Professor (c/ alteração)"')
+    .in('cliente_id',[...byClient.keys()]);
+  if(!ptRows?.length) return;
+  for(const pt of ptRows){
+    const updates=byClient.get(pt.cliente_id)||[];
+    const patch={};
+    for(const{jCol,ativo}of updates)
+      patch[jCol]=ativo?(parseFloat(pt['Valor mensal Professor (c/ alteração)'])||0):0;
+    if(Object.keys(patch).length)
+      await _SB.from('pagamentos_treinadores').update(patch).eq('id',pt.id);
+  }
+  _tpData=null;
+}
 
 const _TP_PERIODOS = {
   'Jan':['Jan'],'Fev':['Fev'],'Mar':['Mar'],'Abr':['Abr'],
