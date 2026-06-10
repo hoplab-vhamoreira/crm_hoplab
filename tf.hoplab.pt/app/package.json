@@ -1,0 +1,29 @@
+{
+  "name": "speechcraft-app",
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "expo": "~56.0.9",
+    "expo-router": "~5.1.0",
+    "expo-status-bar": "~56.0.4",
+    "expo-secure-store": "~14.2.0",
+    "expo-font": "~13.3.1",
+    "expo-splash-screen": "~0.29.24",
+    "@supabase/supabase-js": "^2.49.4",
+    "react": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-safe-area-context": "^5.4.0",
+    "react-native-screens": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "private": true
+}

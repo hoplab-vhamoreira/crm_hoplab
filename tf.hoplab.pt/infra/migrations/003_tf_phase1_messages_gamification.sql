@@ -1,0 +1,4 @@
+-- SpeechCraft — Fase 1: Mensagens + Gamificação por hábito
+-- Ver migration aplicada no Supabase para políticas completas
+-- Tabelas: messages · streaks · badges · push_tokens
+-- Função: tf.update_streak(patient_id) — premia hábito, nunca qualidade clínica
