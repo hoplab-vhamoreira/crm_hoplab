@@ -151,7 +151,7 @@ export function PatientExercisePage() {
   async function load() {
     setLoading(true)
     const { data } = await tfFrom('plan_exercises')
-      .select('id, exercise_id, plan_id, reps, sets, duration_seconds, exercises:exercise_id(title, instructions, duration_seconds, video_url), treatment_plans:plan_id(therapist_id)')
+      .select('id, exercise_id, plan_id, reps, sets, duration_seconds, exercises:tf_exercises(title, instructions, duration_seconds, video_url), treatment_plans:tf_plans(therapist_id)')
       .eq('id', exerciseId!)
       .single()
 

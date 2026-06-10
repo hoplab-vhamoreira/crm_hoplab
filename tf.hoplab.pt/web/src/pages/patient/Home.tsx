@@ -72,7 +72,7 @@ export function PatientHomePage() {
 
     if (plan) {
       const { data: planExercises } = await tfFrom('plan_exercises')
-        .select('id, exercise_id, reps, sets, duration_seconds, exercises:exercise_id(title, instructions, duration_seconds)')
+        .select('id, exercise_id, reps, sets, duration_seconds, exercises:tf_exercises(title, instructions, duration_seconds)')
         .eq('plan_id', plan.id)
         .order('sort_order')
 

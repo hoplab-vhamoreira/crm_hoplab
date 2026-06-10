@@ -25,7 +25,7 @@ export function PatientHistoryPage() {
   async function load() {
     setLoading(true)
     const { data } = await tfFrom('adherence_logs')
-      .select('id, session_date, plan_exercise_id, self_rating, notes, plan_exercises:plan_exercise_id(exercises:exercise_id(title))')
+      .select('id, session_date, plan_exercise_id, self_rating, notes, plan_exercises:tf_plan_exercises(exercises:tf_exercises(title))')
       .eq('patient_id', profile!.id)
       .order('session_date', { ascending: false })
       .limit(60)
