@@ -1,15 +1,18 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/auth'
+import { Icon } from './Icon'
 
 const NAV = [
-  { to: '/',          label: 'Dashboard',    emoji: '🏠' },
-  { to: '/patients',  label: 'Utentes',      emoji: '👥' },
-  { to: '/reviews',   label: 'Revisões',     emoji: '📹' },
-  { to: '/exercises', label: 'Biblioteca',   emoji: '📚' },
-  { to: '/shortcuts', label: 'Atalhos',      emoji: '⚡' },
-  { to: '/messages',  label: 'Mensagens',    emoji: '💬' },
-  { to: '/compliance',label: 'Conformidade', emoji: '🔒' },
-]
+  { to: '/',          label: 'Painel',      icon: 'home'     },
+  { to: '/patients',  label: 'Utentes',     icon: 'users'    },
+  { to: '/reviews',   label: 'Revisões',    icon: 'video'    },
+  { to: '/exercises', label: 'Biblioteca',  icon: 'book'     },
+  { to: '/shortcuts', label: 'Atalhos',     icon: 'zap'      },
+  { to: '/messages',  label: 'Mensagens',   icon: 'chat'     },
+  { to: '/compliance',label: 'Conformidade',icon: 'lock'     },
+] as const
+
+const BASE = import.meta.env.BASE_URL
 
 export function Layout() {
   const { profile, signOut } = useAuth()
@@ -22,40 +25,62 @@ export function Layout() {
 
   return (
     <div className="layout">
+      {/* ── Sidebar (desktop) ──────────────────────────────────────── */}
       <aside className="sidebar">
-        {/* Logo */}
         <div style={{ padding: '4px 12px 20px', borderBottom: '1px solid rgba(127,182,208,.2)', marginBottom: 12 }}>
-          <div style={{ fontWeight: 600, fontSize: 'var(--font-lg)', color: 'var(--eira-paper)' }}>Eira</div>
-          <div style={{ fontSize: 'var(--font-xs)', color: 'var(--eira-ocean-lt)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Cuidado sem distância</div>
+          <img
+            src={`${BASE}eira-logo-horizontal-slogan-dark.svg`}
+            alt="Eira"
+            style={{ height: 38, width: 'auto', display: 'block' }}
+          />
         </div>
 
-        {/* Nav */}
-        {NAV.map(({ to, label, emoji }) => (
+        {NAV.map(({ to, label, icon }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
           >
-            <span>{emoji}</span>
+            <Icon name={icon as any} size={18} />
             <span>{label}</span>
           </NavLink>
         ))}
 
-        {/* Perfil */}
         <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid rgba(127,182,208,.2)' }}>
           <div style={{ padding: '8px 12px', fontSize: 'var(--font-sm)', color: 'var(--eira-ocean-lt)' }}>
             {profile?.full_name ?? 'Terapeuta'}
           </div>
-          <button className="nav-item btn" style={{ width: '100%', background: 'none', color: 'var(--eira-danger)' }} onClick={handleSignOut}>
-            <span>🚪</span><span>Sair</span>
+          <button
+            className="nav-item btn"
+            style={{ width: '100%', background: 'none', color: 'var(--eira-danger)' }}
+            onClick={handleSignOut}
+          >
+            <Icon name="sign-out" size={18} />
+            <span>Sair</span>
           </button>
         </div>
       </aside>
 
+      {/* ── Conteúdo ──────────────────────────────────────────────── */}
       <main className="main">
         <Outlet />
       </main>
+
+      {/* ── Bottom nav (mobile only) ───────────────────────────────── */}
+      <nav className="mobile-bottom-nav">
+        {NAV.slice(0, 5).map(({ to, label, icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={({ isActive }) => `mobile-nav-item${isActive ? ' active' : ''}`}
+          >
+            <Icon name={icon as any} size={20} />
+            <span>{label}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   )
 }

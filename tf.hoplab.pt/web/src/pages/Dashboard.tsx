@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tfFrom } from '../lib/supabase'
 import { useAuth } from '../context/auth'
+import { Icon } from '../components/Icon'
 
 interface PendingReview { id: string; patient_id: string; created_at: string; patient_name?: string }
 interface UnreadMsg    { link_id: string; count: number; patient_name?: string; patient_id?: string }
@@ -9,57 +10,39 @@ interface UnreadMsg    { link_id: string; count: number; patient_name?: string; 
 export function DashboardPage() {
   const { profile } = useAuth()
   const nav = useNavigate()
-  const [reviews, setReviews] = useState<PendingReview[]>([])
-  const [unread,  setUnread]  = useState<UnreadMsg[]>([])
+  const [reviews, setReviews]           = useState<PendingReview[]>([])
   const [lowAdherence, setLowAdherence] = useState<{ id: string; full_name: string | null; days: number }[]>([])
   const [apptRequests, setApptRequests] = useState<{ id: string; patient_id: string; created_at: string; patient_name?: string }[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]           = useState(true)
 
   useEffect(() => { if (profile?.id) load() }, [profile?.id])
 
   async function load() {
     setLoading(true)
-
-    // Revisões pendentes
     const { data: revData } = await tfFrom('video_submissions')
-      .select('id, patient_id, created_at')
-      .eq('therapist_id', profile!.id)
-      .eq('status', 'pending_review')
-      .order('created_at', { ascending: true })
-      .limit(20)
-
-    // Utentes com baixa adesão (sem actividade nos últimos 3 dias)
+      .select('id, patient_id, created_at').eq('therapist_id', profile!.id).eq('status', 'pending_review')
+      .order('created_at', { ascending: true }).limit(20)
     const { data: streakData } = await tfFrom('streaks')
       .select('patient_id, last_active_date')
       .lte('last_active_date', new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10))
-
-    // Pedidos de consulta pendentes
     const { data: reqData } = await tfFrom('appointment_requests')
-      .select('id, patient_id, created_at')
-      .eq('therapist_id', profile!.id)
-      .eq('status', 'pendente')
+      .select('id, patient_id, created_at').eq('therapist_id', profile!.id).eq('status', 'pendente')
       .order('created_at', { ascending: true })
 
-    // Nomes dos utentes
-    const patientIds = [
-      ...new Set([...(revData ?? []).map(r => r.patient_id), ...(streakData ?? []).map(s => s.patient_id), ...(reqData ?? []).map(r => r.patient_id)])
-    ]
+    const patientIds = [...new Set([...(revData ?? []).map(r => r.patient_id), ...(streakData ?? []).map(s => s.patient_id), ...(reqData ?? []).map(r => r.patient_id)])]
     const { data: patients } = patientIds.length
       ? await tfFrom('tf_users').select('id, full_name').in('id', patientIds)
       : { data: [] }
-
     const nameMap = new Map((patients ?? []).map(p => [p.id, p.full_name]))
 
     setReviews((revData ?? []).map(r => ({ ...r, patient_name: nameMap.get(r.patient_id) ?? 'Utente' })))
     setApptRequests((reqData ?? []).map(r => ({ ...r, patient_name: nameMap.get(r.patient_id) ?? 'Utente' })))
-
     setLowAdherence((streakData ?? []).map(s => {
       const days = s.last_active_date
         ? Math.floor((Date.now() - new Date(s.last_active_date).getTime()) / 86400000)
         : 999
       return { id: s.patient_id, full_name: nameMap.get(s.patient_id) ?? null, days }
     }))
-
     setLoading(false)
   }
 
@@ -70,13 +53,18 @@ export function DashboardPage() {
       <h1 className="page-title">Painel</h1>
       <p className="page-sub">Bom dia — aqui está o resumo do dia.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
 
         {/* Revisões pendentes */}
         <div className="card">
-          <div className="section-title">📹 Revisões pendentes</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <Icon name="video" size={16} style={{ color: 'var(--eira-ocean)' }} />
+            <span className="section-title" style={{ margin: 0 }}>Revisões pendentes</span>
+          </div>
           {reviews.length === 0
-            ? <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)' }}>Nenhuma pendente. ✅</p>
+            ? <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name="check" size={15} style={{ color: 'var(--success)' }} /> Nenhuma pendente.
+              </p>
             : reviews.map(r => (
               <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                 <div>
@@ -92,7 +80,10 @@ export function DashboardPage() {
         {/* Pedidos de consulta */}
         {apptRequests.length > 0 && (
           <div className="card">
-            <div className="section-title">🗓️ Pedidos de consulta</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <Icon name="calendar" size={16} style={{ color: 'var(--eira-ocean)' }} />
+              <span className="section-title" style={{ margin: 0 }}>Pedidos de consulta</span>
+            </div>
             {apptRequests.map(r => (
               <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                 <div>
@@ -107,12 +98,17 @@ export function DashboardPage() {
 
         {/* Baixa adesão */}
         <div className="card">
-          <div className="section-title">⚠️ Baixa adesão (factual)</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <Icon name="warning" size={16} style={{ color: 'var(--warning)' }} />
+            <span className="section-title" style={{ margin: 0 }}>Baixa adesão</span>
+          </div>
           <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginBottom: 12, fontStyle: 'italic' }}>
             Dias sem actividade registada — sem interpretação clínica.
           </p>
           {lowAdherence.length === 0
-            ? <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)' }}>Todos activos recentemente. ✅</p>
+            ? <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name="check" size={15} style={{ color: 'var(--success)' }} /> Todos activos recentemente.
+              </p>
             : lowAdherence.map(u => (
               <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ fontWeight: 600 }}>{u.full_name ?? 'Utente'}</div>
@@ -122,17 +118,20 @@ export function DashboardPage() {
           }
         </div>
 
-        {/* Atalhos rápidos */}
+        {/* Ações rápidas */}
         <div className="card">
-          <div className="section-title">⚡ Ações rápidas</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <Icon name="zap" size={16} style={{ color: 'var(--eira-ocean)' }} />
+            <span className="section-title" style={{ margin: 0 }}>Ações rápidas</span>
+          </div>
           {[
-            { label: '+ Novo utente',       action: () => nav('/patients') },
-            { label: '+ Novo exercício',    action: () => nav('/exercises') },
-            { label: 'Gerir atalhos',       action: () => nav('/shortcuts') },
-            { label: 'Registos conformidade', action: () => nav('/compliance') },
-          ].map(({ label, action }) => (
-            <button key={label} className="btn btn-ghost btn-sm" style={{ width: '100%', marginBottom: 8, justifyContent: 'flex-start' }} onClick={action}>
-              {label}
+            { label: 'Novo utente',           icon: 'users'   as const, action: () => nav('/patients')   },
+            { label: 'Novo exercício',        icon: 'plus'    as const, action: () => nav('/exercises')  },
+            { label: 'Gerir atalhos',         icon: 'zap'     as const, action: () => nav('/shortcuts')  },
+            { label: 'Registos conformidade', icon: 'lock'    as const, action: () => nav('/compliance') },
+          ].map(({ label, icon, action }) => (
+            <button key={label} className="btn btn-ghost btn-sm" style={{ width: '100%', marginBottom: 8, justifyContent: 'flex-start', gap: 8 }} onClick={action}>
+              <Icon name={icon} size={15} /> {label}
             </button>
           ))}
         </div>

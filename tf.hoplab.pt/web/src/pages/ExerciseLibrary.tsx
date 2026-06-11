@@ -1,6 +1,7 @@
 import { useEffect, useState, FormEvent } from 'react'
 import { tfFrom } from '../lib/supabase'
 import { useAuth } from '../context/auth'
+import { Icon } from '../components/Icon'
 import type { Exercise, ClinicalArea } from '@tf/types'
 
 const AREAS: ClinicalArea[] = ['respiracao','ressonancia','articulacao','tom','voz','mof','linguagem','gaguez']
@@ -23,6 +24,7 @@ export function ExerciseLibraryPage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { if (profile?.id) load() }, [profile?.id])
+  useEffect(() => { if (profile?.id) load() }, [filter])
 
   async function load() {
     setLoading(true)
@@ -31,8 +33,6 @@ export function ExerciseLibraryPage() {
     setExercises(data ?? [])
     setLoading(false)
   }
-
-  useEffect(() => { if (profile?.id) load() }, [filter])
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -54,9 +54,14 @@ export function ExerciseLibraryPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-        <div><h1 className="page-title">Biblioteca de exercícios</h1><p className="page-sub">Conteúdos de modelagem reutilizáveis entre utentes.</p></div>
-        <button className="btn btn-primary" onClick={() => setEditing(blank())}>+ Novo exercício</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, gap: 12 }}>
+        <div>
+          <h1 className="page-title">Biblioteca</h1>
+          <p className="page-sub">Conteúdos de modelagem reutilizáveis.</p>
+        </div>
+        <button className="btn btn-primary" style={{ flexShrink: 0 }} onClick={() => setEditing(blank())}>
+          <Icon name="plus" size={16} /> Novo
+        </button>
       </div>
 
       {/* Filtro por área */}
@@ -68,34 +73,52 @@ export function ExerciseLibraryPage() {
         ))}
       </div>
 
-      {/* Lista */}
-      {loading ? <div className="empty-state"><span className="spinner" /></div> : (
-        <div className="card" style={{ padding: 0 }}>
-          <table>
-            <thead><tr><th>Título</th><th>Área</th><th>Duração</th><th>Vídeo</th><th></th></tr></thead>
-            <tbody>
-              {exercises.length === 0 && <tr><td colSpan={5} className="empty-state">Sem exercícios ainda.</td></tr>}
-              {exercises.map(ex => (
-                <tr key={ex.id}>
-                  <td style={{ fontWeight: 600 }}>{ex.title}</td>
-                  <td><span className="badge badge-blue">{ex.clinical_area}</span></td>
-                  <td>{ex.duration_seconds ? `${ex.duration_seconds}s` : '—'}</td>
-                  <td>{ex.video_url ? '✅' : '—'}</td>
-                  <td style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(ex)}>Editar</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => remove(ex.id)}>Eliminar</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Lista — cards responsivos */}
+      {loading ? <div className="empty-state"><span className="spinner" /></div> : exercises.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+          <Icon name="book" size={40} style={{ color: 'var(--eira-mist)', marginBottom: 12 }} />
+          <p style={{ color: 'var(--text-2)' }}>Sem exercícios ainda.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {exercises.map(ex => (
+            <div key={ex.id} className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600 }}>{ex.title}</span>
+                    <span className="badge badge-blue">{ex.clinical_area}</span>
+                    {ex.duration_seconds && <span className="badge badge-blue">{ex.duration_seconds}s</span>}
+                    {ex.video_url && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 'var(--font-xs)', color: 'var(--success)' }}>
+                        <Icon name="video" size={12} /> vídeo
+                      </span>
+                    )}
+                  </div>
+                  {ex.instructions && (
+                    <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {ex.instructions}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setEditing(ex)} style={{ padding: '6px 8px' }}>
+                    <Icon name="edit" size={15} />
+                  </button>
+                  <button className="btn btn-danger btn-sm" onClick={() => remove(ex.id)} style={{ padding: '6px 8px' }}>
+                    <Icon name="trash" size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
       {/* Modal de edição */}
       {editing !== null && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div className="card" style={{ width: 520, maxHeight: '90vh', overflowY: 'auto', padding: 32 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div className="card" style={{ width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', padding: 28 }}>
             <h2 style={{ margin: '0 0 20px', fontSize: 'var(--font-xl)' }}>{editing.id ? 'Editar' : 'Novo'} exercício</h2>
             <form onSubmit={save}>
               <div className="field"><label>Título *</label><input value={editing.title ?? ''} onChange={e => setEditing(v => ({ ...v!, title: e.target.value }))} required /></div>

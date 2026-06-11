@@ -1,5 +1,8 @@
 import { useState, FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
+import { Icon } from '../components/Icon'
+
+const BASE = import.meta.env.BASE_URL
 
 export function LoginPage() {
   const [email, setEmail]       = useState('')
@@ -22,9 +25,11 @@ export function LoginPage() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 16 }}>
       <div className="card" style={{ width: '100%', maxWidth: 380, padding: 36 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🌊</div>
-          <h1 style={{ fontSize: 'var(--font-xl)', fontWeight: 600, margin: 0, color: 'var(--eira-ink)' }}>Eira</h1>
-          <p style={{ color: 'var(--eira-ocean)', fontSize: 'var(--font-xs)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Cuidado sem distância</p>
+          <img
+            src={`${BASE}eira-logo-vertical-slogan.svg`}
+            alt="Eira — Cuidado sem distância"
+            style={{ height: 100, width: 'auto', margin: '0 auto', display: 'block' }}
+          />
         </div>
 
         <form onSubmit={signIn}>
@@ -39,8 +44,8 @@ export function LoginPage() {
               <input id="password" type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••" required style={{ paddingRight: 44 }} />
               <button type="button" onClick={() => setShowPass(v => !v)}
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 16, padding: 0, lineHeight: 1 }}>
-                {showPass ? '🙈' : '👁'}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: 4, lineHeight: 1, display: 'flex' }}>
+                <Icon name={showPass ? 'close' : 'lock'} size={16} />
               </button>
             </div>
           </div>

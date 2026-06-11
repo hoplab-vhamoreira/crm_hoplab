@@ -1,5 +1,8 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/auth'
+import { Icon } from './Icon'
+
+const BASE = import.meta.env.BASE_URL
 
 export function PatientLayout() {
   const { profile, signOut } = useAuth()
@@ -14,18 +17,27 @@ export function PatientLayout() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
       {/* Header */}
       <header style={{
-        height: 56, background: 'var(--surface)', borderBottom: '1px solid var(--border)',
+        height: 56, background: 'var(--surface)', borderBottom: 'var(--hairline)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 20px', position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <div style={{ fontWeight: 700, fontSize: 'var(--font-lg)', color: 'var(--primary)' }}>
-          SpeechTherapy
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)' }}>
+        <img
+          src={`${BASE}eira-logo-horizontal-slogan.svg`}
+          alt="Eira"
+          style={{ height: 30, width: 'auto' }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {profile?.full_name ?? 'Utente'}
           </span>
-          <button className="btn btn-ghost btn-sm" onClick={handleSignOut}>Sair</button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={handleSignOut}
+            style={{ padding: '6px 8px' }}
+            title="Sair"
+          >
+            <Icon name="sign-out" size={16} />
+          </button>
         </div>
       </header>
 
@@ -34,30 +46,30 @@ export function PatientLayout() {
         <Outlet />
       </main>
 
-      {/* Nav bar inferior (mobile-first) */}
+      {/* Nav bar inferior */}
       <nav style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
-        background: 'var(--surface)', borderTop: '1px solid var(--border)',
+        background: 'var(--surface)', borderTop: 'var(--hairline)',
         display: 'flex', justifyContent: 'space-around',
         padding: '8px 0 max(8px, env(safe-area-inset-bottom))',
         zIndex: 10,
       }}>
         {[
-          { to: '/patient', label: 'Hoje', icon: '🏠', end: true },
-          { to: '/patient/history', label: 'Histórico', icon: '📊' },
-          { to: '/patient/messages', label: 'Mensagens', icon: '💬' },
+          { to: '/patient',          label: 'Hoje',      icon: 'home'  as const, end: true },
+          { to: '/patient/history',  label: 'Histórico', icon: 'chart' as const },
+          { to: '/patient/messages', label: 'Mensagens', icon: 'chat'  as const },
         ].map(({ to, label, icon, end }) => (
           <NavLink
             key={to} to={to} end={end}
             style={({ isActive }) => ({
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
               textDecoration: 'none', fontSize: 'var(--font-xs)',
-              color: isActive ? 'var(--primary)' : 'var(--text-2)',
+              color: isActive ? 'var(--eira-ocean)' : 'var(--text-2)',
               fontWeight: isActive ? 700 : 400,
               minWidth: 64, padding: '4px 0',
             })}
           >
-            <span style={{ fontSize: 20 }}>{icon}</span>
+            <Icon name={icon} size={22} />
             {label}
           </NavLink>
         ))}
