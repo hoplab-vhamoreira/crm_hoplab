@@ -217,6 +217,11 @@ export function PatientDetailPage() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                {a.kind === 'online' && a.location_or_link && (a.status === 'proposta' || a.status === 'confirmada') && (
+                  <a className="btn btn-primary btn-sm" href={a.location_or_link} target="_blank" rel="noreferrer">
+                    <Icon name="video" size={14} /> Entrar
+                  </a>
+                )}
                 <span className={`badge ${a.status === 'confirmada' ? 'badge-green' : a.status === 'cancelada' ? 'badge-red' : 'badge-blue'}`}>{a.status}</span>
                 {(a.status === 'proposta' || a.status === 'confirmada') && (
                   <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }} onClick={() => setCancelling(a)} title="Cancelar consulta">
