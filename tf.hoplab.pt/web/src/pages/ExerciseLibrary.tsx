@@ -1,5 +1,5 @@
-import { useEffect, useState, FormEvent } from 'react'
-import { tfFrom } from '../lib/supabase'
+import { useEffect, useState, useRef, FormEvent } from 'react'
+import { supabase, tfFrom } from '../lib/supabase'
 import { useAuth } from '../context/auth'
 import { Icon } from '../components/Icon'
 import type { Exercise, ClinicalArea } from '@tf/types'
@@ -24,6 +24,21 @@ export function ExerciseLibraryPage() {
   const [saving, setSaving] = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [seedDone, setSeedDone] = useState(false)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function uploadVideo(file: File) {
+    if (!profile?.id) return
+    if (file.size > 100 * 1024 * 1024) { setUploadError('O vídeo não pode exceder 100 MB.'); return }
+    setUploadingVideo(true); setUploadError('')
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'mp4'
+    const path = `modeling/${profile.id}/${crypto.randomUUID()}.${ext}`
+    const { error } = await supabase.storage.from('tf-videos').upload(path, file, { contentType: file.type || 'video/mp4', upsert: false })
+    if (error) setUploadError('Erro ao carregar: ' + error.message)
+    else setEditing(v => ({ ...v!, video_url: `storage:${path}` }))
+    setUploadingVideo(false)
+  }
 
   useEffect(() => { if (profile?.id) load() }, [profile?.id])
   useEffect(() => { if (profile?.id) load() }, [filter])
@@ -183,7 +198,35 @@ export function ExerciseLibraryPage() {
                 </select>
               </div>
               <div className="field"><label>Instruções</label><textarea rows={4} value={editing.instructions ?? ''} onChange={e => setEditing(v => ({ ...v!, instructions: e.target.value || null }))} /></div>
-              <div className="field"><label>URL do vídeo de modelagem</label><input type="url" value={editing.video_url ?? ''} onChange={e => setEditing(v => ({ ...v!, video_url: e.target.value || null }))} placeholder="https://…" /></div>
+              <div className="field">
+                <label>Vídeo de modelagem</label>
+                {editing.video_url?.startsWith('storage:') ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--success-lt)', borderRadius: 'var(--radius-sm)', padding: '10px 14px' }}>
+                    <Icon name="video" size={16} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 'var(--font-sm)', color: 'var(--success)', fontWeight: 600 }}>Vídeo próprio carregado</span>
+                    <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }}
+                      onClick={() => setEditing(v => ({ ...v!, video_url: null }))} title="Remover vídeo">
+                      <Icon name="trash" size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input type="url" value={editing.video_url ?? ''} onChange={e => setEditing(v => ({ ...v!, video_url: e.target.value || null }))} placeholder="https://… (YouTube, Vimeo ou link directo)" style={{ flex: 1 }} />
+                      <button type="button" className="btn btn-ghost btn-sm" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                        disabled={uploadingVideo} onClick={() => fileRef.current?.click()}>
+                        {uploadingVideo ? <span className="spinner" /> : <><Icon name="camera" size={14} /> Carregar / gravar</>}
+                      </button>
+                    </div>
+                    <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadVideo(f); e.target.value = '' }} />
+                    <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 6, marginBottom: 0 }}>
+                      Pode colar um link ou carregar um vídeo seu (máx. 100 MB). No telemóvel, "Carregar / gravar" permite filmar na hora.
+                    </p>
+                  </>
+                )}
+                {uploadError && <p style={{ color: 'var(--error)', fontSize: 'var(--font-sm)', marginTop: 6 }}>{uploadError}</p>}
+              </div>
               <div className="field"><label>Duração sugerida (segundos)</label><input type="number" min={1} max={3600} value={editing.duration_seconds ?? ''} onChange={e => setEditing(v => ({ ...v!, duration_seconds: e.target.value ? +e.target.value : null }))} /></div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditing(null)}>Cancelar</button>

@@ -26,11 +26,30 @@ interface ExerciseDetail {
 }
 
 function ModelVideo({ url, compact = false }: { url: string; compact?: boolean }) {
+  // 'storage:path' = vídeo próprio do terapeuta no bucket tf-videos → URL assinado
+  const isStorage = url.startsWith('storage:')
+  const [signedUrl, setSignedUrl] = useState<string | null>(null)
+  const [storageError, setStorageError] = useState(false)
+
+  useEffect(() => {
+    if (!isStorage) return
+    supabase.storage.from('tf-videos').createSignedUrl(url.slice(8), 3600)
+      .then(({ data, error }) => {
+        if (error || !data?.signedUrl) setStorageError(true)
+        else setSignedUrl(data.signedUrl)
+      })
+  }, [url])
+
   const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/)
   const vimeo = url.match(/vimeo\.com\/(\d+)/)
   const style: CSSProperties = {
     width: '100%', aspectRatio: '16/9', borderRadius: 'var(--radius)',
     border: 'none', background: '#000', display: 'block',
+  }
+  if (isStorage) {
+    if (storageError) return <p style={{ color: 'var(--error)', fontSize: 'var(--font-sm)' }}>Não foi possível carregar o vídeo de demonstração.</p>
+    if (!signedUrl) return <div style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="spinner" /></div>
+    return <video src={signedUrl} controls playsInline style={{ ...style, aspectRatio: undefined, maxHeight: compact ? 220 : 360 }} />
   }
   if (yt) return <iframe style={style} src={`https://www.youtube-nocookie.com/embed/${yt[1]}`} allow="encrypted-media; picture-in-picture" allowFullScreen title="Demonstração" />
   if (vimeo) return <iframe style={style} src={`https://player.vimeo.com/video/${vimeo[1]}?dnt=1`} allow="encrypted-media; picture-in-picture" allowFullScreen title="Demonstração" />
