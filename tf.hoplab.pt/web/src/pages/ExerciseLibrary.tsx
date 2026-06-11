@@ -28,16 +28,65 @@ export function ExerciseLibraryPage() {
   const [uploadError, setUploadError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  async function uploadVideo(file: File) {
+  // Gravação por webcam (desktop)
+  const [recMode, setRecMode] = useState<'idle' | 'live' | 'recording' | 'recorded'>('idle')
+  const [recBlob, setRecBlob] = useState<Blob | null>(null)
+  const [recUrl, setRecUrl] = useState<string | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<BlobPart[]>([])
+  const liveRef = useRef<HTMLVideoElement>(null)
+
+  async function uploadVideo(data: Blob, ext: string, contentType: string) {
     if (!profile?.id) return
-    if (file.size > 100 * 1024 * 1024) { setUploadError('O vídeo não pode exceder 100 MB.'); return }
+    if (data.size > 100 * 1024 * 1024) { setUploadError('O vídeo não pode exceder 100 MB.'); return }
     setUploadingVideo(true); setUploadError('')
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'mp4'
     const path = `modeling/${profile.id}/${crypto.randomUUID()}.${ext}`
-    const { error } = await supabase.storage.from('tf-videos').upload(path, file, { contentType: file.type || 'video/mp4', upsert: false })
+    const { error } = await supabase.storage.from('tf-videos').upload(path, data, { contentType, upsert: false })
     if (error) setUploadError('Erro ao carregar: ' + error.message)
-    else setEditing(v => ({ ...v!, video_url: `storage:${path}` }))
+    else { setEditing(v => ({ ...v!, video_url: `storage:${path}` })); closeRecorder() }
     setUploadingVideo(false)
+  }
+
+  async function openRecorder() {
+    setUploadError('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: true })
+      streamRef.current = stream
+      setRecMode('live')
+      // o <video> só existe após o re-render
+      setTimeout(() => { if (liveRef.current) { liveRef.current.srcObject = stream; liveRef.current.play() } }, 50)
+    } catch {
+      setUploadError('Não foi possível aceder à câmara/microfone.')
+    }
+  }
+
+  function startRec() {
+    if (!streamRef.current) return
+    const mr = new MediaRecorder(streamRef.current, { mimeType: 'video/webm;codecs=vp8,opus' })
+    chunksRef.current = []
+    mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+    mr.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+      setRecBlob(blob)
+      setRecUrl(URL.createObjectURL(blob))
+      setRecMode('recorded')
+    }
+    mr.start()
+    recorderRef.current = mr
+    setRecMode('recording')
+  }
+
+  function stopRec() {
+    if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
+  }
+
+  function closeRecorder() {
+    if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    streamRef.current = null
+    if (recUrl) URL.revokeObjectURL(recUrl)
+    setRecBlob(null); setRecUrl(null); setRecMode('idle')
   }
 
   useEffect(() => { if (profile?.id) load() }, [profile?.id])
@@ -60,7 +109,7 @@ export function ExerciseLibraryPage() {
     } else {
       await tfFrom('exercises').insert({ ...blank(), ...editing, therapist_id: profile!.id })
     }
-    setSaving(false); setEditing(null); load()
+    setSaving(false); setEditing(null); closeRecorder(); load()
   }
 
   async function seedLibrary() {
@@ -209,27 +258,73 @@ export function ExerciseLibraryPage() {
                       <Icon name="trash" size={14} />
                     </button>
                   </div>
-                ) : (
+                ) : recMode === 'idle' ? (
                   <>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input type="url" value={editing.video_url ?? ''} onChange={e => setEditing(v => ({ ...v!, video_url: e.target.value || null }))} placeholder="https://… (YouTube, Vimeo ou link directo)" style={{ flex: 1 }} />
                       <button type="button" className="btn btn-ghost btn-sm" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
                         disabled={uploadingVideo} onClick={() => fileRef.current?.click()}>
-                        {uploadingVideo ? <span className="spinner" /> : <><Icon name="camera" size={14} /> Carregar / gravar</>}
+                        {uploadingVideo ? <span className="spinner" /> : <><Icon name="plus" size={14} /> Carregar</>}
+                      </button>
+                      <button type="button" className="btn btn-ghost btn-sm" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                        disabled={uploadingVideo} onClick={openRecorder}>
+                        <Icon name="camera" size={14} /> Gravar
                       </button>
                     </div>
                     <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }}
-                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadVideo(f); e.target.value = '' }} />
+                      onChange={e => {
+                        const f = e.target.files?.[0]
+                        if (f) uploadVideo(f, f.name.split('.').pop()?.toLowerCase() || 'mp4', f.type || 'video/mp4')
+                        e.target.value = ''
+                      }} />
                     <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 6, marginBottom: 0 }}>
-                      Pode colar um link ou carregar um vídeo seu (máx. 100 MB). No telemóvel, "Carregar / gravar" permite filmar na hora.
+                      Cole um link, carregue um ficheiro ou grave com a câmara do computador (máx. 100 MB).
                     </p>
                   </>
+                ) : (
+                  <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12 }}>
+                    {(recMode === 'live' || recMode === 'recording') && (
+                      <video ref={liveRef} muted playsInline style={{ width: '100%', borderRadius: 'var(--radius-sm)', background: '#000', transform: 'scaleX(-1)', maxHeight: 280 }} />
+                    )}
+                    {recMode === 'recorded' && recUrl && (
+                      <video src={recUrl} controls playsInline style={{ width: '100%', borderRadius: 'var(--radius-sm)', background: '#000', maxHeight: 280 }} />
+                    )}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
+                      {recMode === 'live' && (
+                        <button type="button" className="btn btn-primary btn-sm" onClick={startRec}>
+                          <Icon name="mic" size={14} /> Começar a gravar
+                        </button>
+                      )}
+                      {recMode === 'recording' && (
+                        <>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--eira-danger)', display: 'inline-block' }} />
+                          <button type="button" className="btn btn-danger btn-sm" onClick={stopRec}>
+                            <Icon name="stop" size={14} /> Parar
+                          </button>
+                        </>
+                      )}
+                      {recMode === 'recorded' && recBlob && (
+                        <>
+                          <button type="button" className="btn btn-primary btn-sm" disabled={uploadingVideo}
+                            onClick={() => uploadVideo(recBlob, 'webm', 'video/webm')}>
+                            {uploadingVideo ? <span className="spinner" /> : <><Icon name="check" size={14} /> Usar este vídeo</>}
+                          </button>
+                          <button type="button" className="btn btn-ghost btn-sm" disabled={uploadingVideo} onClick={() => { if (recUrl) URL.revokeObjectURL(recUrl); setRecBlob(null); setRecUrl(null); openRecorder() }}>
+                            <Icon name="refresh" size={14} /> Repetir
+                          </button>
+                        </>
+                      )}
+                      <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} disabled={uploadingVideo} onClick={closeRecorder}>
+                        <Icon name="close" size={14} /> Fechar
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {uploadError && <p style={{ color: 'var(--error)', fontSize: 'var(--font-sm)', marginTop: 6 }}>{uploadError}</p>}
               </div>
               <div className="field"><label>Duração sugerida (segundos)</label><input type="number" min={1} max={3600} value={editing.duration_seconds ?? ''} onChange={e => setEditing(v => ({ ...v!, duration_seconds: e.target.value ? +e.target.value : null }))} /></div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditing(null)}>Cancelar</button>
+                <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => { setEditing(null); closeRecorder() }}>Cancelar</button>
                 <button className="btn btn-primary" style={{ flex: 1 }} disabled={saving}>{saving ? <span className="spinner" /> : 'Guardar'}</button>
               </div>
             </form>
