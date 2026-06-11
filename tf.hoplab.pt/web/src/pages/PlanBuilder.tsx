@@ -67,7 +67,7 @@ export function PlanBuilderPage() {
         setTitle(plan.title); setTotalWeeks(plan.total_weeks)
         setStartsOn(plan.starts_on); setNotes(plan.notes ?? '')
       }
-      const { data: pe } = await tfFrom('plan_exercises').select('*, exercise:exercises(*)').eq('plan_id', planId).order('week_number').order('sort_order')
+      const { data: pe } = await tfFrom('plan_exercises').select('*, exercise:tf_exercises(*)').eq('plan_id', planId).order('week_number').order('sort_order')
       setExercises((pe ?? []).map((p, i) => ({
         tempId: p.id, exercise_id: p.exercise_id, exercise: (p as any).exercise,
         week_number: p.week_number, sets: p.sets, reps: p.reps,
