@@ -29,6 +29,7 @@ export function PatientDetailPage() {
   const [cancellingBusy, setCancellingBusy] = useState(false)
   const [callUrl, setCallUrl] = useState<string | null>(null)
   const [savingAppt, setSavingAppt] = useState(false)
+  const [apptError, setApptError] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => { if (patientId) load() }, [patientId])
@@ -50,21 +51,32 @@ export function PatientDetailPage() {
 
   async function saveAppointment() {
     if (!newAppt?.starts_at || !profile) return
+    setApptError('')
+    const when = new Date(newAppt.starts_at)
+    if (isNaN(when.getTime())) { setApptError('Data e hora inválidas.'); return }
     setSavingAppt(true)
-    await tfFrom('appointments').insert({
-      therapist_id: profile.id,
-      patient_id: patientId!,
-      kind: newAppt.kind,
-      starts_at: new Date(newAppt.starts_at).toISOString(),
-      location_or_link: newAppt.location.trim() || null,
-      status: 'confirmada',
-      created_by: profile.id,
-    })
-    // Marca pedidos pendentes como aceites
-    if (pendingRequests.length) {
-      await tfFrom('appointment_requests').update({ status: 'aceite' }).eq('patient_id', patientId!).eq('status', 'pendente')
+    try {
+      const { error } = await tfFrom('appointments').insert({
+        therapist_id: profile.id,
+        patient_id: patientId!,
+        kind: newAppt.kind,
+        starts_at: when.toISOString(),
+        location_or_link: newAppt.location.trim() || null,
+        status: 'confirmada',
+        created_by: profile.id,
+      })
+      if (error) { setApptError('Erro ao marcar: ' + error.message); return }
+      // Marca pedidos pendentes como aceites
+      if (pendingRequests.length) {
+        await tfFrom('appointment_requests').update({ status: 'aceite' }).eq('patient_id', patientId!).eq('status', 'pendente')
+      }
+      setNewAppt(null)
+      load()
+    } catch (e: any) {
+      setApptError('Erro inesperado: ' + (e?.message ?? String(e)))
+    } finally {
+      setSavingAppt(false)
     }
-    setSavingAppt(false); setNewAppt(null); load()
   }
 
   async function setApptStatus(id: string, status: Appt['status']) {
@@ -194,8 +206,9 @@ export function PatientDetailPage() {
                 </p>
               )}
             </div>
+            {apptError && <p style={{ color: 'var(--error)', fontSize: 'var(--font-sm)', marginBottom: 10 }}>{apptError}</p>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setNewAppt(null)}>Cancelar</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setNewAppt(null); setApptError('') }}>Cancelar</button>
               <button className="btn btn-primary btn-sm" disabled={!newAppt.starts_at || savingAppt} onClick={saveAppointment}>
                 {savingAppt ? <span className="spinner" /> : 'Confirmar consulta'}
               </button>
