@@ -9,6 +9,7 @@ import { supabase, tfFrom } from '../../lib/supabase'
 import { useAuth } from '../../context/auth'
 import { logAudit } from '../../lib/audit'
 import { Icon } from '../../components/Icon'
+import { Fox, Confetti } from '../../components/Fox'
 
 type Step = 1 | 2 | 3 | 4
 
@@ -377,7 +378,7 @@ function StepConclusao({
 }: {
   detail: ExerciseDetail
   videoBlob: Blob | null
-  profile: { id: string } | null
+  profile: { id: string; ui_variant?: string } | null
   onDone: () => void
 }) {
   const [selfRating, setSelfRating] = useState<'easy' | 'medium' | 'hard' | null>(null)
@@ -424,13 +425,28 @@ function StepConclusao({
   }
 
   if (done) {
+    const isAdventure = profile?.ui_variant === 'adventure'
     return (
-      <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--success-lt)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-          <Icon name="star" size={36} style={{ color: 'var(--success)' }} fill />
-        </div>
-        <h2 style={{ fontWeight: 700, marginBottom: 8, color: 'var(--eira-ink)' }}>Excelente!</h2>
-        <p style={{ color: 'var(--text-2)', marginBottom: 28 }}>Exercício registado. Continue assim!</p>
+      <div style={{ position: 'relative', textAlign: 'center', padding: '40px 20px', overflow: 'hidden' }}>
+        {isAdventure ? (
+          <>
+            <Confetti />
+            <Fox size={96} mood="cheer" />
+            <h2 style={{ fontWeight: 700, marginBottom: 8, color: 'var(--warning)', marginTop: 12 }}>Missão cumprida!</h2>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginBottom: 8 }}>
+              <Icon name="star" size={26} style={{ color: 'var(--eira-sun)' }} fill />
+            </div>
+            <p style={{ color: 'var(--text-2)', marginBottom: 28 }}>Ganhaste uma estrela! O Raposo está orgulhoso.</p>
+          </>
+        ) : (
+          <>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--success-lt)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <Icon name="star" size={36} style={{ color: 'var(--success)' }} fill />
+            </div>
+            <h2 style={{ fontWeight: 700, marginBottom: 8, color: 'var(--eira-ink)' }}>Excelente!</h2>
+            <p style={{ color: 'var(--text-2)', marginBottom: 28 }}>Exercício registado. Continue assim!</p>
+          </>
+        )}
         <button className="btn btn-primary" style={{ minWidth: 180 }} onClick={onDone}>
           Voltar ao início
         </button>

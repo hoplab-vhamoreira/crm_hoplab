@@ -8,6 +8,7 @@ import { tfFrom } from '../../lib/supabase'
 import { useAuth } from '../../context/auth'
 import { Icon } from '../../components/Icon'
 import { VideoCall } from '../../components/VideoCall'
+import { Fox, Confetti } from '../../components/Fox'
 
 interface TodayItem {
   plan_exercise_id: string
@@ -34,6 +35,7 @@ export function PatientHomePage() {
   const [requesting, setRequesting]   = useState(false)
   const [showRequestForm, setShowRequestForm] = useState(false)
   const [callUrl, setCallUrl] = useState<string | null>(null)
+  const [showParents, setShowParents] = useState(false)
   const [prefDays, setPrefDays]       = useState<Set<string>>(new Set())
   const [prefPeriod, setPrefPeriod]   = useState('')
   const [prefNote, setPrefNote]       = useState('')
@@ -118,34 +120,14 @@ export function PatientHomePage() {
 
   const doneCount  = items.filter(i => i.done).length
   const totalCount = items.length
+  const isAdventure = profile?.ui_variant === 'adventure'
 
   if (loading) return <div className="empty-state"><span className="spinner" /></div>
 
-  return (
-    <div>
-      {/* Cabeçalho */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 'var(--font-xl)', fontWeight: 700, margin: 0 }}>
-          Olá, {profile?.full_name?.split(' ')[0]}
-        </h1>
-        <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)', marginTop: 4 }}>
-          {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}
-        </p>
-      </div>
-
-      {/* Streak */}
-      {streak && streak.current_streak > 0 && (
-        <div className="card" style={{ background: 'var(--warning-lt)', border: '1.5px solid var(--eira-sun)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--eira-sun)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icon name="flame" size={22} style={{ color: '#fff' }} fill />
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, color: 'var(--warning)' }}>{streak.current_streak} dias seguidos!</div>
-            <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)' }}>Recorde: {streak.longest_streak} dias</div>
-          </div>
-        </div>
-      )}
-
+  // Bloco de consulta + feedback — na variante Aventura vai para a "Área dos pais"
+  // (o conteúdo clínico do terapeuta é para o responsável; a criança vê só celebração).
+  const appointmentAndFeedback = (
+    <>
       {/* Próxima consulta / pedir consulta */}
       {nextAppt ? (
         <div className="card" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -244,13 +226,66 @@ export function PatientHomePage() {
           ))}
         </div>
       )}
+    </>
+  )
+
+  return (
+    <div>
+      {/* Cabeçalho */}
+      {isAdventure ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+          <Fox size={84} mood={doneCount === totalCount && totalCount > 0 ? 'cheer' : 'happy'} />
+          <div>
+            <h1 style={{ fontSize: 'var(--font-xl)', fontWeight: 700, margin: 0 }}>
+              Olá, {profile?.full_name?.split(' ')[0]}!
+            </h1>
+            <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)', marginTop: 4 }}>
+              {doneCount === totalCount && totalCount > 0
+                ? 'Missão de hoje cumprida! O Raposo está orgulhoso.'
+                : totalCount > 0
+                  ? 'O Raposo tem uma missão para ti!'
+                  : 'O Raposo está à espera de novas missões.'}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 'var(--font-xl)', fontWeight: 700, margin: 0 }}>
+            Olá, {profile?.full_name?.split(' ')[0]}
+          </h1>
+          <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)', marginTop: 4 }}>
+            {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
+        </div>
+      )}
+
+      {/* Streak */}
+      {streak && streak.current_streak > 0 && (
+        <div className="card" style={{ background: 'var(--warning-lt)', border: '1.5px solid var(--eira-sun)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--eira-sun)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name={isAdventure ? 'star' : 'flame'} size={22} style={{ color: '#fff' }} fill />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, color: 'var(--warning)' }}>
+              {isAdventure ? `${streak.current_streak} dias de missões!` : `${streak.current_streak} dias seguidos!`}
+            </div>
+            <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)' }}>Recorde: {streak.longest_streak} dias</div>
+          </div>
+        </div>
+      )}
+
+      {/* Consulta + feedback — visível directamente, excepto na Aventura (vai para a área dos pais) */}
+      {!isAdventure && appointmentAndFeedback}
 
       {/* Progresso do dia */}
       {totalCount > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600 }}>Hoje</span>
-            <span style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)' }}>{doneCount}/{totalCount}</span>
+            <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600 }}>{isAdventure ? 'Missões de hoje' : 'Hoje'}</span>
+            <span style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              {isAdventure && <Icon name="star" size={14} style={{ color: 'var(--eira-sun)' }} fill />}
+              {doneCount}/{totalCount}
+            </span>
           </div>
           <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
             <div style={{
@@ -286,9 +321,10 @@ export function PatientHomePage() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <Icon
-                  name={item.done ? 'check' : 'play'}
+                  name={isAdventure ? 'star' : item.done ? 'check' : 'play'}
                   size={18}
-                  style={{ color: item.done ? 'var(--success)' : 'var(--eira-ocean)' }}
+                  style={{ color: item.done ? (isAdventure ? 'var(--eira-sun)' : 'var(--success)') : 'var(--eira-ocean)' }}
+                  fill={isAdventure && item.done}
                 />
               </div>
               <div style={{ flex: 1 }}>
@@ -308,9 +344,56 @@ export function PatientHomePage() {
       )}
 
       {doneCount === totalCount && totalCount > 0 && (
-        <div className="card" style={{ textAlign: 'center', padding: 24, marginTop: 20, background: 'var(--success-lt)', border: '1.5px solid var(--success)' }}>
-          <Icon name="star" size={32} style={{ color: 'var(--success)', marginBottom: 8 }} fill />
-          <div style={{ fontWeight: 700, color: 'var(--success)' }}>Sessão completa! Excelente trabalho.</div>
+        isAdventure ? (
+          <div className="card" style={{ position: 'relative', textAlign: 'center', padding: 28, marginTop: 20, background: 'var(--warning-lt)', border: '1.5px solid var(--eira-sun)', overflow: 'hidden' }}>
+            <Confetti />
+            <Fox size={72} mood="cheer" />
+            <div style={{ fontWeight: 700, fontSize: 'var(--font-lg)', color: 'var(--warning)', marginTop: 8 }}>
+              Missão cumprida!
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginTop: 8 }}>
+              {Array.from({ length: totalCount }, (_, i) => (
+                <Icon key={i} name="star" size={22} style={{ color: 'var(--eira-sun)' }} fill />
+              ))}
+            </div>
+            <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)', marginTop: 8, marginBottom: 0 }}>
+              Ganhaste {totalCount} estrela{totalCount > 1 ? 's' : ''} hoje. Até amanhã!
+            </p>
+          </div>
+        ) : (
+          <div className="card" style={{ textAlign: 'center', padding: 24, marginTop: 20, background: 'var(--success-lt)', border: '1.5px solid var(--success)' }}>
+            <Icon name="star" size={32} style={{ color: 'var(--success)', marginBottom: 8 }} fill />
+            <div style={{ fontWeight: 700, color: 'var(--success)' }}>Sessão completa! Excelente trabalho.</div>
+          </div>
+        )
+      )}
+
+      {/* Área dos pais — variante Aventura: consultas e feedback clínico ficam aqui */}
+      {isAdventure && (
+        <div style={{ marginTop: 28 }}>
+          <button
+            onClick={() => setShowParents(v => !v)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+              background: 'var(--surface)', border: 'var(--hairline)', borderRadius: 'var(--radius)',
+              padding: '14px 16px', cursor: 'pointer', fontFamily: 'Poppins, sans-serif',
+              fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--text)',
+            }}
+          >
+            <Icon name="lock" size={16} style={{ color: 'var(--text-2)' }} />
+            Área dos pais
+            <span style={{ marginLeft: 'auto', transform: showParents ? 'rotate(90deg)' : 'none', transition: 'transform .15s', display: 'inline-flex' }}>
+              <Icon name="chevron-right" size={16} style={{ color: 'var(--text-2)' }} />
+            </span>
+          </button>
+          {showParents && (
+            <div style={{ marginTop: 12 }}>
+              <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', margin: '0 0 12px' }}>
+                Consultas e indicações do terapeuta — para o responsável.
+              </p>
+              {appointmentAndFeedback}
+            </div>
+          )}
         </div>
       )}
 
