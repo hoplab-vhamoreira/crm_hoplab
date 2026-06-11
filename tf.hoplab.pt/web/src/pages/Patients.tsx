@@ -39,6 +39,9 @@ export function PatientsPage() {
   const [loading, setLoading] = useState(true)
   const [showInvite, setShowInvite] = useState(false)
   const [patientEmail, setPatientEmail] = useState('')
+  const [inviteProfile, setInviteProfile] = useState<'adulto' | 'crianca' | 'senior'>('adulto')
+  const [invitePatientName, setInvitePatientName] = useState('')
+  const [inviteGuardianName, setInviteGuardianName] = useState('')
   const [inviteSent, setInviteSent] = useState(false)
   const [creating, setCreating] = useState(false)
   const [inviteError, setInviteError] = useState('')
@@ -75,10 +78,25 @@ export function PatientsPage() {
 
   async function sendInvite() {
     if (!patientEmail.trim()) return
+    if (inviteProfile === 'crianca' && !invitePatientName.trim()) { setInviteError('Indique o nome da criança.'); return }
     setCreating(true); setInviteError(''); setDirectLink(null)
-    const result = await invokeInvite(patientEmail.trim().toLowerCase())
+    const email = patientEmail.trim().toLowerCase()
+    const result = await invokeInvite(email)
     setCreating(false)
     if (result.error) { setInviteError(result.error); return }
+
+    // Guardar o perfil pré-selecionado no convite — aplicado no onboarding do utente
+    const invited_profile = {
+      ui_variant: inviteProfile === 'crianca' ? 'adventure' : inviteProfile === 'senior' ? 'calm' : 'focus',
+      role: inviteProfile === 'crianca' ? 'parent' : inviteProfile === 'senior' ? 'patient_senior' : 'patient_adult',
+      patient_name: invitePatientName.trim() || null,
+      guardian_name: inviteProfile === 'crianca' ? (inviteGuardianName.trim() || null) : null,
+    }
+    const { data: pend } = await tfFrom('therapist_patient_links')
+      .select('id').eq('patient_email', email).eq('status', 'pending')
+      .order('created_at', { ascending: false }).limit(1)
+    if (pend?.[0]) await tfFrom('therapist_patient_links').update({ invited_profile }).eq('id', pend[0].id)
+
     if (result.directLink) setDirectLink(result.directLink)
     await logAudit('invite.sent', 'therapist_patient_links')
     setInviteSent(true); load()
@@ -98,6 +116,7 @@ export function PatientsPage() {
 
   function closeInvite() {
     setShowInvite(false); setPatientEmail(''); setInviteSent(false); setInviteError(''); setDirectLink(null)
+    setInviteProfile('adulto'); setInvitePatientName(''); setInviteGuardianName('')
   }
 
   if (loading) return <div className="empty-state"><span className="spinner" /></div>
@@ -125,9 +144,57 @@ export function PatientsPage() {
                   O utente recebe um email com link de acesso directo. Não precisa de criar password.
                 </p>
                 <div className="field">
-                  <label>Email do utente *</label>
+                  <label>Perfil do utente *</label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {([
+                      { key: 'adulto',  label: 'Adulto'  },
+                      { key: 'crianca', label: 'Criança' },
+                      { key: 'senior',  label: 'Sénior'  },
+                    ] as const).map(({ key, label }) => (
+                      <button key={key} type="button" onClick={() => setInviteProfile(key)} style={{
+                        flex: 1, padding: '9px 0', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                        fontFamily: 'Poppins, sans-serif', fontSize: 'var(--font-sm)',
+                        border: '1.5px solid', borderColor: inviteProfile === key ? 'var(--eira-ocean)' : 'var(--border)',
+                        background: inviteProfile === key ? 'var(--primary-lt)' : 'var(--surface)',
+                        color: inviteProfile === key ? 'var(--eira-ocean)' : 'var(--text)',
+                        fontWeight: inviteProfile === key ? 700 : 400,
+                      }}>{label}</button>
+                    ))}
+                  </div>
+                  <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 6, marginBottom: 0 }}>
+                    {inviteProfile === 'crianca'
+                      ? 'O convite é enviado ao pai/mãe (responsável), que gere a conta da criança.'
+                      : inviteProfile === 'senior'
+                        ? 'Interface simplificada: letra grande, alto contraste, uma ação de cada vez.'
+                        : 'Interface padrão para utilização autónoma.'}
+                  </p>
+                </div>
+
+                {inviteProfile === 'crianca' && (
+                  <>
+                    <div className="field">
+                      <label>Nome da criança *</label>
+                      <input value={invitePatientName} onChange={e => setInvitePatientName(e.target.value)} placeholder="Ex: Lucas Martins" />
+                    </div>
+                    <div className="field">
+                      <label>Nome do responsável (pai/mãe)</label>
+                      <input value={inviteGuardianName} onChange={e => setInviteGuardianName(e.target.value)} placeholder="Ex: Marta Martins" />
+                    </div>
+                  </>
+                )}
+
+                {inviteProfile !== 'crianca' && (
+                  <div className="field">
+                    <label>Nome do utente (opcional)</label>
+                    <input value={invitePatientName} onChange={e => setInvitePatientName(e.target.value)} placeholder="Pré-preenche o registo" />
+                  </div>
+                )}
+
+                <div className="field">
+                  <label>{inviteProfile === 'crianca' ? 'Email do responsável *' : 'Email do utente *'}</label>
                   <input type="email" value={patientEmail} onChange={e => setPatientEmail(e.target.value)}
-                    placeholder="utente@email.pt" autoFocus onKeyDown={e => e.key === 'Enter' && sendInvite()} />
+                    placeholder={inviteProfile === 'crianca' ? 'pai-ou-mae@email.pt' : 'utente@email.pt'}
+                    onKeyDown={e => e.key === 'Enter' && sendInvite()} />
                 </div>
                 {inviteError && <p style={{ color: 'var(--error)', fontSize: 'var(--font-sm)', marginBottom: 12 }}>{inviteError}</p>}
                 <div style={{ display: 'flex', gap: 10 }}>

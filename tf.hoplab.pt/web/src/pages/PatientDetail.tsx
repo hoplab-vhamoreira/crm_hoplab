@@ -28,6 +28,9 @@ export function PatientDetailPage() {
   const [cancelling, setCancelling] = useState<Appt | null>(null)
   const [cancellingBusy, setCancellingBusy] = useState(false)
   const [callUrl, setCallUrl] = useState<string | null>(null)
+  const [editingProfile, setEditingProfile] = useState<{ full_name: string; ui_variant: string; role: string } | null>(null)
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileError, setProfileError] = useState('')
   const [savingAppt, setSavingAppt] = useState(false)
   const [apptError, setApptError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -84,6 +87,21 @@ export function PatientDetailPage() {
     load()
   }
 
+  async function saveProfile() {
+    if (!editingProfile || !patientId) return
+    if (!editingProfile.full_name.trim()) { setProfileError('O nome é obrigatório.'); return }
+    setSavingProfile(true); setProfileError('')
+    const { error } = await tfFrom('tf_users').update({
+      full_name: editingProfile.full_name.trim(),
+      ui_variant: editingProfile.ui_variant,
+      role: editingProfile.role,
+    }).eq('id', patientId)
+    setSavingProfile(false)
+    if (error) { setProfileError('Erro ao guardar: ' + error.message); return }
+    setEditingProfile(null)
+    load()
+  }
+
   async function confirmCancel() {
     if (!cancelling) return
     setCancellingBusy(true)
@@ -107,6 +125,9 @@ export function PatientDetailPage() {
           <p className="page-sub">{patient.role} · variante {patient.ui_variant}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={() => { setProfileError(''); setEditingProfile({ full_name: patient.full_name ?? '', ui_variant: patient.ui_variant ?? 'focus', role: patient.role }) }}>
+            <Icon name="edit" size={15} /> Editar
+          </button>
           <button className="btn btn-ghost" onClick={() => nav(`/messages/${patientId}`)}><Icon name="chat" size={15} /> Mensagens</button>
           <button className="btn btn-primary" onClick={() => nav(`/patients/${patientId}/plan/new`)}>+ Novo plano</button>
         </div>
@@ -277,6 +298,54 @@ export function PatientDetailPage() {
             </div>
         }
       </div>
+
+      {/* Modal: editar perfil do utente */}
+      {editingProfile && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div className="card" style={{ width: '100%', maxWidth: 440, padding: 28 }}>
+            <h2 style={{ margin: '0 0 20px', fontSize: 'var(--font-xl)' }}>Editar perfil do utente</h2>
+            <div className="field">
+              <label>Nome *</label>
+              <input value={editingProfile.full_name} onChange={e => setEditingProfile(v => ({ ...v!, full_name: e.target.value }))} />
+            </div>
+            <div className="field">
+              <label>Variante de interface</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {([
+                  { key: 'focus',     label: 'Adulto'  },
+                  { key: 'adventure', label: 'Criança' },
+                  { key: 'calm',      label: 'Sénior'  },
+                ] as const).map(({ key, label }) => (
+                  <button key={key} type="button" onClick={() => setEditingProfile(v => ({ ...v!, ui_variant: key }))} style={{
+                    flex: 1, padding: '9px 0', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                    fontFamily: 'Poppins, sans-serif', fontSize: 'var(--font-sm)',
+                    border: '1.5px solid', borderColor: editingProfile.ui_variant === key ? 'var(--eira-ocean)' : 'var(--border)',
+                    background: editingProfile.ui_variant === key ? 'var(--primary-lt)' : 'var(--surface)',
+                    color: editingProfile.ui_variant === key ? 'var(--eira-ocean)' : 'var(--text)',
+                    fontWeight: editingProfile.ui_variant === key ? 700 : 400,
+                  }}>{label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="field">
+              <label>Papel</label>
+              <select value={editingProfile.role} onChange={e => setEditingProfile(v => ({ ...v!, role: e.target.value }))}>
+                <option value="patient_adult">Utente adulto</option>
+                <option value="patient_senior">Utente sénior</option>
+                <option value="parent">Pai/Mãe (gere conta de criança)</option>
+                <option value="caregiver">Cuidador</option>
+              </select>
+            </div>
+            {profileError && <p style={{ color: 'var(--error)', fontSize: 'var(--font-sm)', marginBottom: 12 }}>{profileError}</p>}
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditingProfile(null)} disabled={savingProfile}>Cancelar</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={saveProfile} disabled={savingProfile}>
+                {savingProfile ? <span className="spinner" /> : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Chamada de vídeo embebida */}
       {callUrl && <VideoCall url={callUrl} onClose={() => setCallUrl(null)} />}

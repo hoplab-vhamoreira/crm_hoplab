@@ -2,10 +2,17 @@
  * Onboarding — consentimento RGPD.
  * Recolhe consentimento granular antes de criar perfil de utente.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tfFrom, supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/auth'
+
+interface InvitedProfile {
+  ui_variant?: 'focus' | 'adventure' | 'calm'
+  role?: string
+  patient_name?: string | null
+  guardian_name?: string | null
+}
 
 const POLICY_VERSION = import.meta.env.VITE_POLICY_VERSION ?? '1.0'
 
@@ -29,8 +36,27 @@ export function PatientConsentPage() {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [invited, setInvited] = useState<InvitedProfile | null>(null)
 
   const allRequired = SCOPES.filter(s => s.required).every(s => consents[s.key])
+
+  // Carrega o perfil pré-selecionado pelo terapeuta no convite (se existir)
+  useEffect(() => {
+    if (!user?.email) return
+    tfFrom('therapist_patient_links')
+      .select('invited_profile')
+      .eq('patient_email', user.email)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        const ip = (data?.[0] as any)?.invited_profile as InvitedProfile | null
+        if (ip) {
+          setInvited(ip)
+          if (ip.patient_name) setName(ip.patient_name)
+        }
+      })
+  }, [user?.email])
 
   async function save() {
     if (!allRequired || !name.trim() || !user) return
@@ -43,8 +69,8 @@ export function PatientConsentPage() {
       const { data: existing } = await tfFrom('tf_users')
         .select('id').eq('id', user.id).limit(1)
       const profileData = {
-        role: 'patient_adult',
-        ui_variant: 'focus',
+        role: invited?.role ?? 'patient_adult',
+        ui_variant: invited?.ui_variant ?? 'focus',
         full_name: name.trim(),
       }
       const { error: profileErr } = existing && existing.length
@@ -106,8 +132,13 @@ export function PatientConsentPage() {
         </div>
 
         <div className="field">
-          <label>O seu nome *</label>
+          <label>{invited?.role === 'parent' ? 'Nome da criança *' : 'O seu nome *'}</label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Nome completo" autoFocus />
+          {invited?.role === 'parent' && (
+            <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 6, marginBottom: 0 }}>
+              Como responsável{invited.guardian_name ? ` (${invited.guardian_name})` : ''}, está a dar consentimento parental e a gerir a conta da criança.
+            </p>
+          )}
         </div>
 
         <div style={{ marginBottom: 20 }}>
