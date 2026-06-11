@@ -195,14 +195,14 @@ export function PatientDetailPage() {
                   placeholder={newAppt.kind === 'online' ? 'https://…' : 'Ex: Clínica X, Gabinete 2'} style={{ flex: 1 }} />
                 {newAppt.kind === 'online' && (
                   <button type="button" className="btn btn-ghost btn-sm" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
-                    onClick={() => setNewAppt(v => ({ ...v!, location: `https://framatalk.org/eira-${crypto.randomUUID().slice(0, 12)}` }))}>
+                    onClick={() => setNewAppt(v => ({ ...v!, location: `https://meet.jit.si/eira-${crypto.randomUUID().slice(0, 12)}` }))}>
                     <Icon name="video" size={14} /> Gerar link
                   </button>
                 )}
               </div>
               {newAppt.kind === 'online' && (
                 <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 6, marginBottom: 0 }}>
-                  "Gerar link" cria uma sala de vídeo (Jitsi, servidor na UE, sem conta nem login). Ambos entram com um clique.
+                  "Gerar link" cria uma sala Jitsi Meet. Para abrir a sala, inicie sessão uma vez com Google/GitHub (só o terapeuta); o utente entra sem qualquer conta.
                 </p>
               )}
             </div>
