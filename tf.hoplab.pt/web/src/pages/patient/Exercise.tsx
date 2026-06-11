@@ -422,10 +422,29 @@ function StepConclusao({
     })
     await logAudit('exercise.completed', 'adherence_logs', detail.id)
     setSaving(false); setDone(true)
+    // Variante Calma: reforço verbal lido em voz alta
+    if (profile?.ui_variant === 'calm' && 'speechSynthesis' in window && localStorage.getItem('eira-tts') !== 'off') {
+      const u = new SpeechSynthesisUtterance('Muito bem. O exercício ficou registado.')
+      u.lang = 'pt-PT'; u.rate = 0.92
+      speechSynthesis.cancel(); speechSynthesis.speak(u)
+    }
   }
 
   if (done) {
     const isAdventure = profile?.ui_variant === 'adventure'
+    const isCalm = profile?.ui_variant === 'calm'
+    if (isCalm) return (
+      <div style={{ textAlign: 'center', padding: '48px 20px' }}>
+        <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'var(--success-lt)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <Icon name="check" size={40} style={{ color: 'var(--success)' }} />
+        </div>
+        <h2 style={{ fontWeight: 700, marginBottom: 8 }}>Muito bem.</h2>
+        <p style={{ color: 'var(--text-2)', marginBottom: 32, fontSize: 'var(--font-md)' }}>O exercício ficou registado.</p>
+        <button className="btn btn-primary" style={{ minWidth: 220 }} onClick={onDone}>
+          Voltar ao início
+        </button>
+      </div>
+    )
     return (
       <div style={{ position: 'relative', textAlign: 'center', padding: '40px 20px', overflow: 'hidden' }}>
         {isAdventure ? (

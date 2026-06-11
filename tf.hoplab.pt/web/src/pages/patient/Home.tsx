@@ -36,6 +36,8 @@ export function PatientHomePage() {
   const [showRequestForm, setShowRequestForm] = useState(false)
   const [callUrl, setCallUrl] = useState<string | null>(null)
   const [showParents, setShowParents] = useState(false)
+  const [ttsOn, setTtsOn] = useState(() => localStorage.getItem('eira-tts') !== 'off')
+  const [speaking, setSpeaking] = useState(false)
   const [prefDays, setPrefDays]       = useState<Set<string>>(new Set())
   const [prefPeriod, setPrefPeriod]   = useState('')
   const [prefNote, setPrefNote]       = useState('')
@@ -121,6 +123,39 @@ export function PatientHomePage() {
   const doneCount  = items.filter(i => i.done).length
   const totalCount = items.length
   const isAdventure = profile?.ui_variant === 'adventure'
+  const isCalm      = profile?.ui_variant === 'calm'
+
+  // Leitura em voz alta (variante Calma) — Web Speech API, voz pt-PT
+  function speakSummary() {
+    if (!('speechSynthesis' in window)) return
+    const parts: string[] = [`Olá, ${profile?.full_name?.split(' ')[0] ?? ''}.`]
+    if (nextAppt) {
+      parts.push(`A sua próxima consulta é ${new Date(nextAppt.starts_at).toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })} às ${new Date(nextAppt.starts_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}.`)
+    }
+    if (totalCount > 0) {
+      parts.push(doneCount === totalCount
+        ? `Já fez os exercícios de hoje. Muito bem.`
+        : `Tem ${totalCount - doneCount} exercício${totalCount - doneCount > 1 ? 's' : ''} para fazer hoje.`)
+    }
+    const u = new SpeechSynthesisUtterance(parts.join(' '))
+    u.lang = 'pt-PT'
+    u.rate = 0.92
+    u.onend = () => setSpeaking(false)
+    speechSynthesis.cancel()
+    speechSynthesis.speak(u)
+    setSpeaking(true)
+  }
+
+  function toggleSpeak() {
+    if (speaking) { speechSynthesis.cancel(); setSpeaking(false); return }
+    speakSummary()
+  }
+
+  // Ler automaticamente ao abrir (se ativo); parar ao sair da página
+  useEffect(() => {
+    if (isCalm && !loading && ttsOn) speakSummary()
+    return () => { if ('speechSynthesis' in window) speechSynthesis.cancel() }
+  }, [loading])
 
   if (loading) return <div className="empty-state"><span className="spinner" /></div>
 
@@ -256,22 +291,42 @@ export function PatientHomePage() {
           <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)', marginTop: 4 }}>
             {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
+          {isCalm && 'speechSynthesis' in window && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+              <button className="btn btn-ghost" onClick={toggleSpeak}>
+                <Icon name={speaking ? 'pause' : 'play'} size={16} /> {speaking ? 'Parar leitura' : 'Ler em voz alta'}
+              </button>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--font-sm)', color: 'var(--text-2)', cursor: 'pointer', margin: 0 }}>
+                <input type="checkbox" checked={ttsOn} style={{ width: 20, height: 20 }}
+                  onChange={e => { setTtsOn(e.target.checked); localStorage.setItem('eira-tts', e.target.checked ? 'on' : 'off'); if (!e.target.checked) { speechSynthesis.cancel(); setSpeaking(false) } }} />
+                Ler automaticamente
+              </label>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Streak */}
+      {/* Streak — na Calma é reforço verbal gentil, sem pontos nem fogo */}
       {streak && streak.current_streak > 0 && (
-        <div className="card" style={{ background: 'var(--warning-lt)', border: '1.5px solid var(--eira-sun)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--eira-sun)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icon name={isAdventure ? 'star' : 'flame'} size={22} style={{ color: '#fff' }} fill />
+        isCalm ? (
+          <div className="card" style={{ marginBottom: 20 }}>
+            <p style={{ margin: 0, fontSize: 'var(--font-md)' }}>
+              Tem praticado {streak.current_streak} dia{streak.current_streak > 1 ? 's' : ''} seguido{streak.current_streak > 1 ? 's' : ''}. Muito bem.
+            </p>
           </div>
-          <div>
-            <div style={{ fontWeight: 700, color: 'var(--warning)' }}>
-              {isAdventure ? `${streak.current_streak} dias de missões!` : `${streak.current_streak} dias seguidos!`}
+        ) : (
+          <div className="card" style={{ background: 'var(--warning-lt)', border: '1.5px solid var(--eira-sun)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--eira-sun)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon name={isAdventure ? 'star' : 'flame'} size={22} style={{ color: '#fff' }} fill />
             </div>
-            <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)' }}>Recorde: {streak.longest_streak} dias</div>
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--warning)' }}>
+                {isAdventure ? `${streak.current_streak} dias de missões!` : `${streak.current_streak} dias seguidos!`}
+              </div>
+              <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)' }}>Recorde: {streak.longest_streak} dias</div>
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {/* Consulta + feedback — visível directamente, excepto na Aventura (vai para a área dos pais) */}

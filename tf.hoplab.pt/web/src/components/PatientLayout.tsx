@@ -53,6 +53,23 @@ export function PatientLayout() {
         <Outlet />
       </main>
 
+      {/* Ajuda persistente — variante Calma (sénior) */}
+      {profile?.ui_variant === 'calm' && (
+        <button
+          onClick={() => nav('/patient/messages')}
+          style={{
+            position: 'fixed', right: 16, bottom: 'calc(84px + env(safe-area-inset-bottom))', zIndex: 11,
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: 'var(--eira-ocean)', color: '#fff', border: 'none', borderRadius: 999,
+            padding: '14px 22px', fontFamily: 'Poppins, sans-serif', fontSize: 'var(--font-md)',
+            fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16,51,69,.25)',
+          }}
+          aria-label="Pedir ajuda ao terapeuta"
+        >
+          <Icon name="chat" size={20} /> Ajuda
+        </button>
+      )}
+
       {/* Nav bar inferior */}
       <nav style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
