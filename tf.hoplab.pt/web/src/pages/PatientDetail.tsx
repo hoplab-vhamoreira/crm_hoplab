@@ -24,6 +24,8 @@ export function PatientDetailPage() {
   const [appts, setAppts] = useState<Appt[]>([])
   const [pendingRequests, setPendingRequests] = useState<{ id: string; created_at: string; message: string | null }[]>([])
   const [newAppt, setNewAppt] = useState<{ starts_at: string; kind: 'presencial' | 'online'; location: string } | null>(null)
+  const [cancelling, setCancelling] = useState<Appt | null>(null)
+  const [cancellingBusy, setCancellingBusy] = useState(false)
   const [savingAppt, setSavingAppt] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -66,6 +68,14 @@ export function PatientDetailPage() {
   async function setApptStatus(id: string, status: Appt['status']) {
     await tfFrom('appointments').update({ status }).eq('id', id)
     load()
+  }
+
+  async function confirmCancel() {
+    if (!cancelling) return
+    setCancellingBusy(true)
+    await setApptStatus(cancelling.id, 'cancelada')
+    setCancellingBusy(false)
+    setCancelling(null)
   }
 
   if (loading) return <div className="empty-state"><span className="spinner" /></div>
@@ -209,7 +219,7 @@ export function PatientDetailPage() {
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                 <span className={`badge ${a.status === 'confirmada' ? 'badge-green' : a.status === 'cancelada' ? 'badge-red' : 'badge-blue'}`}>{a.status}</span>
                 {(a.status === 'proposta' || a.status === 'confirmada') && (
-                  <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }} onClick={() => setApptStatus(a.id, 'cancelada')} title="Cancelar">
+                  <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }} onClick={() => setCancelling(a)} title="Cancelar consulta">
                     <Icon name="close" size={14} />
                   </button>
                 )}
@@ -247,6 +257,33 @@ export function PatientDetailPage() {
             </div>
         }
       </div>
+
+      {/* Modal: confirmar cancelamento de consulta */}
+      {cancelling && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div className="card" style={{ width: '100%', maxWidth: 400, padding: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--error-lt)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name="warning" size={18} style={{ color: 'var(--eira-danger)' }} />
+              </div>
+              <h2 style={{ margin: 0, fontSize: 'var(--font-lg)' }}>Cancelar consulta?</h2>
+            </div>
+            <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)', marginBottom: 20 }}>
+              {new Date(cancelling.starts_at).toLocaleString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+              {cancelling.kind === 'online' ? ' · online' : cancelling.location_or_link ? ` · ${cancelling.location_or_link}` : ''}
+              <br />O utente deixa de ver esta consulta como marcada.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setCancelling(null)} disabled={cancellingBusy}>
+                Manter
+              </button>
+              <button className="btn btn-danger" style={{ flex: 1 }} onClick={confirmCancel} disabled={cancellingBusy}>
+                {cancellingBusy ? <span className="spinner" /> : 'Cancelar consulta'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
