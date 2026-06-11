@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { tfFrom } from '../../lib/supabase'
 import { useAuth } from '../../context/auth'
 import { Icon } from '../../components/Icon'
+import { VideoCall } from '../../components/VideoCall'
 
 interface TodayItem {
   plan_exercise_id: string
@@ -32,6 +33,7 @@ export function PatientHomePage() {
   const [requestPending, setRequestPending] = useState(false)
   const [requesting, setRequesting]   = useState(false)
   const [showRequestForm, setShowRequestForm] = useState(false)
+  const [callUrl, setCallUrl] = useState<string | null>(null)
   const [prefDays, setPrefDays]       = useState<Set<string>>(new Set())
   const [prefPeriod, setPrefPeriod]   = useState('')
   const [prefNote, setPrefNote]       = useState('')
@@ -160,7 +162,9 @@ export function PatientHomePage() {
             </div>
           </div>
           {nextAppt.kind === 'online' && nextAppt.location_or_link && (
-            <a className="btn btn-primary btn-sm" href={nextAppt.location_or_link} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>Entrar</a>
+            <button className="btn btn-primary btn-sm" style={{ flexShrink: 0 }} onClick={() => setCallUrl(nextAppt.location_or_link)}>
+              <Icon name="video" size={14} /> Entrar
+            </button>
           )}
         </div>
       ) : therapistId && (
@@ -309,6 +313,9 @@ export function PatientHomePage() {
           <div style={{ fontWeight: 700, color: 'var(--success)' }}>Sessão completa! Excelente trabalho.</div>
         </div>
       )}
+
+      {/* Chamada de vídeo embebida */}
+      {callUrl && <VideoCall url={callUrl} onClose={() => setCallUrl(null)} />}
     </div>
   )
 }

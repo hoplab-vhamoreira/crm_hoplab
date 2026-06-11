@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { tfFrom } from '../lib/supabase'
 import { useAuth } from '../context/auth'
 import { Icon } from '../components/Icon'
+import { VideoCall } from '../components/VideoCall'
 import type { TfUser, TreatmentPlan, Streak, Consent } from '@tf/types'
 
 interface Appt {
@@ -26,6 +27,7 @@ export function PatientDetailPage() {
   const [newAppt, setNewAppt] = useState<{ starts_at: string; kind: 'presencial' | 'online'; location: string } | null>(null)
   const [cancelling, setCancelling] = useState<Appt | null>(null)
   const [cancellingBusy, setCancellingBusy] = useState(false)
+  const [callUrl, setCallUrl] = useState<string | null>(null)
   const [savingAppt, setSavingAppt] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -218,9 +220,9 @@ export function PatientDetailPage() {
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                 {a.kind === 'online' && a.location_or_link && (a.status === 'proposta' || a.status === 'confirmada') && (
-                  <a className="btn btn-primary btn-sm" href={a.location_or_link} target="_blank" rel="noreferrer">
+                  <button className="btn btn-primary btn-sm" onClick={() => setCallUrl(a.location_or_link)}>
                     <Icon name="video" size={14} /> Entrar
-                  </a>
+                  </button>
                 )}
                 <span className={`badge ${a.status === 'confirmada' ? 'badge-green' : a.status === 'cancelada' ? 'badge-red' : 'badge-blue'}`}>{a.status}</span>
                 {(a.status === 'proposta' || a.status === 'confirmada') && (
@@ -262,6 +264,9 @@ export function PatientDetailPage() {
             </div>
         }
       </div>
+
+      {/* Chamada de vídeo embebida */}
+      {callUrl && <VideoCall url={callUrl} onClose={() => setCallUrl(null)} />}
 
       {/* Modal: confirmar cancelamento de consulta */}
       {cancelling && (
