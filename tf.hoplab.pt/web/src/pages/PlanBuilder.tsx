@@ -16,7 +16,16 @@ interface DraftExercise {
   duration_seconds: number | null
   therapist_notes: string
   sort_order: number
+  day_of_week: number[] | null   // 0=Dom … 6=Sáb (convenção JS); null = todos os dias
+  allow_repeat: boolean          // utente pode repetir no mesmo dia
 }
+
+// Ordem de apresentação: Seg → Dom
+const DAY_CHIPS: { d: number; label: string }[] = [
+  { d: 1, label: 'S' }, { d: 2, label: 'T' }, { d: 3, label: 'Q' }, { d: 4, label: 'Q' },
+  { d: 5, label: 'S' }, { d: 6, label: 'S' }, { d: 0, label: 'D' },
+]
+const DAY_NAMES: Record<number, string> = { 1: '2ª', 2: '3ª', 3: '4ª', 4: '5ª', 5: '6ª', 6: 'Sáb', 0: 'Dom' }
 
 interface PlanTemplate {
   id: string
@@ -72,6 +81,7 @@ export function PlanBuilderPage() {
         tempId: p.id, exercise_id: p.exercise_id, exercise: (p as any).exercise,
         week_number: p.week_number, sets: p.sets, reps: p.reps,
         duration_seconds: p.duration_seconds, therapist_notes: p.therapist_notes ?? '', sort_order: i,
+        day_of_week: (p as any).day_of_week ?? null, allow_repeat: (p as any).allow_repeat ?? false,
       })))
     }
     setLoading(false)
@@ -82,6 +92,7 @@ export function PlanBuilderPage() {
       tempId: crypto.randomUUID(), exercise_id: ex.id, exercise: ex,
       week_number: selectedWeek, sets: 3, reps: null,
       duration_seconds: ex.duration_seconds, therapist_notes: '', sort_order: prev.length,
+      day_of_week: null, allow_repeat: false,
     }])
   }
 
@@ -91,6 +102,37 @@ export function PlanBuilderPage() {
 
   function removeDraft(tempId: string) {
     setExercises(prev => prev.filter(d => d.tempId !== tempId))
+  }
+
+  function toggleDay(tempId: string, day: number) {
+    setExercises(prev => prev.map(d => {
+      if (d.tempId !== tempId) return d
+      const cur = d.day_of_week ?? []
+      const next = cur.includes(day) ? cur.filter(x => x !== day) : [...cur, day]
+      return { ...d, day_of_week: next.length ? next : null }
+    }))
+  }
+
+  // Copia os exercícios da semana actual para outra (substitui o conteúdo da semana destino)
+  function copyWeekTo(target: number) {
+    const source = exercises.filter(e => e.week_number === selectedWeek)
+    if (!source.length) return
+    const targetHas = exercises.some(e => e.week_number === target)
+    if (targetHas && !confirm(`A semana ${target} já tem exercícios — substituir pelo conteúdo da semana ${selectedWeek}?`)) return
+    setExercises(prev => [
+      ...prev.filter(e => e.week_number !== target),
+      ...source.map(e => ({ ...e, tempId: crypto.randomUUID(), week_number: target })),
+    ])
+  }
+
+  // Copia as atribuições de um dia para outro (na semana actual):
+  // exercícios que incluem o dia de origem passam a incluir também o destino
+  function copyDay(from: number, to: number) {
+    setExercises(prev => prev.map(d => {
+      if (d.week_number !== selectedWeek) return d
+      if (!d.day_of_week?.includes(from) || d.day_of_week.includes(to)) return d
+      return { ...d, day_of_week: [...d.day_of_week, to] }
+    }))
   }
 
   // Guardar plano actual como template
@@ -110,6 +152,8 @@ export function PlanBuilderPage() {
         duration_seconds: d.duration_seconds,
         therapist_notes: d.therapist_notes,
         sort_order: d.sort_order,
+        day_of_week: d.day_of_week,
+        allow_repeat: d.allow_repeat,
       })),
     })
     await logAudit('template.created', 'plan_templates')
@@ -138,6 +182,8 @@ export function PlanBuilderPage() {
       duration_seconds: e.duration_seconds,
       therapist_notes: e.therapist_notes ?? '',
       sort_order: i,
+      day_of_week: (e as any).day_of_week ?? null,
+      allow_repeat: (e as any).allow_repeat ?? false,
     })))
     setSelectedWeek(1)
     setShowTemplates(false)
@@ -173,6 +219,8 @@ export function PlanBuilderPage() {
         plan_id: pid!, exercise_id: d.exercise_id, week_number: d.week_number,
         sets: d.sets, reps: d.reps, duration_seconds: d.duration_seconds,
         therapist_notes: d.therapist_notes || null, sort_order: i,
+        day_of_week: d.day_of_week?.length ? d.day_of_week : null,
+        allow_repeat: d.allow_repeat,
       })))
     }
 
@@ -335,7 +383,37 @@ export function PlanBuilderPage() {
             ))}
           </div>
 
-          <div className="section-title">Semana {selectedWeek}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 4 }}>
+            <div className="section-title" style={{ margin: 0 }}>Semana {selectedWeek}</div>
+            {weekExercises.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  defaultValue=""
+                  onChange={e => { if (e.target.value) { copyWeekTo(+e.target.value); e.target.value = '' } }}
+                  style={{ width: 'auto', fontSize: 'var(--font-xs)', padding: '6px 10px' }}
+                >
+                  <option value="">Copiar semana para…</option>
+                  {weeks.filter(w => w !== selectedWeek).map(w => <option key={w} value={w}>Semana {w}</option>)}
+                </select>
+                <select
+                  defaultValue=""
+                  onChange={e => {
+                    const [from, to] = e.target.value.split('-').map(Number)
+                    if (!isNaN(from) && !isNaN(to)) copyDay(from, to)
+                    e.target.value = ''
+                  }}
+                  style={{ width: 'auto', fontSize: 'var(--font-xs)', padding: '6px 10px' }}
+                >
+                  <option value="">Copiar dia…</option>
+                  {DAY_CHIPS.flatMap(({ d: from }) =>
+                    DAY_CHIPS.filter(({ d: to }) => to !== from).map(({ d: to }) => (
+                      <option key={`${from}-${to}`} value={`${from}-${to}`}>{DAY_NAMES[from]} → {DAY_NAMES[to]}</option>
+                    ))
+                  )}
+                </select>
+              </div>
+            )}
+          </div>
 
           {weekExercises.length === 0 && (
             <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)', padding: '12px 0' }}>
@@ -367,10 +445,40 @@ export function PlanBuilderPage() {
                   <input type="number" min={1} value={d.duration_seconds ?? ''} onChange={e => updateDraft(d.tempId, { duration_seconds: e.target.value ? +e.target.value : null })} placeholder="—" />
                 </div>
               </div>
-              <div className="field" style={{ marginTop: 8, marginBottom: 0 }}>
+              {/* Dias da semana */}
+              <div style={{ marginTop: 10 }}>
+                <label style={{ marginBottom: 6 }}>Dias da semana</label>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {DAY_CHIPS.map(({ d: day, label }) => {
+                    const active = d.day_of_week?.includes(day) ?? false
+                    return (
+                      <button key={day} type="button" onClick={() => toggleDay(d.tempId, day)} title={DAY_NAMES[day]} style={{
+                        width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
+                        fontFamily: 'Poppins, sans-serif', fontSize: 12, fontWeight: 700,
+                        border: '1.5px solid', borderColor: active ? 'var(--eira-ocean)' : 'var(--border)',
+                        background: active ? 'var(--eira-ocean)' : 'var(--surface)',
+                        color: active ? '#fff' : 'var(--text-2)',
+                      }}>{label}</button>
+                    )
+                  })}
+                  <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginLeft: 6 }}>
+                    {d.day_of_week?.length
+                      ? d.day_of_week.slice().sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b)).map(x => DAY_NAMES[x]).join(', ')
+                      : 'Todos os dias'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="field" style={{ marginTop: 10, marginBottom: 0 }}>
                 <label>Nota para o utente</label>
                 <input value={d.therapist_notes} onChange={e => updateDraft(d.tempId, { therapist_notes: e.target.value })} placeholder="Instrução específica" />
               </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, marginBottom: 0, cursor: 'pointer', fontWeight: 400, fontSize: 'var(--font-sm)', color: 'var(--text)' }}>
+                <input type="checkbox" checked={d.allow_repeat} style={{ width: 16, height: 16 }}
+                  onChange={e => updateDraft(d.tempId, { allow_repeat: e.target.checked })} />
+                O utente pode repetir este exercício no mesmo dia
+              </label>
             </div>
           ))}
         </div>

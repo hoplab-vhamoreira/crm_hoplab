@@ -17,6 +17,9 @@ interface TodayItem {
   duration_seconds: number | null
   reps: number | null
   done: boolean
+  allow_repeat: boolean
+  times_done: number
+  log_id: string | null
 }
 
 interface StreakData { current_streak: number; longest_streak: number }
@@ -57,19 +60,29 @@ export function PatientHomePage() {
       .select('id').eq('patient_id', profile!.id).eq('is_active', true).maybeSingle()
     if (plan) {
       const { data: planExercises } = await tfFrom('plan_exercises')
-        .select('id, exercise_id, reps, sets, duration_seconds, exercises:tf_exercises(title, instructions, duration_seconds)')
+        .select('id, exercise_id, reps, sets, duration_seconds, day_of_week, allow_repeat, exercises:tf_exercises(title, instructions, duration_seconds)')
         .eq('plan_id', plan.id).order('sort_order')
       const { data: logs } = await tfFrom('adherence_logs')
-        .select('plan_exercise_id').eq('patient_id', profile!.id).eq('session_date', today)
-      const donePeIds = new Set((logs ?? []).map(l => l.plan_exercise_id))
-      setItems((planExercises ?? []).map((pe: any) => ({
-        plan_exercise_id: pe.id,
-        exercise_id: pe.exercise_id,
-        title: pe.exercises?.title ?? 'Exercício',
-        duration_seconds: pe.duration_seconds ?? pe.exercises?.duration_seconds ?? null,
-        reps: pe.reps ?? null,
-        done: donePeIds.has(pe.id),
-      })))
+        .select('id, plan_exercise_id, times_done').eq('patient_id', profile!.id).eq('session_date', today)
+      const logMap = new Map((logs ?? []).map((l: any) => [l.plan_exercise_id, l]))
+      const weekday = new Date().getDay() // 0=Dom … 6=Sáb
+      setItems((planExercises ?? [])
+        // Só os exercícios atribuídos a hoje (sem dias definidos = todos os dias)
+        .filter((pe: any) => !pe.day_of_week?.length || pe.day_of_week.includes(weekday))
+        .map((pe: any) => {
+          const log = logMap.get(pe.id)
+          return {
+            plan_exercise_id: pe.id,
+            exercise_id: pe.exercise_id,
+            title: pe.exercises?.title ?? 'Exercício',
+            duration_seconds: pe.duration_seconds ?? pe.exercises?.duration_seconds ?? null,
+            reps: pe.reps ?? null,
+            done: !!log,
+            allow_repeat: pe.allow_repeat ?? false,
+            times_done: log?.times_done ?? 0,
+            log_id: log?.id ?? null,
+          }
+        }))
     }
 
     const { data: s } = await tfFrom('streaks').select('current_streak, longest_streak').eq('patient_id', profile!.id).maybeSingle()
@@ -103,6 +116,13 @@ export function PatientHomePage() {
     setPrefDays(prev => {
       const next = new Set(prev); next.has(d) ? next.delete(d) : next.add(d); return next
     })
+  }
+
+  // Repetir exercício já feito hoje (quando o terapeuta o permite) — incrementa o registo
+  async function repeatExercise(item: TodayItem) {
+    if (!item.log_id) return
+    await tfFrom('adherence_logs').update({ times_done: item.times_done + 1 }).eq('id', item.log_id)
+    setItems(prev => prev.map(i => i.plan_exercise_id === item.plan_exercise_id ? { ...i, times_done: i.times_done + 1 } : i))
   }
 
   async function requestAppointment() {
@@ -383,7 +403,12 @@ export function PatientHomePage() {
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600 }}>{item.title}</div>
+                <div style={{ fontWeight: 600 }}>
+                  {item.title}
+                  {item.done && item.times_done > 1 && (
+                    <span className="badge badge-blue" style={{ marginLeft: 8 }}>×{item.times_done}</span>
+                  )}
+                </div>
                 {(item.duration_seconds || item.reps) && (
                   <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 2 }}>
                     {item.duration_seconds ? `${item.duration_seconds}s` : ''}
@@ -393,6 +418,12 @@ export function PatientHomePage() {
                 )}
               </div>
               {!item.done && <Icon name="chevron-right" size={18} style={{ color: 'var(--eira-ocean)', flexShrink: 0 }} />}
+              {item.done && item.allow_repeat && (
+                <button className="btn btn-ghost btn-sm" style={{ flexShrink: 0 }}
+                  onClick={e => { e.stopPropagation(); repeatExercise(item) }}>
+                  <Icon name="refresh" size={14} /> Repetir
+                </button>
+              )}
             </div>
           ))}
         </div>
