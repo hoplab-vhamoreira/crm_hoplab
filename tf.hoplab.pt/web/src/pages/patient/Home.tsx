@@ -76,10 +76,12 @@ export function PatientHomePage() {
       .order('reviewed_at', { ascending: false }).limit(3)
     setFeedback((fb ?? []) as FeedbackItem[])
 
+    // Mostra consultas a partir do início de HOJE — uma consulta marcada para
+    // há minutos atrás continua visível até ao fim do dia.
     const { data: appts } = await tfFrom('appointments')
       .select('id, kind, starts_at, location_or_link, status')
       .eq('patient_id', profile!.id).in('status', ['proposta', 'confirmada'])
-      .gte('starts_at', new Date().toISOString()).order('starts_at').limit(1)
+      .gte('starts_at', `${today}T00:00:00`).order('starts_at').limit(1)
     setNextAppt((appts?.[0] as Appointment) ?? null)
 
     const { data: reqs } = await tfFrom('appointment_requests')
