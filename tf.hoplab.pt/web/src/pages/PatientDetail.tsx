@@ -195,7 +195,7 @@ export function PatientDetailPage() {
                   placeholder={newAppt.kind === 'online' ? 'https://…' : 'Ex: Clínica X, Gabinete 2'} style={{ flex: 1 }} />
                 {newAppt.kind === 'online' && (
                   <button type="button" className="btn btn-ghost btn-sm" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
-                    onClick={() => setNewAppt(v => ({ ...v!, location: `https://meet.ffmuc.net/eira-${crypto.randomUUID().slice(0, 12)}` }))}>
+                    onClick={() => setNewAppt(v => ({ ...v!, location: `https://framatalk.org/eira-${crypto.randomUUID().slice(0, 12)}` }))}>
                     <Icon name="video" size={14} /> Gerar link
                   </button>
                 )}
