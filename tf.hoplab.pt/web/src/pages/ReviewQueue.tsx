@@ -6,7 +6,7 @@
  * A app NUNCA filtra, ordena, destaca ou pré-seleciona atalhos com
  * base no conteúdo do vídeo. Quem avalia e escolhe é o terapeuta.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase, tfFrom } from '../lib/supabase'
 import { useAuth } from '../context/auth'
 import { logAudit } from '../lib/audit'
@@ -20,7 +20,6 @@ interface Submission {
   created_at: string
   plan_exercise_id: string | null
   patient_name?: string
-  exercise_title?: string
 }
 
 const AREA_LABELS: Record<ClinicalArea, string> = {
@@ -30,15 +29,24 @@ const AREA_LABELS: Record<ClinicalArea, string> = {
 
 export function ReviewQueuePage() {
   const { profile } = useAuth()
-  const [queue, setQueue] = useState<Submission[]>([])
-  const [active, setActive] = useState<Submission | null>(null)
-  const [shortcuts, setShortcuts] = useState<FeedbackShortcut[]>([])
+  const [queue, setQueue]                       = useState<Submission[]>([])
+  const [active, setActive]                     = useState<Submission | null>(null)
+  const [shortcuts, setShortcuts]               = useState<FeedbackShortcut[]>([])
   const [selectedShortcuts, setSelectedShortcuts] = useState<Set<string>>(new Set())
-  const [freeText, setFreeText] = useState('')
-  const [sending, setSending] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [videoUrl, setVideoUrl] = useState<string | null>(null)
-  const [videoError, setVideoError] = useState('')
+  const [freeText, setFreeText]                 = useState('')
+  const [sending, setSending]                   = useState(false)
+  const [loading, setLoading]                   = useState(true)
+  const [videoUrl, setVideoUrl]                 = useState<string | null>(null)
+  const [videoError, setVideoError]             = useState('')
+
+  // Áudio de resposta
+  const [audioMode, setAudioMode]       = useState<'idle' | 'recording' | 'recorded'>('idle')
+  const [audioBlob, setAudioBlob]       = useState<Blob | null>(null)
+  const [audioUrl, setAudioUrl]         = useState<string | null>(null)
+  const [recSeconds, setRecSeconds]     = useState(0)
+  const mediaRef   = useRef<MediaRecorder | null>(null)
+  const chunksRef  = useRef<BlobPart[]>([])
+  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => { if (profile?.id) load() }, [profile?.id])
 
@@ -50,16 +58,14 @@ export function ReviewQueuePage() {
       .eq('status', 'pending_review')
       .order('created_at', { ascending: true })
 
-    // Nomes dos utentes
     const pids = [...new Set((subs ?? []).map(s => s.patient_id))]
     const { data: patients } = pids.length
       ? await tfFrom('tf_users').select('id, full_name').in('id', pids)
       : { data: [] }
     const nameMap = new Map((patients ?? []).map(p => [p.id, p.full_name]))
-
     setQueue((subs ?? []).map(s => ({ ...s, patient_name: nameMap.get(s.patient_id) ?? 'Utente' })))
 
-    // Atalhos do terapeuta — lista FIXA, ordenação neutra (categoria + label)
+    // Atalhos do terapeuta — lista FIXA, ordenação neutra (categoria + sort_order)
     // NUNCA filtrada/ordenada pelo conteúdo do vídeo — ver compliance.md §5.3
     const { data: sc } = await tfFrom('feedback_shortcuts')
       .select('*')
@@ -67,7 +73,6 @@ export function ReviewQueuePage() {
       .order('category')
       .order('sort_order')
     setShortcuts(sc ?? [])
-
     setLoading(false)
   }
 
@@ -76,44 +81,90 @@ export function ReviewQueuePage() {
     setSelectedShortcuts(new Set())
     setFreeText('')
     setVideoUrl(null); setVideoError('')
+    resetAudio()
     logAudit('video.viewed', 'video_submissions', sub.id)
 
-    // URL assinado de expiração curta (15 min) — nunca download permanente
     const { data, error } = await supabase.storage.from('tf-videos').createSignedUrl(sub.storage_path, 900)
     if (error || !data?.signedUrl) setVideoError('Não foi possível carregar o vídeo. Pode já ter sido eliminado (retenção RGPD).')
     else setVideoUrl(data.signedUrl)
   }
 
+  function resetAudio() {
+    stopRecording()
+    if (audioUrl) URL.revokeObjectURL(audioUrl)
+    setAudioBlob(null); setAudioUrl(null); setAudioMode('idle'); setRecSeconds(0)
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+      chunksRef.current = []
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      mr.onstop = () => {
+        stream.getTracks().forEach(t => t.stop())
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        const url  = URL.createObjectURL(blob)
+        setAudioBlob(blob); setAudioUrl(url); setAudioMode('recorded')
+        if (timerRef.current) clearInterval(timerRef.current)
+      }
+      mr.start()
+      mediaRef.current = mr
+      setAudioMode('recording'); setRecSeconds(0)
+      timerRef.current = setInterval(() => setRecSeconds(s => s + 1), 1000)
+    } catch {
+      alert('Não foi possível aceder ao microfone.')
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRef.current?.state === 'recording') mediaRef.current.stop()
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+  }
+
   function toggleShortcut(id: string) {
     setSelectedShortcuts(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
+      const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next
     })
   }
 
   async function sendFeedback() {
     if (!active) return
-    const body = [
+    const textBody = [
       ...[...selectedShortcuts].map(id => shortcuts.find(s => s.id === id)?.body ?? ''),
       freeText.trim(),
     ].filter(Boolean).join('\n\n')
 
-    if (!body) { alert('Escreva ou seleccione feedback antes de enviar.'); return }
+    if (!textBody && !audioBlob) { alert('Escreva, seleccione atalho, ou grave áudio antes de enviar.'); return }
 
     setSending(true)
+
+    // Upload do áudio de resposta (se existir)
+    let audioPath: string | null = null
+    if (audioBlob) {
+      const ext  = 'webm'
+      audioPath  = `audio-feedback/${active.id}-${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('tf-videos')
+        .upload(audioPath, audioBlob, { contentType: 'audio/webm', upsert: false })
+      if (upErr) { alert('Erro ao enviar áudio: ' + upErr.message); setSending(false); return }
+    }
+
     await tfFrom('video_submissions').update({
       status: 'reviewed',
-      therapist_feedback: body,
+      therapist_feedback: textBody || null,
+      audio_feedback_path: audioPath,
       shortcut_ids: [...selectedShortcuts],
       reviewed_at: new Date().toISOString(),
     }).eq('id', active.id)
 
-    await logAudit('video.reviewed', 'video_submissions', active.id, { shortcuts_used: selectedShortcuts.size, free_text: !!freeText.trim() })
+    await logAudit('video.reviewed', 'video_submissions', active.id, {
+      shortcuts_used: selectedShortcuts.size,
+      free_text: !!freeText.trim(),
+      audio: !!audioBlob,
+    })
 
-    setSending(false)
-    setActive(null)
-    load()
+    setSending(false); setActive(null); resetAudio(); load()
   }
 
   // Agrupa atalhos por categoria — ordem FIXA, sem filtro por conteúdo
@@ -125,6 +176,8 @@ export function ReviewQueuePage() {
 
   if (loading) return <div className="empty-state"><span className="spinner" /></div>
 
+  const hasContent = selectedShortcuts.size > 0 || freeText.trim() || audioBlob
+
   return (
     <div>
       <h1 className="page-title">Fila de revisão</h1>
@@ -132,14 +185,14 @@ export function ReviewQueuePage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: active ? '280px 1fr' : '1fr', gap: 20 }}>
         {/* Lista */}
-        <div className="card" style={{ padding: 0 }}>
+        <div className="card" style={{ padding: 0, alignSelf: 'start' }}>
           {queue.length === 0 && <p className="empty-state">Sem vídeos pendentes. ✅</p>}
           {queue.map(s => (
             <div
               key={s.id}
               onClick={() => openReview(s)}
               style={{
-                padding: '14px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                padding: '14px 16px', cursor: 'pointer', borderBottom: 'var(--hairline)',
                 background: active?.id === s.id ? 'var(--primary-lt)' : 'transparent',
               }}
             >
@@ -161,7 +214,7 @@ export function ReviewQueuePage() {
               <button className="btn btn-ghost btn-sm" onClick={() => setActive(null)}>✕</button>
             </div>
 
-            {/* Vídeo — URL assinado de expiração curta */}
+            {/* Vídeo — URL assinado de expiração curta (15 min) */}
             {videoUrl ? (
               <video
                 src={videoUrl} controls playsInline
@@ -198,11 +251,11 @@ export function ReviewQueuePage() {
                       key={sc.id}
                       onClick={() => toggleShortcut(sc.id)}
                       style={{
-                        padding: '6px 12px', borderRadius: 20, fontSize: 'var(--font-sm)',
+                        padding: '6px 12px', borderRadius: 999, fontSize: 'var(--font-sm)',
                         cursor: 'pointer', border: '1.5px solid',
-                        borderColor: selectedShortcuts.has(sc.id) ? 'var(--primary)' : 'var(--border)',
+                        borderColor: selectedShortcuts.has(sc.id) ? 'var(--eira-ocean)' : 'var(--border)',
                         background: selectedShortcuts.has(sc.id) ? 'var(--primary-lt)' : 'var(--surface)',
-                        color: selectedShortcuts.has(sc.id) ? 'var(--primary)' : 'var(--text)',
+                        color: selectedShortcuts.has(sc.id) ? 'var(--eira-ocean)' : 'var(--text)',
                         fontWeight: selectedShortcuts.has(sc.id) ? 600 : 400,
                       }}
                     >
@@ -215,31 +268,80 @@ export function ReviewQueuePage() {
 
             <div className="divider" />
 
-            {/* Texto livre adicional */}
+            {/* Texto adicional */}
             <div className="field">
               <label>Texto adicional (opcional)</label>
-              <textarea rows={3} value={freeText} onChange={e => setFreeText(e.target.value)} placeholder="Escreva o seu feedback personalizado…" />
+              <textarea rows={3} value={freeText} onChange={e => setFreeText(e.target.value)}
+                placeholder="Escreva o seu feedback personalizado…" />
             </div>
 
-            {/* Pré-visualização do feedback que vai ser enviado */}
+            {/* ── Resposta por áudio ───────────────────────────── */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 8 }}>Resposta por áudio (opcional)</label>
+
+              {audioMode === 'idle' && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={startRecording}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  🎙️ Gravar resposta em voz
+                </button>
+              )}
+
+              {audioMode === 'recording' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--eira-danger)', display: 'inline-block', animation: 'pulse 1s infinite' }} />
+                  <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--eira-danger)' }}>
+                    A gravar… {formatSecs(recSeconds)}
+                  </span>
+                  <button className="btn btn-danger btn-sm" onClick={stopRecording}>⏹ Parar</button>
+                </div>
+              )}
+
+              {audioMode === 'recorded' && audioUrl && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <audio src={audioUrl} controls style={{ width: '100%', borderRadius: 8 }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={resetAudio}>🗑 Descartar</button>
+                    <button className="btn btn-ghost btn-sm" onClick={startRecording}>🔄 Gravar outra vez</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pré-visualização do feedback */}
             {(selectedShortcuts.size > 0 || freeText.trim()) && (
-              <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius)', padding: 14, marginBottom: 16, fontSize: 'var(--font-sm)', borderLeft: '3px solid var(--primary)' }}>
-                <div style={{ fontWeight: 600, marginBottom: 6 }}>Pré-visualização do feedback:</div>
+              <div style={{ background: 'var(--primary-lt)', borderRadius: 'var(--radius)', padding: 14, marginBottom: 16, fontSize: 'var(--font-sm)', borderLeft: '3px solid var(--eira-ocean)' }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>Pré-visualização do texto:</div>
                 {[...selectedShortcuts].map(id => <div key={id} style={{ marginBottom: 4 }}>• {shortcuts.find(s => s.id === id)?.body}</div>)}
                 {freeText.trim() && <div style={{ marginTop: 4 }}>{freeText}</div>}
               </div>
             )}
 
-            <button className="btn btn-primary" style={{ width: '100%' }} disabled={sending || (!selectedShortcuts.size && !freeText.trim())} onClick={sendFeedback}>
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+              disabled={sending || !hasContent}
+              onClick={sendFeedback}
+            >
               {sending ? <span className="spinner" /> : '✓ Marcar como revisto e enviar feedback'}
             </button>
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+      `}</style>
     </div>
   )
 }
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+function formatSecs(s: number) {
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 }
