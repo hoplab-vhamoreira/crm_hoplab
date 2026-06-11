@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { tfFrom } from '../lib/supabase'
 import { useAuth } from '../context/auth'
+import { Icon } from '../components/Icon'
 import type { TfUser, TreatmentPlan, Streak, Consent } from '@tf/types'
 
 interface Appt {
@@ -82,12 +83,12 @@ export function PatientDetailPage() {
           <p className="page-sub">{patient.role} · variante {patient.ui_variant}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-ghost" onClick={() => nav(`/messages/${patientId}`)}>💬 Mensagens</button>
+          <button className="btn btn-ghost" onClick={() => nav(`/messages/${patientId}`)}><Icon name="chat" size={15} /> Mensagens</button>
           <button className="btn btn-primary" onClick={() => nav(`/patients/${patientId}/plan/new`)}>+ Novo plano</button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20, marginBottom: 20 }}>
         {/* Adesão factual */}
         <div className="card">
           <div className="section-title">Adesão (factual)</div>
@@ -135,8 +136,9 @@ export function PatientDetailPage() {
         </div>
 
         {pendingRequests.length > 0 && (
-          <div style={{ background: 'var(--primary-lt)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 12, fontSize: 'var(--font-sm)' }}>
-            🗓️ O utente pediu uma consulta ({new Date(pendingRequests[0].created_at).toLocaleDateString('pt-PT')}). Marque uma data para aceitar.
+          <div style={{ background: 'var(--primary-lt)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 12, fontSize: 'var(--font-sm)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Icon name="calendar" size={15} style={{ color: 'var(--eira-ocean)', flexShrink: 0 }} />
+            O utente pediu uma consulta ({new Date(pendingRequests[0].created_at).toLocaleDateString('pt-PT')}). Marque uma data para aceitar.
           </div>
         )}
 
@@ -150,8 +152,8 @@ export function PatientDetailPage() {
               <div className="field" style={{ margin: 0 }}>
                 <label>Tipo</label>
                 <select value={newAppt.kind} onChange={e => setNewAppt(v => ({ ...v!, kind: e.target.value as 'presencial' | 'online' }))}>
-                  <option value="presencial">📍 Presencial</option>
-                  <option value="online">💻 Online</option>
+                  <option value="presencial">Presencial</option>
+                  <option value="online">Online</option>
                 </select>
               </div>
             </div>
@@ -173,16 +175,23 @@ export function PatientDetailPage() {
           ? <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)', margin: 0 }}>Sem consultas futuras.</p>
           : appts.map(a => (
             <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 'var(--font-sm)' }}>
-                  {a.kind === 'online' ? '💻' : '📍'} {new Date(a.starts_at).toLocaleString('pt-PT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--primary-lt)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon name={a.kind === 'online' ? 'video' : 'location'} size={15} style={{ color: 'var(--eira-ocean)' }} />
                 </div>
-                {a.location_or_link && <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)' }}>{a.location_or_link}</div>}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 'var(--font-sm)' }}>
+                    {new Date(a.starts_at).toLocaleString('pt-PT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                  {a.location_or_link && <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.location_or_link}</div>}
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                 <span className={`badge ${a.status === 'confirmada' ? 'badge-green' : a.status === 'cancelada' ? 'badge-red' : 'badge-blue'}`}>{a.status}</span>
                 {(a.status === 'proposta' || a.status === 'confirmada') && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => setApptStatus(a.id, 'cancelada')}>✕</button>
+                  <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }} onClick={() => setApptStatus(a.id, 'cancelada')} title="Cancelar">
+                    <Icon name="close" size={14} />
+                  </button>
                 )}
               </div>
             </div>
@@ -197,22 +206,25 @@ export function PatientDetailPage() {
         </div>
         {plans.length === 0
           ? <p className="empty-state">Sem planos. Crie o primeiro.</p>
-          : (
-            <table>
-              <thead><tr><th>Título</th><th>Semanas</th><th>Início</th><th>Estado</th><th></th></tr></thead>
-              <tbody>
-                {plans.map(p => (
-                  <tr key={p.id}>
-                    <td style={{ fontWeight: 600 }}>{p.title}</td>
-                    <td>{p.current_week} / {p.total_weeks}</td>
-                    <td>{p.starts_on}</td>
-                    <td><span className={`badge ${p.is_active ? 'badge-green' : 'badge-blue'}`}>{p.is_active ? 'Activo' : 'Concluído'}</span></td>
-                    <td><button className="btn btn-ghost btn-sm" onClick={() => nav(`/patients/${patientId}/plan/${p.id}`)}>Editar</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {plans.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{p.title}</div>
+                    <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)' }}>
+                      Semana {p.current_week}/{p.total_weeks}
+                      {p.starts_on ? ` · início ${p.starts_on}` : ''}
+                    </div>
+                  </div>
+                  <span className={`badge ${p.is_active ? 'badge-green' : 'badge-blue'}`} style={{ flexShrink: 0 }}>
+                    {p.is_active ? 'Activo' : 'Concluído'}
+                  </span>
+                  <button className="btn btn-ghost btn-sm" style={{ flexShrink: 0 }} onClick={() => nav(`/patients/${patientId}/plan/${p.id}`)}>
+                    <Icon name="edit" size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
         }
       </div>
     </div>

@@ -8,6 +8,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, tfFrom } from '../../lib/supabase'
 import { useAuth } from '../../context/auth'
 import { logAudit } from '../../lib/audit'
+import { Icon } from '../../components/Icon'
 
 type Step = 1 | 2 | 3 | 4
 
@@ -268,15 +269,15 @@ function StepPratica({
           {camError && <p style={{ color: 'var(--error)', fontSize: 'var(--font-sm)', margin: '4px 0 8px' }}>{camError}</p>}
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            {!videoBlob && !recording && <button className="btn btn-primary btn-sm" onClick={startRecording}>⏺ Gravar</button>}
-            {recording && <button className="btn btn-danger btn-sm" onClick={stopRecording}>⏹ Parar</button>}
-            {videoBlob && <button className="btn btn-ghost btn-sm" onClick={() => setVideoBlob(null)}>↺ Regravar</button>}
-            <button className="btn btn-ghost btn-sm" onClick={closeCamera}>✕ Fechar</button>
+            {!videoBlob && !recording && <button className="btn btn-primary btn-sm" onClick={startRecording}><Icon name="mic" size={14} /> Gravar</button>}
+            {recording && <button className="btn btn-danger btn-sm" onClick={stopRecording}><Icon name="stop" size={14} /> Parar</button>}
+            {videoBlob && <button className="btn btn-ghost btn-sm" onClick={() => setVideoBlob(null)}><Icon name="refresh" size={14} /> Regravar</button>}
+            <button className="btn btn-ghost btn-sm" onClick={closeCamera}><Icon name="close" size={14} /> Fechar</button>
           </div>
         </div>
       ) : (
         <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16, width: '100%' }} onClick={openCamera}>
-          🎥 Abrir câmara (espelho)
+          <Icon name="camera" size={15} /> Abrir câmara (espelho)
         </button>
       )}
 
@@ -291,7 +292,7 @@ function StepPratica({
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className={`btn ${running ? 'btn-danger' : 'btn-primary'}`} onClick={() => setRunning(r => !r)}>
-                {running ? '⏸ Pausar' : timer > 0 ? '▶ Continuar' : '▶ Iniciar'}
+                {running ? <><Icon name="pause" size={15} /> Pausar</> : timer > 0 ? <><Icon name="play" size={15} /> Continuar</> : <><Icon name="play" size={15} /> Iniciar</>}
               </button>
               {timer > 0 && !running && <button className="btn btn-ghost" onClick={() => setTimer(0)}>↺ Reset</button>}
             </div>
@@ -406,7 +407,9 @@ function StepConclusao({
   if (done) {
     return (
       <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-        <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
+        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--success-lt)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <Icon name="star" size={36} style={{ color: 'var(--success)' }} fill />
+        </div>
         <h2 style={{ fontWeight: 700, marginBottom: 8, color: 'var(--eira-ink)' }}>Excelente!</h2>
         <p style={{ color: 'var(--text-2)', marginBottom: 28 }}>Exercício registado. Continue assim!</p>
         <button className="btn btn-primary" style={{ minWidth: 180 }} onClick={onDone}>
@@ -428,24 +431,24 @@ function StepConclusao({
         <div className="section-title">Perceção do esforço (opcional)</div>
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           {([
-            { value: 'hard',   emoji: '😓', label: 'Difícil' },
-            { value: 'medium', emoji: '😐', label: 'Médio'   },
-            { value: 'easy',   emoji: '😊', label: 'Fácil'   },
-          ] as const).map(({ value, emoji, label }) => (
+            { value: 'hard',   icon: 'zap'   as const, color: 'var(--eira-danger)', label: 'Difícil' },
+            { value: 'medium', icon: 'clock' as const, color: 'var(--warning)',     label: 'Médio'   },
+            { value: 'easy',   icon: 'check' as const, color: 'var(--success)',     label: 'Fácil'   },
+          ] as const).map(({ value, icon, color, label }) => (
             <button
               key={value}
               onClick={() => setSelfRating(selfRating === value ? null : value)}
               style={{
                 flex: 1, padding: '12px 0', borderRadius: 'var(--radius)',
                 border: '1.5px solid',
-                borderColor: selfRating === value ? 'var(--eira-ocean)' : 'var(--border)',
+                borderColor: selfRating === value ? color : 'var(--border)',
                 background: selfRating === value ? 'var(--primary-lt)' : 'var(--surface)',
-                color: selfRating === value ? 'var(--eira-ocean)' : 'var(--text)',
-                cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                color: selfRating === value ? color : 'var(--text)',
+                cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
                 fontFamily: 'Poppins, sans-serif', fontWeight: selfRating === value ? 600 : 400, fontSize: 14,
               }}
             >
-              <span style={{ fontSize: 24 }}>{emoji}</span>
+              <Icon name={icon} size={22} style={{ color: selfRating === value ? color : 'var(--text-2)' }} />
               <span>{label}</span>
             </button>
           ))}
@@ -468,19 +471,19 @@ function StepConclusao({
           </p>
           {videoError && <p style={{ color: 'var(--error)', fontSize: 'var(--font-sm)', marginBottom: 8 }}>{videoError}</p>}
           <button className="btn btn-primary btn-sm" disabled={uploading} onClick={sendVideo}>
-            {uploading ? <span className="spinner" /> : '📤 Enviar vídeo ao terapeuta'}
+            {uploading ? <span className="spinner" /> : <><Icon name="send" size={14} /> Enviar vídeo ao terapeuta</>}
           </button>
         </div>
       )}
 
       {videoSent && (
         <div style={{ background: 'var(--success-lt)', borderRadius: 'var(--radius)', padding: 12, marginBottom: 16, fontSize: 'var(--font-sm)', color: 'var(--success)', fontWeight: 600 }}>
-          ✅ Vídeo enviado ao seu terapeuta.
+          <Icon name="check" size={15} style={{ color: 'var(--success)' }} /> Vídeo enviado ao seu terapeuta.
         </div>
       )}
 
       <button className="btn btn-primary" style={{ width: '100%' }} disabled={saving} onClick={markDone}>
-        {saving ? <span className="spinner" /> : '✓ Marcar como feito'}
+        {saving ? <span className="spinner" /> : <><Icon name="check" size={15} /> Marcar como feito</>}
       </button>
     </div>
   )
@@ -551,7 +554,7 @@ export function PatientExercisePage() {
                 color: s.n <= step ? '#fff' : 'var(--text-2)',
                 transition: 'background .2s',
               }}>
-                {s.n < step ? '✓' : i + 1}
+                {s.n < step ? <Icon name="check" size={12} /> : i + 1}
               </div>
               <div style={{ fontSize: 10, color: s.n === step ? 'var(--eira-ocean)' : 'var(--text-2)', marginTop: 3, fontWeight: s.n === step ? 700 : 400, whiteSpace: 'nowrap' }}>
                 {s.label}

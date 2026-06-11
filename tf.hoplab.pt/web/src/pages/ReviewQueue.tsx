@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase, tfFrom } from '../lib/supabase'
 import { useAuth } from '../context/auth'
 import { logAudit } from '../lib/audit'
+import { Icon } from '../components/Icon'
 import type { FeedbackShortcut, ClinicalArea } from '@tf/types'
 
 interface Submission {
@@ -186,7 +187,7 @@ export function ReviewQueuePage() {
       <div style={{ display: 'grid', gridTemplateColumns: active ? '280px 1fr' : '1fr', gap: 20 }}>
         {/* Lista */}
         <div className="card" style={{ padding: 0, alignSelf: 'start' }}>
-          {queue.length === 0 && <p className="empty-state">Sem vídeos pendentes. ✅</p>}
+          {queue.length === 0 && <p className="empty-state" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Icon name="check" size={16} style={{ color: 'var(--success)' }} /> Sem vídeos pendentes.</p>}
           {queue.map(s => (
             <div
               key={s.id}
@@ -211,7 +212,7 @@ export function ReviewQueuePage() {
                 <div style={{ fontWeight: 700, fontSize: 'var(--font-lg)' }}>{active.patient_name}</div>
                 <div style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)' }}>{formatDate(active.created_at)}</div>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setActive(null)}>✕</button>
+              <button className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }} onClick={() => setActive(null)}><Icon name="close" size={15} /></button>
             </div>
 
             {/* Vídeo — URL assinado de expiração curta (15 min) */}
@@ -285,7 +286,7 @@ export function ReviewQueuePage() {
                   onClick={startRecording}
                   style={{ display: 'flex', alignItems: 'center', gap: 6 }}
                 >
-                  🎙️ Gravar resposta em voz
+                  <Icon name="mic" size={14} /> Gravar resposta em voz
                 </button>
               )}
 
@@ -295,7 +296,7 @@ export function ReviewQueuePage() {
                   <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--eira-danger)' }}>
                     A gravar… {formatSecs(recSeconds)}
                   </span>
-                  <button className="btn btn-danger btn-sm" onClick={stopRecording}>⏹ Parar</button>
+                  <button className="btn btn-danger btn-sm" onClick={stopRecording}><Icon name="stop" size={14} /> Parar</button>
                 </div>
               )}
 
@@ -303,8 +304,8 @@ export function ReviewQueuePage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <audio src={audioUrl} controls style={{ width: '100%', borderRadius: 8 }} />
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn-ghost btn-sm" onClick={resetAudio}>🗑 Descartar</button>
-                    <button className="btn btn-ghost btn-sm" onClick={startRecording}>🔄 Gravar outra vez</button>
+                    <button className="btn btn-ghost btn-sm" onClick={resetAudio}><Icon name="trash" size={14} /> Descartar</button>
+                    <button className="btn btn-ghost btn-sm" onClick={startRecording}><Icon name="refresh" size={14} /> Gravar outra vez</button>
                   </div>
                 </div>
               )}
@@ -325,7 +326,7 @@ export function ReviewQueuePage() {
               disabled={sending || !hasContent}
               onClick={sendFeedback}
             >
-              {sending ? <span className="spinner" /> : '✓ Marcar como revisto e enviar feedback'}
+              {sending ? <span className="spinner" /> : <><Icon name="check" size={15} /> Marcar como revisto e enviar feedback</>}
             </button>
           </div>
         )}

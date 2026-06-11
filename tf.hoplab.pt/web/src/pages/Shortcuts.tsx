@@ -5,6 +5,7 @@
 import { useEffect, useState, FormEvent } from 'react'
 import { tfFrom } from '../lib/supabase'
 import { useAuth } from '../context/auth'
+import { Icon } from '../components/Icon'
 import type { FeedbackShortcut, ClinicalArea } from '@tf/types'
 
 const AREAS: ClinicalArea[] = ['respiracao','ressonancia','articulacao','tom','voz','mof','linguagem','gaguez']
@@ -65,10 +66,10 @@ export function ShortcutsPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 20, padding: 16 }}>
-        <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)', margin: 0 }}>
-          ⚠️ <strong>Regra de compliance:</strong> estes atalhos são sempre apresentados em ordem fixa e neutra na fila de revisão.
+        <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)', margin: 0, display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+          <Icon name="warning" size={15} style={{ color: 'var(--warning)', flexShrink: 0, marginTop: 1 }} /><span><strong>Regra de compliance:</strong> estes atalhos são sempre apresentados em ordem fixa e neutra na fila de revisão.
           A app nunca filtra, ordena ou sugere atalhos com base no conteúdo do vídeo do utente.
-          A escolha é exclusivamente sua.
+          A escolha é exclusivamente sua.</span>
         </p>
       </div>
 
@@ -94,30 +95,26 @@ export function ShortcutsPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginLeft: 16, flexShrink: 0 }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => setEditing(sc)}>Editar</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => remove(sc.id)}>✕</button>
+                    <button className="btn btn-danger btn-sm" style={{ padding: '4px 8px' }} onClick={() => remove(sc.id)}><Icon name="trash" size={14} /></button>
                   </div>
                 </div>
               ))}
             </div>
           ))
           : (
-            <div className="card" style={{ padding: 0 }}>
-              <table>
-                <thead><tr><th>Label</th><th>Texto</th><th>Ordem</th><th></th></tr></thead>
-                <tbody>
-                  {shortcuts.map(sc => (
-                    <tr key={sc.id}>
-                      <td style={{ fontWeight: 600 }}>{sc.label}</td>
-                      <td style={{ color: 'var(--text-2)', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sc.body}</td>
-                      <td>{sc.sort_order}</td>
-                      <td style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setEditing(sc)}>Editar</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => remove(sc.id)}>✕</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {shortcuts.map(sc => (
+                <div key={sc.id} className="card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{sc.label}</div>
+                    <div style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sc.body}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(sc)}><Icon name="edit" size={14} /></button>
+                    <button className="btn btn-danger btn-sm" style={{ padding: '4px 8px' }} onClick={() => remove(sc.id)}><Icon name="trash" size={14} /></button>
+                  </div>
+                </div>
+              ))}
             </div>
           )
       )}

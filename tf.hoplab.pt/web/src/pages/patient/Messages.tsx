@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase, tfFrom } from '../../lib/supabase'
 import { useAuth } from '../../context/auth'
 import { logAudit } from '../../lib/audit'
+import { Icon } from '../../components/Icon'
 import type { Message } from '@tf/types'
 
 export function PatientMessagesPage() {
@@ -81,7 +82,7 @@ export function PatientMessagesPage() {
 
   if (!linkId) return (
     <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-      <div style={{ fontSize: 40, marginBottom: 12 }}>💬</div>
+      <Icon name="chat" size={40} style={{ color: 'var(--eira-mist)', marginBottom: 12 }} />
       <p style={{ color: 'var(--text-2)' }}>Ainda não está ligado a um terapeuta.<br />Use um código de convite para se ligar.</p>
     </div>
   )
@@ -131,7 +132,7 @@ export function PatientMessagesPage() {
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
         />
         <button className="btn btn-primary" disabled={!draft.trim() || sending} onClick={send} style={{ alignSelf: 'flex-end' }}>
-          {sending ? <span className="spinner" /> : '↑'}
+          {sending ? <span className="spinner" /> : <Icon name="send" size={16} />}
         </button>
       </div>
     </div>

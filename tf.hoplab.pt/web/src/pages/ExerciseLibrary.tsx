@@ -22,6 +22,8 @@ export function ExerciseLibraryPage() {
   const [editing, setEditing] = useState<Partial<Exercise> | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [seeding, setSeeding] = useState(false)
+  const [seedDone, setSeedDone] = useState(false)
 
   useEffect(() => { if (profile?.id) load() }, [profile?.id])
   useEffect(() => { if (profile?.id) load() }, [filter])
@@ -44,6 +46,49 @@ export function ExerciseLibraryPage() {
       await tfFrom('exercises').insert({ ...blank(), ...editing, therapist_id: profile!.id })
     }
     setSaving(false); setEditing(null); load()
+  }
+
+  async function seedLibrary() {
+    if (!profile?.id) return
+    setSeeding(true)
+    const seed: Omit<Exercise, 'id' | 'created_at' | 'updated_at'>[] = [
+      // Respiração
+      { therapist_id: profile.id, title: 'Respiração diafragmática', clinical_area: 'respiracao', duration_seconds: 120, instructions: 'Inspire pelo nariz contando 4 tempos, expire pela boca contando 8 tempos. Mão sobre o abdómen para sentir o movimento.', video_url: null },
+      { therapist_id: profile.id, title: 'Coordenação pneumofonoarticulatória', clinical_area: 'respiracao', duration_seconds: 90, instructions: 'Inspire, faça pausa breve e produza /s/ contínuo na expiração durante 10–15 segundos.', video_url: null },
+      { therapist_id: profile.id, title: 'Sopro sonoro sustentado', clinical_area: 'respiracao', duration_seconds: 60, instructions: 'Mantenha /f/ ou /s/ contínuo o máximo de tempo possível sem tensão cervical.', video_url: null },
+      // Articulação
+      { therapist_id: profile.id, title: 'Movimentos labiais alternados', clinical_area: 'articulacao', duration_seconds: 60, instructions: 'Alterne /p/ – /b/ – /m/ em séries de 10 repetições, com atenção ao encerramento labial completo.', video_url: null },
+      { therapist_id: profile.id, title: 'Diadococinesia /pa-ta-ca/', clinical_area: 'articulacao', duration_seconds: 60, instructions: 'Repita /pa-ta-ca/ o mais rápido e claro possível durante 10 segundos. Registe repetições por segundo.', video_url: null },
+      { therapist_id: profile.id, title: 'Exercício de língua — ponta', clinical_area: 'articulacao', duration_seconds: 45, instructions: 'Eleve a ponta da língua ao alvéolo superior e mantenha 5 segundos. Repita 10×.', video_url: null },
+      { therapist_id: profile.id, title: 'Trava-língua terapêutico', clinical_area: 'articulacao', duration_seconds: 90, instructions: 'Produza trava-língua com os sons-alvo em velocidade crescente, mantendo inteligibilidade.', video_url: null },
+      // Voz
+      { therapist_id: profile.id, title: 'Humming — voz suave', clinical_area: 'voz', duration_seconds: 90, instructions: 'Produza /m/ com lábios relaxados, sem esforço, sentindo vibração nos lábios. Deslize lentamente na tessitura.', video_url: null },
+      { therapist_id: profile.id, title: 'Tempo máximo de fonação /a/', clinical_area: 'voz', duration_seconds: 30, instructions: 'Inspire profundamente e emita /a/ sustentado o máximo de tempo em intensidade confortável.', video_url: null },
+      { therapist_id: profile.id, title: 'Glides ascendentes e descendentes', clinical_area: 'voz', duration_seconds: 60, instructions: 'Deslize em /i/ do mais grave possível ao mais agudo e desça. Sem quebras ou tensão. 5 repetições.', video_url: null },
+      { therapist_id: profile.id, title: 'Exercício de tracto semiocluído — canudo', clinical_area: 'voz', duration_seconds: 90, instructions: 'Expire através de um canudo fino durante 5 segundos. Sinta resistência labial. Repita 10×.', video_url: null },
+      // Ressonância
+      { therapist_id: profile.id, title: 'Fala anterior — /mi-ma-mo/', clinical_area: 'ressonancia', duration_seconds: 60, instructions: 'Produza /mi-ma-mo/ com foco na vibração nos lábios. Evite ressonância nasal em /a/ e /o/.', video_url: null },
+      { therapist_id: profile.id, title: 'Controlo de hipernasalidade — plug nasal', clinical_area: 'ressonancia', duration_seconds: 90, instructions: 'Tampe as narinas gentilmente e compare o som oral com o nasal. Pratique alternância consciente.', video_url: null },
+      // Motricidade Orofacial
+      { therapist_id: profile.id, title: 'Selagem labial ativa', clinical_area: 'mof', duration_seconds: 45, instructions: 'Comprima lábios com espátula entre eles (sem morder) durante 10 segundos. 5 repetições.', video_url: null },
+      { therapist_id: profile.id, title: 'Elevação do véu do palato — /a/ rápido', clinical_area: 'mof', duration_seconds: 45, instructions: 'Produza /a/ curto e forte repetidamente para estimular a elevação velar. 20 repetições.', video_url: null },
+      { therapist_id: profile.id, title: 'Mobilidade de mandíbula', clinical_area: 'mof', duration_seconds: 60, instructions: 'Abra a boca lentamente ao máximo sem dor, mantenha 5 segundos e feche. 8 repetições.', video_url: null },
+      // Gaguez
+      { therapist_id: profile.id, title: 'Fala suave — início suave', clinical_area: 'gaguez', duration_seconds: 90, instructions: 'Inicie cada palavra com fluxo de ar suave antes de acionar a fonação. Pratique em frases curtas.', video_url: null },
+      { therapist_id: profile.id, title: 'Controlo de ritmo — fala lenta', clinical_area: 'gaguez', duration_seconds: 120, instructions: 'Leia em voz alta a 50% da velocidade habitual. Use o metrónomo a 60 bpm como guia.', video_url: null },
+      { therapist_id: profile.id, title: 'Cancelamento de gaguez', clinical_area: 'gaguez', duration_seconds: 90, instructions: 'Quando gaguejar, pare voluntariamente, pause 2 segundos e recomece a palavra de forma suave.', video_url: null },
+      // Linguagem
+      { therapist_id: profile.id, title: 'Nomeação por categorias', clinical_area: 'linguagem', duration_seconds: 60, instructions: 'Nomeie o maior número de itens de uma categoria (ex.: animais) em 60 segundos.', video_url: null },
+      { therapist_id: profile.id, title: 'Completamento de frases', clinical_area: 'linguagem', duration_seconds: 90, instructions: 'Complete frases deixadas em aberto pelo terapeuta com a palavra mais adequada ao contexto.', video_url: null },
+      { therapist_id: profile.id, title: 'Leitura em voz alta — parágrafo', clinical_area: 'linguagem', duration_seconds: 180, instructions: 'Leia um parágrafo em voz alta com atenção à prosódia e pontuação. Grave e reveja.', video_url: null },
+      // Tom
+      { therapist_id: profile.id, title: 'Variação de tom prosódico', clinical_area: 'tom', duration_seconds: 60, instructions: 'Repita a mesma frase com entoações diferentes (afirmação, pergunta, surpresa). 5 padrões.', video_url: null },
+      { therapist_id: profile.id, title: 'Escalas de altura tonal', clinical_area: 'tom', duration_seconds: 90, instructions: 'Suba em dó-ré-mi-fá-sol e desça, em voz falada. Mantenha qualidade vocal em todos os semitons.', video_url: null },
+    ]
+    await tfFrom('exercises').insert(seed)
+    setSeeding(false)
+    setSeedDone(true)
+    load()
   }
 
   async function remove(id: string) {
@@ -77,7 +122,16 @@ export function ExerciseLibraryPage() {
       {loading ? <div className="empty-state"><span className="spinner" /></div> : exercises.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48 }}>
           <Icon name="book" size={40} style={{ color: 'var(--eira-mist)', marginBottom: 12 }} />
-          <p style={{ color: 'var(--text-2)' }}>Sem exercícios ainda.</p>
+          <p style={{ color: 'var(--text-2)', marginBottom: 20 }}>A biblioteca está vazia.</p>
+          {seedDone ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: 'var(--success)', fontWeight: 600 }}>
+              <Icon name="check" size={18} /> 24 exercícios importados
+            </div>
+          ) : (
+            <button className="btn btn-ghost" onClick={seedLibrary} disabled={seeding} style={{ margin: '0 auto' }}>
+              {seeding ? <><span className="spinner" /> A importar…</> : <><Icon name="zap" size={15} /> Importar exercícios iniciais</>}
+            </button>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

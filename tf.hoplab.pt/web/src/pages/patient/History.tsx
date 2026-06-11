@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { tfFrom } from '../../lib/supabase'
 import { useAuth } from '../../context/auth'
+import { Icon } from '../../components/Icon'
 
 interface LogRow {
   id: string
@@ -45,8 +46,10 @@ export function PatientHistoryPage() {
   const byDate: Record<string, LogRow[]> = {}
   logs.forEach(l => { (byDate[l.session_date] ??= []).push(l) })
 
-  const ratingEmoji = (r: 'easy' | 'medium' | 'hard' | null) =>
-    r === 'easy' ? '😊' : r === 'medium' ? '😐' : r === 'hard' ? '😓' : null
+  const ratingIcon = (r: 'easy' | 'medium' | 'hard' | null) =>
+    r === 'easy' ? { name: 'check' as const, color: 'var(--success)', label: 'Fácil' } :
+    r === 'medium' ? { name: 'clock' as const, color: 'var(--warning)', label: 'Médio' } :
+    r === 'hard' ? { name: 'zap' as const, color: 'var(--eira-danger)', label: 'Difícil' } : null
 
   if (loading) return <div className="empty-state"><span className="spinner" /></div>
 
@@ -57,7 +60,7 @@ export function PatientHistoryPage() {
 
       {Object.keys(byDate).length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+          <Icon name="book" size={40} style={{ color: 'var(--eira-mist)', marginBottom: 12 }} />
           <p style={{ color: 'var(--text-2)' }}>Ainda não tem exercícios registados.</p>
         </div>
       )}
@@ -71,18 +74,21 @@ export function PatientHistoryPage() {
             {items.map(item => (
               <div key={item.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
-                  width: 36, height: 36, borderRadius: '50%', background: 'var(--primary-lt)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0,
-                }}>✓</div>
+                  width: 36, height: 36, borderRadius: '50%', background: 'var(--success-lt)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}><Icon name="check" size={16} style={{ color: 'var(--success)' }} /></div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 'var(--font-sm)' }}>{item.exercise_title}</div>
                   {item.notes && (
                     <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 2 }}>{item.notes}</div>
                   )}
                 </div>
-                {ratingEmoji(item.self_rating) && (
-                  <span style={{ fontSize: 20 }}>{ratingEmoji(item.self_rating)}</span>
-                )}
+                {ratingIcon(item.self_rating) && (() => { const r = ratingIcon(item.self_rating)!; return (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-xs)', color: r.color, fontWeight: 600, flexShrink: 0 }}>
+                    <Icon name={r.name} size={14} style={{ color: r.color }} />
+                    {r.label}
+                  </span>
+                )})()}
               </div>
             ))}
           </div>

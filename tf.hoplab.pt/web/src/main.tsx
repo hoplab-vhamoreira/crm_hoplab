@@ -4,6 +4,7 @@ import { HashRouter } from 'react-router-dom'
 import { AuthProvider } from './context/auth'
 import App from './App'
 import './styles/tokens.css'
+import './styles/variants.css'
 import { supabase } from './lib/supabase'
 
 /**

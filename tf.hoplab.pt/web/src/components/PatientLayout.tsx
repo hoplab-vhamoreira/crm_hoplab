@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/auth'
 import { Icon } from './Icon'
@@ -7,6 +8,12 @@ const BASE = import.meta.env.BASE_URL
 export function PatientLayout() {
   const { profile, signOut } = useAuth()
   const nav = useNavigate()
+
+  useEffect(() => {
+    const cls = `variant-${profile?.ui_variant ?? 'focus'}`
+    document.body.classList.add(cls)
+    return () => document.body.classList.remove(cls)
+  }, [profile?.ui_variant])
 
   async function handleSignOut() {
     await signOut()

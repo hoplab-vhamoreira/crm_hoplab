@@ -1,0 +1,124 @@
+/*
+ * Variantes de UI por perfil de utente (ui_variant em tf_users).
+ * Aplicadas via classe no <body> pelo PatientLayout.
+ * focus = Adulto (padrão Eira), adventure = Criança, calm = Sénior.
+ */
+
+/* ── focus (adulto) ─ padrão Eira, sem overrides ────────────────── */
+
+/* ── adventure (criança) ─────────────────────────────────────────── */
+body.variant-adventure {
+  --primary:        #CF7A1E;
+  --primary-lt:     #FEF3E2;
+  --eira-ocean:     #CF7A1E;
+  --eira-ocean-lt:  #F5C07A;
+  --eira-sun:       #F4A93C;
+  --eira-mist:      #FAE6C8;
+  --border:         #FAE6C8;
+  --radius:         20px;
+  --radius-sm:      14px;
+  --hairline:       1.5px solid #FAE6C8;
+  --shadow:         0 2px 6px rgba(207,122,30,.10);
+
+  /* Escala tipográfica ligeiramente maior */
+  --font-xs:  12px;
+  --font-sm:  14px;
+  --font-md:  16px;
+  --font-lg:  18px;
+  --font-xl:  22px;
+  --font-2xl: 26px;
+}
+
+body.variant-adventure .btn-primary {
+  background: var(--eira-ocean);
+}
+
+body.variant-adventure .btn-ghost {
+  color: var(--eira-ocean);
+  border-color: var(--eira-ocean);
+}
+
+body.variant-adventure .btn-ghost:hover:not(:disabled) {
+  background: var(--primary-lt);
+}
+
+body.variant-adventure .nav-item.active,
+body.variant-adventure nav a[style*="color: var(--eira-ocean)"] {
+  color: var(--eira-ocean) !important;
+}
+
+/* Cards com sombra levemente colorida */
+body.variant-adventure .card {
+  box-shadow: 0 2px 8px rgba(207,122,30,.08);
+}
+
+/* Botões maiores (targets de toque) */
+body.variant-adventure .btn {
+  min-height: 48px;
+  padding: 11px 20px;
+  font-size: var(--font-md);
+}
+
+body.variant-adventure .btn-sm {
+  min-height: 38px;
+  padding: 8px 14px;
+}
+
+/* ── calm (sénior) ───────────────────────────────────────────────── */
+body.variant-calm {
+  /* Paleta igual mas com maior contraste */
+  --font-xs:  14px;
+  --font-sm:  16px;
+  --font-md:  18px;
+  --font-lg:  21px;
+  --font-xl:  26px;
+  --font-2xl: 30px;
+
+  line-height: 1.7;
+}
+
+/* Botões grandes com texto maior */
+body.variant-calm .btn {
+  min-height: 52px;
+  padding: 13px 22px;
+  font-size: var(--font-md);
+  border-radius: var(--radius);
+}
+
+body.variant-calm .btn-sm {
+  min-height: 44px;
+  padding: 10px 18px;
+  font-size: var(--font-sm);
+}
+
+/* Inputs maiores */
+body.variant-calm input,
+body.variant-calm textarea,
+body.variant-calm select {
+  font-size: 18px;
+  padding: 12px 14px;
+}
+
+/* Cards com mais padding e espaçamento */
+body.variant-calm .card {
+  padding: 24px;
+}
+
+/* Texto de apoio mais visível */
+body.variant-calm .page-sub,
+body.variant-calm [style*="color: var(--text-2)"],
+body.variant-calm [style*="color:var(--text-2)"] {
+  color: var(--eira-ink-soft) !important;
+  font-size: var(--font-sm);
+}
+
+/* Nav inferior mais alto */
+body.variant-calm nav[style*="position: fixed"][style*="bottom: 0"] {
+  padding-top: 12px;
+}
+
+/* Exercícios: ícone maior */
+body.variant-calm [style*="width: 40px"][style*="height: 40px"][style*="border-radius: 50%"] {
+  width: 48px !important;
+  height: 48px !important;
+}

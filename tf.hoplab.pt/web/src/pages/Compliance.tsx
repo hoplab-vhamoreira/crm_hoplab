@@ -65,49 +65,49 @@ export function CompliancePage() {
         <>
           {/* Consentimentos */}
           {tab === 'consents' && (
-            <div className="card" style={{ padding: 0 }}>
-              <table>
-                <thead><tr><th>Utente</th><th>Scope</th><th>Versão</th><th>Estado</th><th>Data</th></tr></thead>
-                <tbody>
-                  {consents.length === 0 && <tr><td colSpan={5} className="empty-state">Sem registos.</td></tr>}
+            consents.length === 0
+              ? <div className="empty-state">Sem registos.</div>
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {consents.map(c => (
-                    <tr key={c.id}>
-                      <td>{c.patient_name}</td>
-                      <td style={{ fontFamily: 'monospace', fontSize: 'var(--font-sm)' }}>{c.scope}</td>
-                      <td>{c.policy_version}</td>
-                      <td>
-                        <span className={`badge ${c.granted && !c.revoked_at ? 'badge-green' : 'badge-red'}`}>
-                          {c.granted && !c.revoked_at ? 'Activo' : 'Revogado'}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)' }}>{new Date(c.granted_at).toLocaleDateString('pt-PT')}</td>
-                    </tr>
+                    <div key={c.id} className="card" style={{ padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, marginBottom: 2 }}>{c.patient_name}</div>
+                          <div style={{ fontFamily: 'monospace', fontSize: 'var(--font-xs)', color: 'var(--text-2)' }}>{c.scope} · v{c.policy_version}</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                          <span className={`badge ${c.granted && !c.revoked_at ? 'badge-green' : 'badge-red'}`}>
+                            {c.granted && !c.revoked_at ? 'Activo' : 'Revogado'}
+                          </span>
+                          <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)' }}>
+                            {new Date(c.granted_at).toLocaleDateString('pt-PT')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
           )}
 
           {/* Audit log */}
           {tab === 'audit' && (
-            <div className="card" style={{ padding: 0 }}>
-              <table>
-                <thead><tr><th>Data/hora</th><th>Ação</th><th>Recurso</th><th>ID recurso</th></tr></thead>
-                <tbody>
-                  {auditLog.length === 0 && <tr><td colSpan={4} className="empty-state">Sem registos.</td></tr>}
+            auditLog.length === 0
+              ? <div className="empty-state">Sem registos.</div>
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {auditLog.map(a => (
-                    <tr key={a.id}>
-                      <td style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
-                        {new Date(a.created_at).toLocaleString('pt-PT')}
-                      </td>
-                      <td style={{ fontFamily: 'monospace', fontSize: 'var(--font-sm)' }}>{a.action}</td>
-                      <td style={{ fontFamily: 'monospace', fontSize: 'var(--font-sm)' }}>{a.resource_type}</td>
-                      <td style={{ fontFamily: 'monospace', fontSize: 'var(--font-xs)', color: 'var(--text-2)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.resource_id ?? '—'}</td>
-                    </tr>
+                    <div key={a.id} className="card" style={{ padding: '10px 14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                        <span style={{ fontFamily: 'monospace', fontSize: 'var(--font-sm)', fontWeight: 600 }}>{a.action}</span>
+                        <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+                          {new Date(a.created_at).toLocaleString('pt-PT')}
+                        </span>
+                      </div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 2 }}>
+                        {a.resource_type}{a.resource_id ? ` · ${a.resource_id}` : ''}
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
           )}
 
           {/* Apagamento */}
@@ -123,7 +123,7 @@ export function CompliancePage() {
                 <input value={deletionId} onChange={e => setDeletionId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
               </div>
               <button className="btn btn-danger" disabled={!deletionId.trim() || deleting} onClick={handleDeletion}>
-                {deleting ? <span className="spinner" /> : '🗑 Solicitar apagamento'}
+                {deleting ? <span className="spinner" /> : 'Solicitar apagamento'}
               </button>
               <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 12 }}>
                 Requer implementação de Edge Function com SECURITY DEFINER para eliminação segura em cascata.
