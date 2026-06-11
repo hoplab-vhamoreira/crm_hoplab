@@ -24,9 +24,9 @@ export function Layout() {
     <div className="layout">
       <aside className="sidebar">
         {/* Logo */}
-        <div style={{ padding: '4px 12px 20px', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
-          <div style={{ fontWeight: 700, fontSize: 'var(--font-lg)', color: 'var(--primary)' }}>SpeechTherapy</div>
-          <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 2 }}>Backoffice TF</div>
+        <div style={{ padding: '4px 12px 20px', borderBottom: '1px solid rgba(127,182,208,.2)', marginBottom: 12 }}>
+          <div style={{ fontWeight: 600, fontSize: 'var(--font-lg)', color: 'var(--eira-paper)' }}>Eira</div>
+          <div style={{ fontSize: 'var(--font-xs)', color: 'var(--eira-ocean-lt)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Cuidado sem distância</div>
         </div>
 
         {/* Nav */}
@@ -43,11 +43,11 @@ export function Layout() {
         ))}
 
         {/* Perfil */}
-        <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', fontSize: 'var(--font-sm)', color: 'var(--text-2)' }}>
+        <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid rgba(127,182,208,.2)' }}>
+          <div style={{ padding: '8px 12px', fontSize: 'var(--font-sm)', color: 'var(--eira-ocean-lt)' }}>
             {profile?.full_name ?? 'Terapeuta'}
           </div>
-          <button className="nav-item btn" style={{ width: '100%', background: 'none', color: 'var(--error)' }} onClick={handleSignOut}>
+          <button className="nav-item btn" style={{ width: '100%', background: 'none', color: 'var(--eira-danger)' }} onClick={handleSignOut}>
             <span>🚪</span><span>Sair</span>
           </button>
         </div>

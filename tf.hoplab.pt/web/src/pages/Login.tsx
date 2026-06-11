@@ -22,9 +22,9 @@ export function LoginPage() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 16 }}>
       <div className="card" style={{ width: '100%', maxWidth: 380, padding: 36 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🗣️</div>
-          <h1 style={{ fontSize: 'var(--font-xl)', fontWeight: 700, margin: 0 }}>SpeechTherapy</h1>
-          <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)', marginTop: 4 }}>Terapia da Fala — Backoffice</p>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🌊</div>
+          <h1 style={{ fontSize: 'var(--font-xl)', fontWeight: 600, margin: 0, color: 'var(--eira-ink)' }}>Eira</h1>
+          <p style={{ color: 'var(--eira-ocean)', fontSize: 'var(--font-xs)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Cuidado sem distância</p>
         </div>
 
         <form onSubmit={signIn}>
