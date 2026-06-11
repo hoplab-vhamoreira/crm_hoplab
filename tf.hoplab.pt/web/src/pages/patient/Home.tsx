@@ -31,6 +31,10 @@ export function PatientHomePage() {
   const [therapistId, setTherapistId] = useState<string | null>(null)
   const [requestPending, setRequestPending] = useState(false)
   const [requesting, setRequesting]   = useState(false)
+  const [showRequestForm, setShowRequestForm] = useState(false)
+  const [prefDays, setPrefDays]       = useState<Set<string>>(new Set())
+  const [prefPeriod, setPrefPeriod]   = useState('')
+  const [prefNote, setPrefNote]       = useState('')
   const [loading, setLoading]         = useState(true)
   const today = new Date().toISOString().slice(0, 10)
 
@@ -84,11 +88,27 @@ export function PatientHomePage() {
     setLoading(false)
   }
 
+  const DAYS = ['2ª', '3ª', '4ª', '5ª', '6ª', 'Sábado'] as const
+  const PERIODS = ['Manhã', 'Tarde', 'Fim do dia'] as const
+
+  function toggleDay(d: string) {
+    setPrefDays(prev => {
+      const next = new Set(prev); next.has(d) ? next.delete(d) : next.add(d); return next
+    })
+  }
+
   async function requestAppointment() {
     if (!therapistId || !profile) return
     setRequesting(true)
-    const { error } = await tfFrom('appointment_requests').insert({ patient_id: profile.id, therapist_id: therapistId })
-    if (!error) setRequestPending(true)
+    const parts: string[] = []
+    if (prefDays.size) parts.push(`Dias: ${DAYS.filter(d => prefDays.has(d)).join(', ')}`)
+    if (prefPeriod) parts.push(`Período: ${prefPeriod}`)
+    if (prefNote.trim()) parts.push(prefNote.trim())
+    const { error } = await tfFrom('appointment_requests').insert({
+      patient_id: profile.id, therapist_id: therapistId,
+      message: parts.length ? parts.join(' · ') : null,
+    })
+    if (!error) { setRequestPending(true); setShowRequestForm(false) }
     setRequesting(false)
   }
 
@@ -142,17 +162,61 @@ export function PatientHomePage() {
           )}
         </div>
       ) : therapistId && (
-        <div className="card" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--eira-mist)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icon name="calendar" size={18} style={{ color: 'var(--eira-ocean)' }} />
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--eira-mist)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon name="calendar" size={18} style={{ color: 'var(--eira-ocean)' }} />
+            </div>
+            <div style={{ flex: 1, fontSize: 'var(--font-sm)', color: 'var(--text-2)' }}>
+              {requestPending ? 'Pedido enviado — o terapeuta vai confirmar a data.' : 'Sem consulta marcada.'}
+            </div>
+            {!requestPending && !showRequestForm && (
+              <button className="btn btn-primary btn-sm" style={{ flexShrink: 0 }} onClick={() => setShowRequestForm(true)}>
+                Marcar
+              </button>
+            )}
           </div>
-          <div style={{ flex: 1, fontSize: 'var(--font-sm)', color: 'var(--text-2)' }}>
-            {requestPending ? 'Pedido enviado — o terapeuta vai confirmar a data.' : 'Sem consulta marcada.'}
-          </div>
-          {!requestPending && (
-            <button className="btn btn-primary btn-sm" style={{ flexShrink: 0 }} disabled={requesting} onClick={requestAppointment}>
-              {requesting ? <span className="spinner" /> : 'Marcar'}
-            </button>
+
+          {/* Preferências de horário — o terapeuta decide a data final */}
+          {showRequestForm && !requestPending && (
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 'var(--font-sm)', fontWeight: 600, marginBottom: 8 }}>Dias que dão mais jeito (opcional)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                {DAYS.map(d => (
+                  <button key={d} onClick={() => toggleDay(d)} style={{
+                    padding: '7px 14px', borderRadius: 999, fontSize: 'var(--font-sm)', cursor: 'pointer',
+                    fontFamily: 'Poppins, sans-serif',
+                    border: '1.5px solid', borderColor: prefDays.has(d) ? 'var(--eira-ocean)' : 'var(--border)',
+                    background: prefDays.has(d) ? 'var(--primary-lt)' : 'var(--surface)',
+                    color: prefDays.has(d) ? 'var(--eira-ocean)' : 'var(--text)',
+                    fontWeight: prefDays.has(d) ? 600 : 400,
+                  }}>{d}</button>
+                ))}
+              </div>
+              <div style={{ fontSize: 'var(--font-sm)', fontWeight: 600, marginBottom: 8 }}>Período preferido (opcional)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                {PERIODS.map(p => (
+                  <button key={p} onClick={() => setPrefPeriod(prefPeriod === p ? '' : p)} style={{
+                    padding: '7px 14px', borderRadius: 999, fontSize: 'var(--font-sm)', cursor: 'pointer',
+                    fontFamily: 'Poppins, sans-serif',
+                    border: '1.5px solid', borderColor: prefPeriod === p ? 'var(--eira-ocean)' : 'var(--border)',
+                    background: prefPeriod === p ? 'var(--primary-lt)' : 'var(--surface)',
+                    color: prefPeriod === p ? 'var(--eira-ocean)' : 'var(--text)',
+                    fontWeight: prefPeriod === p ? 600 : 400,
+                  }}>{p}</button>
+                ))}
+              </div>
+              <div className="field" style={{ marginBottom: 14 }}>
+                <label>Nota (opcional)</label>
+                <input value={prefNote} onChange={e => setPrefNote(e.target.value)} placeholder="Ex: só depois das 17h30" />
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowRequestForm(false)}>Cancelar</button>
+                <button className="btn btn-primary btn-sm" disabled={requesting} onClick={requestAppointment}>
+                  {requesting ? <span className="spinner" /> : 'Enviar pedido'}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}

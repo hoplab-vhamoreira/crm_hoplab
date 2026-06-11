@@ -22,7 +22,7 @@ export function PatientDetailPage() {
   const [streak, setStreak] = useState<Streak | null>(null)
   const [consents, setConsents] = useState<Consent[]>([])
   const [appts, setAppts] = useState<Appt[]>([])
-  const [pendingRequests, setPendingRequests] = useState<{ id: string; created_at: string }[]>([])
+  const [pendingRequests, setPendingRequests] = useState<{ id: string; created_at: string; message: string | null }[]>([])
   const [newAppt, setNewAppt] = useState<{ starts_at: string; kind: 'presencial' | 'online'; location: string } | null>(null)
   const [savingAppt, setSavingAppt] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -37,7 +37,7 @@ export function PatientDetailPage() {
       tfFrom('streaks').select('*').eq('patient_id', patientId!).single(),
       tfFrom('consents').select('*').eq('user_id', patientId!).order('granted_at', { ascending: false }),
       tfFrom('appointments').select('id, kind, starts_at, location_or_link, status').eq('patient_id', patientId!).gte('starts_at', new Date(Date.now() - 86400000).toISOString()).order('starts_at'),
-      tfFrom('appointment_requests').select('id, created_at').eq('patient_id', patientId!).eq('status', 'pendente'),
+      tfFrom('appointment_requests').select('id, created_at, message').eq('patient_id', patientId!).eq('status', 'pendente'),
     ])
     setPatient(p.data); setPlans(pl.data ?? []); setStreak(st.data); setConsents(co.data ?? [])
     setAppts((ap.data ?? []) as Appt[]); setPendingRequests(rq.data ?? [])
@@ -136,9 +136,16 @@ export function PatientDetailPage() {
         </div>
 
         {pendingRequests.length > 0 && (
-          <div style={{ background: 'var(--primary-lt)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 12, fontSize: 'var(--font-sm)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Icon name="calendar" size={15} style={{ color: 'var(--eira-ocean)', flexShrink: 0 }} />
-            O utente pediu uma consulta ({new Date(pendingRequests[0].created_at).toLocaleDateString('pt-PT')}). Marque uma data para aceitar.
+          <div style={{ background: 'var(--primary-lt)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 12, fontSize: 'var(--font-sm)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="calendar" size={15} style={{ color: 'var(--eira-ocean)', flexShrink: 0 }} />
+              O utente pediu uma consulta ({new Date(pendingRequests[0].created_at).toLocaleDateString('pt-PT')}). Marque uma data para aceitar.
+            </div>
+            {pendingRequests[0].message && (
+              <div style={{ marginTop: 6, paddingLeft: 23, fontWeight: 600, color: 'var(--eira-ocean)' }}>
+                Preferência do utente: {pendingRequests[0].message}
+              </div>
+            )}
           </div>
         )}
 
@@ -159,8 +166,21 @@ export function PatientDetailPage() {
             </div>
             <div className="field" style={{ marginTop: 10, marginBottom: 10 }}>
               <label>{newAppt.kind === 'online' ? 'Link da chamada' : 'Local'}</label>
-              <input value={newAppt.location} onChange={e => setNewAppt(v => ({ ...v!, location: e.target.value }))}
-                placeholder={newAppt.kind === 'online' ? 'https://…' : 'Ex: Clínica X, Gabinete 2'} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={newAppt.location} onChange={e => setNewAppt(v => ({ ...v!, location: e.target.value }))}
+                  placeholder={newAppt.kind === 'online' ? 'https://…' : 'Ex: Clínica X, Gabinete 2'} style={{ flex: 1 }} />
+                {newAppt.kind === 'online' && (
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                    onClick={() => setNewAppt(v => ({ ...v!, location: `https://meet.jit.si/eira-${crypto.randomUUID().slice(0, 12)}` }))}>
+                    <Icon name="video" size={14} /> Gerar link
+                  </button>
+                )}
+              </div>
+              {newAppt.kind === 'online' && (
+                <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 6, marginBottom: 0 }}>
+                  "Gerar link" cria uma sala Jitsi Meet (gratuito, open-source, sem conta). O utente entra com um clique.
+                </p>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn btn-ghost btn-sm" onClick={() => setNewAppt(null)}>Cancelar</button>
