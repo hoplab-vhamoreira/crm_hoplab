@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { tfFrom } from '../lib/supabase'
 import { useAuth } from '../context/auth'
 import { logAudit } from '../lib/audit'
+import { Icon } from '../components/Icon'
 import type { TreatmentPlan, Exercise, PlanExercise } from '@tf/types'
 
 interface DraftExercise {
@@ -17,26 +18,48 @@ interface DraftExercise {
   sort_order: number
 }
 
+interface PlanTemplate {
+  id: string
+  name: string
+  total_weeks: number
+  notes: string | null
+  exercises: Omit<DraftExercise, 'tempId' | 'exercise'>[]
+  created_at: string
+}
+
 export function PlanBuilderPage() {
   const { patientId, planId } = useParams<{ patientId: string; planId?: string }>()
   const { profile } = useAuth()
   const nav = useNavigate()
 
-  const [title, setTitle] = useState('')
+  const [title, setTitle]           = useState('')
   const [totalWeeks, setTotalWeeks] = useState(6)
-  const [startsOn, setStartsOn] = useState(new Date().toISOString().slice(0, 10))
-  const [notes, setNotes] = useState('')
-  const [exercises, setExercises] = useState<DraftExercise[]>([])
-  const [library, setLibrary] = useState<Exercise[]>([])
+  const [startsOn, setStartsOn]     = useState(new Date().toISOString().slice(0, 10))
+  const [notes, setNotes]           = useState('')
+  const [exercises, setExercises]   = useState<DraftExercise[]>([])
+  const [library, setLibrary]       = useState<Exercise[]>([])
   const [selectedWeek, setSelectedWeek] = useState(1)
-  const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [saving, setSaving]         = useState(false)
+  const [loading, setLoading]       = useState(true)
+
+  // Templates
+  const [templates, setTemplates]         = useState<PlanTemplate[]>([])
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
+  const [templateName, setTemplateName]   = useState('')
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [templateSaved, setTemplateSaved] = useState(false)
 
   useEffect(() => { if (profile?.id) init() }, [profile?.id])
 
   async function init() {
     const { data: lib } = await tfFrom('exercises').select('*').eq('therapist_id', profile!.id)
     setLibrary(lib ?? [])
+
+    // Carregar templates existentes
+    const { data: tmpl } = await tfFrom('plan_templates')
+      .select('*').eq('therapist_id', profile!.id).order('created_at', { ascending: false })
+    setTemplates((tmpl ?? []) as PlanTemplate[])
 
     if (planId) {
       const { data: plan } = await tfFrom('treatment_plans').select('*').eq('id', planId).single()
@@ -68,6 +91,62 @@ export function PlanBuilderPage() {
 
   function removeDraft(tempId: string) {
     setExercises(prev => prev.filter(d => d.tempId !== tempId))
+  }
+
+  // Guardar plano actual como template
+  async function saveAsTemplate() {
+    if (!templateName.trim()) return
+    setSavingTemplate(true)
+    await tfFrom('plan_templates').insert({
+      therapist_id: profile!.id,
+      name: templateName.trim(),
+      total_weeks: totalWeeks,
+      notes: notes || null,
+      exercises: exercises.map(d => ({
+        exercise_id: d.exercise_id,
+        week_number: d.week_number,
+        sets: d.sets,
+        reps: d.reps,
+        duration_seconds: d.duration_seconds,
+        therapist_notes: d.therapist_notes,
+        sort_order: d.sort_order,
+      })),
+    })
+    await logAudit('template.created', 'plan_templates')
+    // Actualizar lista local
+    const { data: tmpl } = await tfFrom('plan_templates')
+      .select('*').eq('therapist_id', profile!.id).order('created_at', { ascending: false })
+    setTemplates((tmpl ?? []) as PlanTemplate[])
+    setSavingTemplate(false)
+    setTemplateSaved(true)
+    setTimeout(() => { setShowSaveTemplate(false); setTemplateName(''); setTemplateSaved(false) }, 1500)
+  }
+
+  // Carregar template para o plano actual
+  function loadTemplate(tmpl: PlanTemplate) {
+    setTotalWeeks(tmpl.total_weeks)
+    setNotes(tmpl.notes ?? '')
+    // Reconstrói rascunhos com referências da biblioteca
+    const libMap = new Map(library.map(ex => [ex.id, ex]))
+    setExercises(tmpl.exercises.map((e, i) => ({
+      tempId: crypto.randomUUID(),
+      exercise_id: e.exercise_id,
+      exercise: libMap.get(e.exercise_id),
+      week_number: e.week_number,
+      sets: e.sets,
+      reps: e.reps,
+      duration_seconds: e.duration_seconds,
+      therapist_notes: e.therapist_notes ?? '',
+      sort_order: i,
+    })))
+    setSelectedWeek(1)
+    setShowTemplates(false)
+  }
+
+  async function deleteTemplate(id: string) {
+    if (!confirm('Eliminar template?')) return
+    await tfFrom('plan_templates').delete().eq('id', id)
+    setTemplates(prev => prev.filter(t => t.id !== id))
   }
 
   async function save() {
@@ -108,33 +187,135 @@ export function PlanBuilderPage() {
 
   return (
     <div>
-      <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }} onClick={() => nav(`/patients/${patientId}`)}>← Utente</button>
-      <h1 className="page-title">{planId ? 'Editar plano' : 'Novo plano'}</h1>
-      <p className="page-sub">Defina semanas e exercícios. O utente vê apenas o plano publicado.</p>
+      <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }} onClick={() => nav(`/patients/${patientId}`)}>
+        <Icon name="arrow-left" size={15} /> Utente
+      </button>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20 }}>
-        {/* Configuração */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4, gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="page-title">{planId ? 'Editar plano' : 'Novo plano'}</h1>
+          <p className="page-sub">Defina semanas e exercícios. O utente vê apenas o plano publicado.</p>
+        </div>
+        {/* Acções de template */}
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowTemplates(true)} style={{ gap: 6 }}>
+            <Icon name="book" size={15} /> Carregar template
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => { setShowSaveTemplate(true); setTemplateName(title || '') }} style={{ gap: 6 }}>
+            <Icon name="star" size={15} /> Guardar como template
+          </button>
+        </div>
+      </div>
+
+      {/* ── Modal: carregar template ──────────────────────────────── */}
+      {showTemplates && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div className="card" style={{ width: '100%', maxWidth: 480, padding: 28, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 'var(--font-xl)' }}>Templates guardados</h2>
+              <button className="btn btn-ghost btn-sm" style={{ padding: '6px 8px' }} onClick={() => setShowTemplates(false)}>
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+
+            {templates.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-2)' }}>
+                <Icon name="book" size={36} style={{ marginBottom: 10, color: 'var(--eira-mist)' }} />
+                <p>Sem templates ainda.<br />Crie um guardando o plano actual.</p>
+              </div>
+            ) : (
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {templates.map(t => (
+                  <div key={t.id} style={{ padding: '14px 0', borderBottom: 'var(--hairline)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600 }}>{t.name}</div>
+                      <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 2 }}>
+                        {t.total_weeks} semanas · {(t.exercises as any[]).length} exercícios
+                        {' · '}{new Date(t.created_at).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                    </div>
+                    <button className="btn btn-primary btn-sm" onClick={() => loadTemplate(t)}>Carregar</button>
+                    <button className="btn btn-ghost btn-sm" style={{ padding: '6px 8px', color: 'var(--eira-danger)', borderColor: 'var(--eira-danger)' }} onClick={() => deleteTemplate(t.id)}>
+                      <Icon name="trash" size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p style={{ fontSize: 'var(--font-xs)', color: 'var(--text-2)', marginTop: 16, fontStyle: 'italic' }}>
+              Carregar um template substitui semanas e exercícios actuais. O título e a data de início mantêm-se.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: guardar como template ─────────────────────────── */}
+      {showSaveTemplate && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div className="card" style={{ width: '100%', maxWidth: 400, padding: 28 }}>
+            <h2 style={{ margin: '0 0 8px', fontSize: 'var(--font-xl)' }}>Guardar como template</h2>
+            <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)', marginBottom: 20 }}>
+              Guarda este plano ({exercises.length} exercícios, {totalWeeks} semanas) como template reutilizável para outros utentes.
+            </p>
+
+            {templateSaved ? (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--success-lt)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+                  <Icon name="check" size={26} style={{ color: 'var(--success)' }} />
+                </div>
+                <div style={{ fontWeight: 600, color: 'var(--success)' }}>Template guardado!</div>
+              </div>
+            ) : (
+              <>
+                <div className="field">
+                  <label>Nome do template *</label>
+                  <input
+                    value={templateName}
+                    onChange={e => setTemplateName(e.target.value)}
+                    placeholder="Ex: Disfonia — Plano inicial 6 semanas"
+                    autoFocus
+                    onKeyDown={e => e.key === 'Enter' && saveAsTemplate()}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => { setShowSaveTemplate(false); setTemplateName('') }}>Cancelar</button>
+                  <button className="btn btn-primary" style={{ flex: 1 }} disabled={!templateName.trim() || savingTemplate} onClick={saveAsTemplate}>
+                    {savingTemplate ? <span className="spinner" /> : <><Icon name="star" size={15} /> Guardar</>}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,2fr)', gap: 20 }}>
+        {/* Configuração + biblioteca */}
         <div>
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="section-title">Configuração</div>
             <div className="field"><label>Título do plano *</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: Plano inicial 6 semanas" /></div>
-            <div className="field"><label>Nº de semanas</label><input type="number" min={1} max={52} value={totalWeeks} onChange={e => setTotalWeeks(+e.target.value)} /></div>
-            <div className="field"><label>Início</label><input type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} /></div>
-            <div className="field"><label>Notas para o utente</label><textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Instruções gerais (não é avaliação clínica)" /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="field"><label>Semanas</label><input type="number" min={1} max={52} value={totalWeeks} onChange={e => setTotalWeeks(+e.target.value)} /></div>
+              <div className="field"><label>Início</label><input type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} /></div>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}><label>Notas para o utente</label><textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Instruções gerais" /></div>
           </div>
 
-          {/* Biblioteca */}
           <div className="card">
-            <div className="section-title">Biblioteca — adicionar à semana {selectedWeek}</div>
+            <div className="section-title">Biblioteca — semana {selectedWeek}</div>
             <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-              {library.length === 0 && <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)' }}>Sem exercícios. Crie primeiro na Biblioteca.</p>}
+              {library.length === 0 && <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)' }}>Sem exercícios. Crie na Biblioteca.</p>}
               {library.map(ex => (
-                <div key={ex.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <div key={ex.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: 'var(--hairline)' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 'var(--font-sm)' }}>{ex.title}</div>
                     <span className="badge badge-blue">{ex.clinical_area}</span>
                   </div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => addExercise(ex)}>+</button>
+                  <button className="btn btn-ghost btn-sm" style={{ padding: '5px 8px' }} onClick={() => addExercise(ex)}>
+                    <Icon name="plus" size={15} />
+                  </button>
                 </div>
               ))}
             </div>
@@ -143,23 +324,34 @@ export function PlanBuilderPage() {
 
         {/* Semanas */}
         <div className="card">
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
             {weeks.map(w => (
               <button key={w} className={`btn btn-sm ${selectedWeek === w ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setSelectedWeek(w)}>
-                S{w} <span style={{ fontSize: 10, marginLeft: 2 }}>({exercises.filter(e => e.week_number === w).length})</span>
+                S{w}
+                {exercises.filter(e => e.week_number === w).length > 0 && (
+                  <span style={{ fontSize: 10, marginLeft: 2, opacity: .75 }}>({exercises.filter(e => e.week_number === w).length})</span>
+                )}
               </button>
             ))}
           </div>
 
           <div className="section-title">Semana {selectedWeek}</div>
 
-          {weekExercises.length === 0 && <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)' }}>Sem exercícios para esta semana. Adicione da biblioteca →</p>}
+          {weekExercises.length === 0 && (
+            <p style={{ color: 'var(--text-2)', fontSize: 'var(--font-sm)', padding: '12px 0' }}>
+              Sem exercícios para esta semana. Adicione da biblioteca.
+            </p>
+          )}
 
           {weekExercises.map(d => (
-            <div key={d.tempId} style={{ background: 'var(--bg)', borderRadius: 'var(--radius-sm)', padding: 14, marginBottom: 10, border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontWeight: 600 }}>{d.exercise?.title}</span>
-                <button className="btn btn-danger btn-sm" onClick={() => removeDraft(d.tempId)}>✕</button>
+            <div key={d.tempId} style={{ background: 'var(--bg)', borderRadius: 'var(--radius-sm)', padding: 14, marginBottom: 10, border: 'var(--hairline)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <span style={{ fontWeight: 600, fontSize: 'var(--font-sm)' }}>
+                  {d.exercise?.title ?? <span style={{ color: 'var(--text-2)', fontStyle: 'italic' }}>Exercício removido da biblioteca</span>}
+                </span>
+                <button className="btn btn-danger btn-sm" style={{ padding: '4px 8px' }} onClick={() => removeDraft(d.tempId)}>
+                  <Icon name="close" size={14} />
+                </button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 <div className="field" style={{ margin: 0 }}>
@@ -177,7 +369,7 @@ export function PlanBuilderPage() {
               </div>
               <div className="field" style={{ marginTop: 8, marginBottom: 0 }}>
                 <label>Nota para o utente</label>
-                <input value={d.therapist_notes} onChange={e => updateDraft(d.tempId, { therapist_notes: e.target.value })} placeholder="Instrução específica (não é feedback clínico)" />
+                <input value={d.therapist_notes} onChange={e => updateDraft(d.tempId, { therapist_notes: e.target.value })} placeholder="Instrução específica" />
               </div>
             </div>
           ))}
@@ -186,8 +378,17 @@ export function PlanBuilderPage() {
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
         <button className="btn btn-ghost" onClick={() => nav(`/patients/${patientId}`)}>Cancelar</button>
-        <button className="btn btn-primary" disabled={saving} onClick={save}>{saving ? <span className="spinner" /> : 'Guardar plano'}</button>
+        <button className="btn btn-primary" disabled={saving} onClick={save}>
+          {saving ? <span className="spinner" /> : <><Icon name="check" size={16} /> Guardar plano</>}
+        </button>
       </div>
+
+      {/* Responsivo mobile: stack columns */}
+      <style>{`
+        @media (max-width: 768px) {
+          .plan-builder-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   )
 }

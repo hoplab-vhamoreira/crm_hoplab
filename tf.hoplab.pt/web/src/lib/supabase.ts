@@ -28,6 +28,7 @@ const T: Record<string, string> = {
   'push_tokens':             'tf_push_tokens',
   'appointments':            'tf_appointments',
   'appointment_requests':    'tf_appt_requests',
+  'plan_templates':          'tf_plan_templates',
 }
 
 /** Substituição de supabase.schema('tf').from(table) */
