@@ -9,6 +9,7 @@ import { useAuth } from '../../context/auth'
 import { Icon } from '../../components/Icon'
 import { VideoCall } from '../../components/VideoCall'
 import { Fox, Confetti } from '../../components/Fox'
+import { ExplorationMap, MedalGrid, MILESTONES } from '../../components/ExplorationMap'
 
 interface TodayItem {
   plan_exercise_id: string
@@ -39,6 +40,8 @@ export function PatientHomePage() {
   const [showRequestForm, setShowRequestForm] = useState(false)
   const [callUrl, setCallUrl] = useState<string | null>(null)
   const [showParents, setShowParents] = useState(false)
+  const [showMedals, setShowMedals] = useState(false)
+  const [trailPos, setTrailPos] = useState(0)
   const [ttsOn, setTtsOn] = useState(() => localStorage.getItem('eira-tts') !== 'off')
   const [speaking, setSpeaking] = useState(false)
   const [prefDays, setPrefDays]       = useState<Set<string>>(new Set())
@@ -87,6 +90,13 @@ export function PatientHomePage() {
 
     const { data: s } = await tfFrom('streaks').select('current_streak, longest_streak').eq('patient_id', profile!.id).maybeSingle()
     setStreak(s ?? null)
+
+    // Mundo de Exploração (Aventura): posição = nº de dias com ≥1 exercício concluído.
+    // Lê apenas datas — nunca self_rating nem qualidade (compliance §14.3).
+    if (profile!.ui_variant === 'adventure') {
+      const { data: sess } = await tfFrom('adherence_logs').select('session_date').eq('patient_id', profile!.id)
+      setTrailPos(new Set((sess ?? []).map((x: any) => x.session_date)).size)
+    }
 
     const { data: fb } = await tfFrom('video_submissions')
       .select('id, therapist_feedback, reviewed_at').eq('patient_id', profile!.id).eq('status', 'reviewed')
@@ -326,6 +336,31 @@ export function PatientHomePage() {
         </div>
       )}
 
+      {/* Mundo de Exploração — só Aventura */}
+      {isAdventure && (
+        <>
+          <ExplorationMap position={trailPos} foxMood={doneCount === totalCount && totalCount > 0 ? 'cheer' : 'happy'} />
+          <div style={{ marginBottom: 20 }}>
+            <button
+              onClick={() => setShowMedals(v => !v)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                background: 'var(--surface)', border: 'var(--hairline)', borderRadius: 'var(--radius)',
+                padding: '12px 16px', cursor: 'pointer', fontFamily: 'Poppins, sans-serif',
+                fontSize: 'var(--font-sm)', fontWeight: 600, color: 'var(--text)',
+              }}
+            >
+              <Icon name="star" size={16} style={{ color: 'var(--eira-sun)' }} fill />
+              Prémios ({MILESTONES.filter(m => trailPos >= m.at).length}/{MILESTONES.length})
+              <span style={{ marginLeft: 'auto', transform: showMedals ? 'rotate(90deg)' : 'none', transition: 'transform .15s', display: 'inline-flex' }}>
+                <Icon name="chevron-right" size={16} style={{ color: 'var(--text-2)' }} />
+              </span>
+            </button>
+            {showMedals && <div style={{ marginTop: 12 }}><MedalGrid position={trailPos} /></div>}
+          </div>
+        </>
+      )}
+
       {/* Streak — na Calma é reforço verbal gentil, sem pontos nem fogo */}
       {streak && streak.current_streak > 0 && (
         isCalm ? (
@@ -443,8 +478,14 @@ export function PatientHomePage() {
               ))}
             </div>
             <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-2)', marginTop: 8, marginBottom: 0 }}>
-              Ganhaste {totalCount} estrela{totalCount > 1 ? 's' : ''} hoje. Até amanhã!
+              Ganhaste {totalCount} estrela{totalCount > 1 ? 's' : ''} hoje — o Raposo avançou uma casa no mapa!
             </p>
+            {MILESTONES.find(m => m.at === trailPos) && (
+              <div style={{ marginTop: 10, fontWeight: 700, color: 'var(--eira-ocean)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <Icon name="star" size={18} style={{ color: 'var(--eira-sun)' }} fill />
+                Nova medalha: {MILESTONES.find(m => m.at === trailPos)!.name}!
+              </div>
+            )}
           </div>
         ) : (
           <div className="card" style={{ textAlign: 'center', padding: 24, marginTop: 20, background: 'var(--success-lt)', border: '1.5px solid var(--success)' }}>

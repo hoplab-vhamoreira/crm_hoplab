@@ -2,9 +2,9 @@
  * Raposo — mascote da variante Aventura (criança).
  * SVG próprio com animação subtil; sem dependências externas.
  */
-export function Fox({ size = 96, mood = 'happy' }: { size?: number; mood?: 'happy' | 'cheer' }) {
+export function Fox({ size = 96, mood = 'happy', style }: { size?: number; mood?: 'happy' | 'cheer'; style?: React.CSSProperties }) {
   return (
-    <div style={{ width: size, height: size, display: 'inline-block', animation: mood === 'cheer' ? 'fox-bounce .6s ease infinite alternate' : 'fox-sway 3s ease-in-out infinite' }}>
+    <div style={{ width: size, height: size, display: 'inline-block', animation: mood === 'cheer' ? 'fox-bounce .6s ease infinite alternate' : 'fox-sway 3s ease-in-out infinite', ...style }}>
       <svg viewBox="0 0 120 120" width={size} height={size} aria-label="Raposo, a mascote">
         {/* orelhas */}
         <polygon points="22,38 36,8 48,34" fill="#E8833A" />
